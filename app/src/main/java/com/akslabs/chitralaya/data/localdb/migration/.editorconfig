@@ -1,0 +1,5 @@
+[*.{kt,kts)}]
+ktlint_standard_class-naming = disabled
+
+
+

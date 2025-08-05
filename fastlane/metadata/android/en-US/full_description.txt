@@ -1,0 +1,1 @@
+<p><i>Whitehole</i> allows you to use a Telegram group as a space to manage your photos.</p><p><br><b>Features:</b></><ul><li>Create and control backups</li><li>Complete customizability</li><li>Automatic periodic sync</li><li>Material Design 3 (You)</li><li>Entirely Open Source</li></ul>

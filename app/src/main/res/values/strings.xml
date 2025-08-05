@@ -1,0 +1,109 @@
+<resources>
+    <!-- Non translatable -->
+    <string name="app_name" translatable="false">CloudGallery</string>
+    <string name="upload_single" translatable="false">upload-single</string>
+    <string name="enabled_periodic_backup" translatable="false">enabled-periodic-backup</string>
+    <string name="disabled_periodic_backup" translatable="false">disabled-periodic-backup</string>
+    <string name="restore_all" translatable="false">restore-all</string>
+    <string name="import_db" translatable="false">import-db</string>
+    <string name="export_db" translatable="false">export-db</string>
+    <string name="enabled_periodic_db_export" translatable="false">enabled-periodic-db-export</string>
+    <string name="disabled_periodic_db_export" translatable="false">disabled-periodic-db-export</string>
+
+    <!-- Translatable -->
+    <string name="export_successful">Export successful!</string>
+    <string name="import_successful">Import successful!</string>
+    <string name="connectivity_status_background_color">connectivity status background color</string>
+    <string name="connectivity_status_content_color">connectivity status content color</string>
+    <string name="no_internet_connection">No Internet Connection!</string>
+    <string name="back_online">Back Online!</string>
+    <string name="connectivity_icon">Connectivity Icon</string>
+    <string name="checking_backup_status">Checking Backup Status</string>
+    <string name="uploading">Uploading</string>
+    <string name="backed_up">Backed Up</string>
+    <string name="backup_to_cloud">Backup to Cloud</string>
+    <string name="upload_failed">Upload failed</string>
+    <string name="upload_enqueued">Upload enqueued</string>
+    <string name="upload_blocked">Upload blocked</string>
+    <string name="icon">icon</string>
+    <string name="theme_switch">Theme Switch</string>
+    <string name="oops_looks_like_there_s_no_internet_connection">"Oops, looks like there's no Internet connection. "</string>
+    <string name="please_check_your_connection_and_try_again">Please check your connection and try again.</string>
+    <string name="retry">Retry</string>
+    <string name="photo">photo</string>
+    <string name="load_error">load error</string>
+    <string name="backgroundalpha">backgroundAlpha</string>
+    <string name="error">error</string>
+    <string name="app">App</string>
+    <string name="version">Version</string>
+    <string name="source_code">Source Code</string>
+    <string name="license">License</string>
+    <string name="contributors">Contributors</string>
+    <string name="see_on_github">See on GitHub</string>
+    <string name="on_device">On Device</string>
+    <string name="not_on_device">Not On Device</string>
+    <string name="cloud_photos">Cloud Photos</string>
+    <string name="remote_photo_grid">remote-photo-grid</string>
+    <string name="periodic_database_export_enabled">Periodic database export enabled.</string>
+    <string name="auto_periodic_backup">Auto periodic backup</string>
+    <string name="periodic_backup_enabled">Periodic backup enabled.</string>
+    <string name="periodic_backup_cancelled">Periodic backup cancelled.</string>
+    <string name="backup_network_type">Backup network type</string>
+    <string name="backup_interval">Backup interval</string>
+    <string name="restore_all_from_cloud">Restore all from cloud</string>
+    <string name="photos_not_found_on_this_device">%1$s photos not found on this device</string>
+    <string name="restoring_task_enqueued_in_the_background">Restoring task enqueued in the background.</string>
+    <string name="import_export"><![CDATA[Import & Export]]></string>
+    <string name="import_database">Import database</string>
+    <string name="export_database">Export database</string>
+    <string name="CloudGallery_photos_backup_json">CloudGallery_photos_backup.json</string>
+    <string name="auto_export_database">Auto export database</string>
+    <string name="CloudGallery_auto_photos_backup_json">CloudGallery_auto_photos_backup.json</string>
+    <string name="periodic_database_export_cancelled">Periodic database export cancelled.</string>
+    <string name="auto_export_interval">Auto export interval</string>
+    <string name="menu_icon">Menu icon</string>
+    <string name="syncing_your_photos">Syncing photos</string>
+    <string name="onboarding_visibility">onboarding-visibility</string>
+    <string name="supporttext">SupportText</string>
+    <string name="recommended_to_only_copy_paste_to_avoid_error">Simple copy and paste to avoid error.</string>
+    <string name="token_cannot_be_empty">Token cannot be empty.</string>
+    <string name="bot_token">Enter bot token</string>
+    <string name="proceed">Proceed</string>
+    <string name="app_icon">app_icon</string>
+    <string name="got_it">Got It</string>
+    <string name="getting_started">Getting Started</string>
+    <string name="_1_visit_botfather_on_telegram">1. Visit BotFather on Telegram.</string>
+    <string name="_2_create_a_new_bot">2. Create a new bot.</string>
+    <string name="_3_get_the_bot_token_from_botfather">3. Get the bot token from BotFather.</string>
+    <string name="_4_paste_the_token_here">4. Paste the token here.</string>
+    <string name="_5_click_on_proceed">5. Click on Proceed.</string>
+    <string name="main">main</string>
+    <string name="just_a_few_more">Just a bit more</string>
+    <string name="_1_create_a_private_group_on_telegram">1. Create a private group on Telegram.</string>
+    <string name="_2_add_the_bot_to_the_group">2. Add the bot to the group.</string>
+    <string name="_3_type_start_in_the_group">3. Type \"/start\" in the group.</string>
+    <string name="_4_copy_and_paste_the_unique_id_here">4. Copy and paste the unique id here.</string>
+    <string name="invalid_uid_or_token">Invalid UID or token.</string>
+    <string name="unique_id_start_in_gc">Enter unique id</string>
+    <string name="download_CloudGallery">Download/CloudGallery</string>
+    <string name="CloudGallery">CloudGallery_%1$s.%2$s</string>
+    <string name="photo_upload_successful">Photo upload successful!</string>
+    <string name="uploading_photo">Uploading photo</string>
+    <string name="exporting_database">Exporting database</string>
+    <string name="backing_up_photos">Backing up photos</string>
+    <string name="syncing_all_photos">Syncing all photos</string>
+    <string name="permissions_required">Permissions Required</string>
+    <string name="this_app_requires_permission_to_photos_and_notifications">"This app requires permission to photos and notifications "</string>
+    <string name="to_work_as_intended_please_grant_the_permissions_to_continue">to work as intended. Please grant the permissions to continue.</string>
+    <string name="grant_permissions">Grant Permissions</string>
+    <string name="grant_permission">Grant permission</string>
+    <string name="ok">OK</string>
+    <string name="permission_required">Permission required</string>
+    <string name="can_be_ve_or_ve_e_g_1234567890_do_not_ignore_the_sign">Can be +ve or -ve. (e.g. -1234567890) \nDo not ignore the \'-\' sign.</string>
+    <string name="photos">%1$s photos</string>
+    <string name="next">Next</string>
+    <string name="this_app_uses_your_telegram_bot..">"This app uses your Telegram bot to manage your photos, keeping you in charge of your data and privacy. "</string>
+    <string name="your_bot_is_responsible_for_all..">"Your bot is responsible for all operations(upload, download etc.) to and from Telegram and this app is just a "</string>
+    <string name="client_to_interact_with_the_bot..">"client to interact with the bot. This app is not meant to and does not endorse spam or any other malicious activities. "</string>
+    <string name="please_use_it_at_your_own_responsibility..">Please use it at your own responsibility. By using this app, you agree to the aforementioned terms and conditions.</string>
+</resources>

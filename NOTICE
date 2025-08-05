@@ -1,0 +1,28 @@
+CloudGallery - Photo Backup and Management App
+===========================================
+
+Copyright 2024 CloudGallery Developer
+
+ORIGINAL WORK ATTRIBUTION:
+--------------------------
+This software is based on the original Chitralaya project:
+- Original repository: https://github.com/AKS-Labs/Chitralaya
+- Original copyright: 2024 AKS-Labs contributors
+- Original license: Apache License, Version 2.0
+
+DERIVATIVE WORK:
+---------------
+CloudGallery includes significant enhancements and new features:
+- Complete privacy overhaul with telemetry removal
+- Modern UI redesign with Material Design 3
+- Settings page redesign and functionality improvements
+- Photo grid customization with rounded corners
+- Enhanced documentation and build system improvements
+
+LICENSE:
+--------
+This work is licensed under the Apache License, Version 2.0.
+You may obtain a copy of the License at:
+http://www.apache.org/licenses/LICENSE-2.0
+
+For the full license text, see the LICENSE file.
