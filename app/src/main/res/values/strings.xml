@@ -106,4 +106,65 @@
     <string name="your_bot_is_responsible_for_all..">"Your bot is responsible for all operations(upload, download etc.) to and from Telegram and this app is just a "</string>
     <string name="client_to_interact_with_the_bot..">"client to interact with the bot. This app is not meant to and does not endorse spam or any other malicious activities. "</string>
     <string name="please_use_it_at_your_own_responsibility..">Please use it at your own responsibility. By using this app, you agree to the aforementioned terms and conditions.</string>
+
+    <!-- Enhanced Disclaimer Screen -->
+    <string name="disclaimer_title">Welcome to CloudGallery</string>
+    <string name="disclaimer_subtitle">Your Privacy-First Photo Backup Solution</string>
+    <string name="i_acknowledge">I Acknowledge</string>
+
+    <!-- Privacy Policy Section -->
+    <string name="privacy_policy_title">Privacy &amp; Data Handling</string>
+    <string name="privacy_policy_content">CloudGallery is designed with your privacy as the top priority:\n\n• No telemetry, analytics, or tracking\n• No third-party data sharing\n• Direct communication only with YOUR Telegram bot\n• All sensitive data encrypted locally using AES-256\n• You maintain complete control over your data\n• Open source and fully auditable</string>
+
+    <!-- User Responsibilities Section -->
+    <string name="user_responsibilities_title">Your Responsibilities</string>
+    <string name="user_responsibilities_content">By using CloudGallery, you acknowledge:\n\n• You are responsible for creating and managing your Telegram bot\n• You must secure your bot token and keep it confidential\n• You understand Telegram\'s terms of service apply to your bot usage\n• You will not use this app for spam or malicious activities\n• You are responsible for backing up your bot configuration</string>
+
+    <!-- App Limitations Section -->
+    <string name="app_limitations_title">App Limitations</string>
+    <string name="app_limitations_content">Please be aware of these technical limitations:\n\n• Telegram Bot API can only access messages from the last 24 hours\n• Historical photos older than 24 hours cannot be retrieved via Bot API\n• Upload speed depends on your internet connection and Telegram servers\n• Large files may take longer to process\n• Bot functionality depends on Telegram service availability</string>
+
+    <!-- Telegram Bot Requirements Section -->
+    <string name="telegram_requirements_title">Telegram Bot Requirements</string>
+    <string name="telegram_requirements_content">To use CloudGallery, you need:\n\n• A Telegram account\n• A bot created through @BotFather\n• A private group or channel for photo storage\n• Your bot added to the group with admin permissions\n• Basic understanding of Telegram bot setup process</string>
+
+    <!-- Terms of Use Section -->
+    <string name="terms_of_use_title">Terms of Use</string>
+    <string name="terms_of_use_content">This application is provided \"as is\" without warranty:\n\n• Use at your own risk and responsibility\n• The developers are not liable for data loss\n• You agree to comply with all applicable laws\n• You will not reverse engineer or modify the app\n• These terms may be updated with app updates</string>
+
+    <!-- Enhanced Getting Started Screen -->
+    <string name="getting_started_title">Let\'s Get Started</string>
+    <string name="getting_started_subtitle">Set up your Telegram bot in just a few steps</string>
+    <string name="bot_setup_instructions_title">How to Create Your Telegram Bot</string>
+    <string name="step_1_title">Step 1: Create Your Bot</string>
+    <string name="step_1_content">Open Telegram and search for @BotFather. Send /newbot and follow the prompts to create your bot. Choose a unique name and username for your bot.</string>
+    <string name="step_2_title">Step 2: Get Your Bot Token</string>
+    <string name="step_2_content">After creating your bot, @BotFather will provide you with a bot token. This token looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz. Copy this token carefully.</string>
+    <string name="step_3_title">Step 3: Create a Private Group</string>
+    <string name="step_3_content">Create a new private group in Telegram. Add your bot to this group and make it an admin. This group will store your photos securely.</string>
+    <string name="step_4_title">Step 4: Get Your Chat ID</string>
+    <string name="step_4_content">In your private group, type /start and send it. Your bot will respond with a number (like -1234567890). This is your Chat ID - copy it exactly, including the minus sign if present.</string>
+    <string name="bot_token_label">Bot Token</string>
+    <string name="bot_token_hint">Paste your bot token here</string>
+    <string name="chat_id_label">Chat ID</string>
+    <string name="chat_id_hint">Enter your group chat ID</string>
+    <string name="show_password">Show token</string>
+    <string name="hide_password">Hide token</string>
+    <string name="continue_button">Continue</string>
+    <string name="setup_complete">Setup Complete!</string>
+    <string name="welcome_message">Welcome to CloudGallery! Your bot is now configured and ready to backup your photos securely.</string>
+
+    <!-- Accessibility Content Descriptions -->
+    <string name="disclaimer_screen_content">Disclaimer and privacy information screen</string>
+    <string name="getting_started_screen_content">Bot setup and configuration screen</string>
+    <string name="app_logo_description">CloudGallery application logo</string>
+    <string name="step_indicator_description">Setup step %1$d of 4</string>
+    <string name="configuration_section_description">Bot configuration input section</string>
+    <string name="instructions_section_description">Step-by-step setup instructions</string>
+    <!-- Onboarding strings -->
+<!-- <string name="onboarding_visibility">Onboarding Visibility</string> -->
+<string name="please_check_your_internet_connection_and_try_again">Please check your internet connection and try again</string>
+<string name="connection_unstable">Connection Unstable</string>
+<string name="your_internet_connection_is_unstable">Your internet connection is unstable</string>
+<string name="connection_lost">Connection Lost</string>
 </resources>
