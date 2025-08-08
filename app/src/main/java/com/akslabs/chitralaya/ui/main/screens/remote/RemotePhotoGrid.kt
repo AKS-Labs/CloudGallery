@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
@@ -144,21 +147,38 @@ fun CloudPhotosGrid(
             else -> {
                 LazyVerticalGrid(
                     state = gridState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(2.dp),
-                    columns = GridCells.Fixed(columnCount),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    columns = GridCells.Fixed(4),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    itemsPaging(
-                        cloudPhotos,
-                        { it.remoteId }
-                    ) { remotePhoto, index ->
-                        CloudPhotoItem(
-                            remotePhoto = remotePhoto,
-                            onClick = { onPhotoClick(index) }
-                        )
+                    var lastHeader: String? = null
+                    for (i in 0 until cloudPhotos.itemCount) {
+                        val item = cloudPhotos.peek(i)
+                        val label = item?.uploadedAt?.let { ms ->
+                            java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(ms))
+                        }
+                        if (label != null && label != lastHeader) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(top = 8.dp)
+                                )
+                            }
+                            lastHeader = label
+                        }
+                        item(key = item?.remoteId ?: "rp_$i") {
+                            CloudPhotoItem(
+                                remotePhoto = item,
+                                onClick = { onPhotoClick(i) }
+                            )
+                        }
                     }
                 }
             }
@@ -187,7 +207,7 @@ fun CloudPhotoItem(
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable { onClick() },
         contentAlignment = Alignment.Center

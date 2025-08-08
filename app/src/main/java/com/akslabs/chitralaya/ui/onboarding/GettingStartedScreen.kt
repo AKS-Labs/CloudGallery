@@ -38,6 +38,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
+import com.akslabs.cloudgallery.api.TelegramRawApi
+import com.akslabs.cloudgallery.api.TelegramHttp
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.utils.connectivity.ConnectivityObserver
 import com.akslabs.cloudgallery.utils.connectivity.ConnectivityStatus
@@ -325,7 +327,18 @@ fun GettingStartedScreen(
                                 val id = chatId.toLongOrNull()
                                 if (id != null) {
                                     Log.i("GettingStartedScreen", "Validating chat ID: $id")
-                                    val canAccess = botApi.getChat(ChatId.fromId(id))
+                                    // Use raw Telegram API to avoid strict JSON parsing issues on pinned_message
+                                    val canAccess = try {
+                                        // First try very-lenient HTTP+JSONObject path
+                                        TelegramHttp.validateChat(id).takeIf { it } ?: run {
+                                            val api = TelegramRawApi.create()
+                                            val resp = api.getChat(id)
+                                            resp.ok && resp.result?.id == id
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.w("GettingStartedScreen", "Raw getChat failed, falling back to BotApi", e)
+                                        botApi.getChat(ChatId.fromId(id))
+                                    }
 
                                     if (canAccess) {
                                         Preferences.editEncrypted {

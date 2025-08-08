@@ -41,6 +41,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
+import com.akslabs.cloudgallery.api.TelegramRawApi
+import com.akslabs.cloudgallery.api.TelegramHttp
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.github.kotlintelegrambot.entities.ChatId
 
@@ -164,9 +166,18 @@ fun UidComponent(
                                     Log.i("UidComponent", "Parsed chat ID: $id (${if (id < 0) "group/channel" else "bot/user"})")
 
                                     // Check if bot can access the chat (works for both groups and direct chats)
-                                    Log.i("UidComponent", "Checking bot access to chat ID: $id")
-                                    val canAccess = botApi.getChat(ChatId.fromId(id))
-                                    Log.i("UidComponent", "Bot access result: $canAccess")
+                                    Log.i("UidComponent", "Checking access to chat ID: $id")
+                                    val canAccess = try {
+                                        TelegramHttp.validateChat(id).takeIf { it } ?: run {
+                                            val api = TelegramRawApi.create()
+                                            val resp = api.getChat(id)
+                                            resp.ok && resp.result?.id == id
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.w("UidComponent", "Raw getChat failed, falling back to BotApi", e)
+                                        botApi.getChat(ChatId.fromId(id))
+                                    }
+                                    Log.i("UidComponent", "Access result: $canAccess")
 
                                     if (canAccess) {
                                         // verification successful

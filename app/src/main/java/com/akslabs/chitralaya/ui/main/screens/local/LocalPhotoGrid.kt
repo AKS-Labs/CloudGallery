@@ -16,6 +16,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.ContentUris
+import android.provider.MediaStore
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BrokenImage
 import androidx.compose.material3.Icon
@@ -45,43 +52,78 @@ import com.akslabs.cloudgallery.ui.components.itemsPaging
 
 @Composable
 fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
+    val context = LocalContext.current
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
-    // Get dynamic column count from preferences
-    val columnCount = remember {
-        Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount)
+    // Fixed grid to match screenshot
+    val columns = 4
+    val horizontalSpacing = 12.dp
+    val verticalSpacing = 12.dp
+
+    // Cache date lookups
+    val dateCache = remember { mutableStateMapOf<String, Long>() }
+
+    fun getDateLabel(localId: String): String? {
+        val cached = dateCache[localId]
+        val millis = if (cached != null) cached else runCatching {
+            val idLong = localId.toLongOrNull() ?: return null
+            val uri = ContentUris.withAppendedId(
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL), idLong
+            )
+            context.contentResolver.query(
+                uri,
+                arrayOf(MediaStore.Images.ImageColumns.DATE_MODIFIED),
+                null,
+                null,
+                null
+            )?.use { c -> if (c.moveToFirst()) (c.getLong(0) * 1000L).also { dateCache[localId] = it } else null }
+        }.getOrNull()
+        millis ?: return null
+        return java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
     }
 
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
-            if (localPhotos.loadState.refresh == LoadState.Loading) {
-                LoadAnimation(modifier = Modifier.align(Alignment.Center))
-            } else {
-                LazyVerticalGrid(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(2.dp),
-                    columns = GridCells.Fixed(columnCount),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    itemsPaging(
-                        items = localPhotos,
-                        { it.localId }
-                    ) { localPhoto, index ->
+        if (localPhotos.loadState.refresh == LoadState.Loading) {
+            LoadAnimation(modifier = Modifier.align(Alignment.Center))
+        } else {
+            LazyVerticalGrid(
+                modifier = Modifier.fillMaxSize(),
+                columns = GridCells.Fixed(columns),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+                horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
+            ) {
+                var lastHeader: String? = null
+                for (i in 0 until localPhotos.itemCount) {
+                    val peek = localPhotos.peek(i)
+                    val label = peek?.localId?.let { getDateLabel(it) }
+                    if (label != null && label != lastHeader) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                            )
+                        }
+                        lastHeader = label
+                    }
+                    item(key = peek?.localId ?: "ph_$i") {
                         Box(
                             modifier = Modifier
                                 .aspectRatio(1f)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .clickable {
-                                    selectedIndex = index
-                                },
+                                .clickable { selectedIndex = i },
                             contentAlignment = Alignment.Center
                         ) {
                             SubcomposeAsyncImage(
-                                model = localPhoto?.pathUri,
+                                model = peek?.pathUri,
                                 contentDescription = stringResource(id = R.string.photo),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
@@ -89,11 +131,8 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                                     Icon(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         imageVector = Icons.Rounded.BrokenImage,
-                                        contentDescription = stringResource(
-                                            id = R.string.load_error
-                                        ),
-                                        modifier = Modifier
-                                            .size(20.dp)
+                                        contentDescription = stringResource(id = R.string.load_error),
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             )
@@ -101,14 +140,13 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                     }
                 }
             }
+        }
         selectedIndex?.let {
             PhotoPageView(
                 initialPage = it,
                 onlyRemotePhotos = false,
                 photos = localPhotos.itemSnapshotList.items
-            ) {
-                selectedIndex = null
-            }
+            ) { selectedIndex = null }
         }
     }
 }
