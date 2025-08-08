@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
@@ -162,7 +163,14 @@ class MainActivity : ComponentActivity() {
 
                 // Trigger an immediate one-time sync if this is a fresh install
                 // or if it's been a while since last sync
-                val lastSyncTime = Preferences.getLong("last_cloud_photo_sync_timestamp", 0L)
+                val lastSyncTime = try {
+                    Preferences.getLong("last_cloud_photo_sync_timestamp", 0L)
+                } catch (e: ClassCastException) {
+                    Log.w("MainActivity", "Invalid sync timestamp format, resetting to 0", e)
+                    // Clear the invalid value and set default
+                    Preferences.edit { remove("last_cloud_photo_sync_timestamp") }
+                    0L
+                }
                 val daysSinceLastSync = (System.currentTimeMillis() - lastSyncTime) / (1000 * 60 * 60 * 24)
 
                 if (lastSyncTime == 0L || daysSinceLastSync > 1) {

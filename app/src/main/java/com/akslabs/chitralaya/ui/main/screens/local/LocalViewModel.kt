@@ -1,6 +1,7 @@
 package com.akslabs.cloudgallery.ui.main.screens.local
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,15 +20,45 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class LocalViewModel : ViewModel() {
+
     val localPhotosFlow: Flow<PagingData<Photo>> =
         Pager(
-            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PREFETCH_DISTANCE, jumpThreshold = JUMP_THRESHOLD),
-            pagingSourceFactory = { DbHolder.database.photoDao().getAllPaging() }
+            config = PagingConfig(
+                pageSize = PAGE_SIZE,
+                prefetchDistance = PREFETCH_DISTANCE,
+                jumpThreshold = JUMP_THRESHOLD
+            ),
+            pagingSourceFactory = {
+                Log.d(TAG, "=== CREATING NEW LOCAL PAGING SOURCE ===")
+                Log.d(TAG, "PageSize: $PAGE_SIZE, PrefetchDistance: $PREFETCH_DISTANCE, JumpThreshold: $JUMP_THRESHOLD")
+                val pagingSource = DbHolder.database.photoDao().getAllPaging()
+                Log.d(TAG, "Local PagingSource created: ${pagingSource::class.simpleName}")
+                pagingSource
+            }
         ).flow.cachedIn(viewModelScope)
 
     val localPhotosCount: StateFlow<Int> =
         DbHolder.database.photoDao().getAllCountFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    init {
+        Log.e(TAG, "🚀 === LOCAL VIEW MODEL INITIALIZED ===")
+        debugDatabaseState()
+
+        // Monitor paging data changes
+        viewModelScope.launch {
+            localPhotosFlow.collect { pagingData ->
+                Log.e(TAG, "📄 New PagingData received in LocalViewModel")
+            }
+        }
+
+        // Monitor total count changes
+        viewModelScope.launch {
+            localPhotosCount.collect { count ->
+                Log.e(TAG, "📊 Local photos count updated: $count")
+            }
+        }
+    }
 
     fun uploadMultiplePhotos(uris: List<Uri>) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -37,7 +68,46 @@ class LocalViewModel : ViewModel() {
         }
     }
 
+    private fun debugDatabaseState() {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "=== LOCAL PHOTOS DATABASE DEBUG ===")
+
+                // Check Photo table
+                val allPhotos = DbHolder.database.photoDao().getAll()
+                Log.i(TAG, "Total Photo records in database: ${allPhotos.size}")
+
+                if (allPhotos.isEmpty()) {
+                    Log.w(TAG, "❌ NO Photo records found in database!")
+                } else {
+                    Log.i(TAG, "✅ Photo records found:")
+                    allPhotos.take(10).forEachIndexed { index, photo ->
+                        Log.d(TAG, "Photo[$index]: localId=${photo.localId}, pathUri=${photo.pathUri}, " +
+                                "remoteId=${photo.remoteId}, photoType=${photo.photoType}")
+                    }
+                    if (allPhotos.size > 10) {
+                        Log.d(TAG, "... and ${allPhotos.size - 10} more records")
+                    }
+
+                    // Test paging source directly
+                    Log.i(TAG, "Testing Local PagingSource directly...")
+                    val pagingSource = DbHolder.database.photoDao().getAllPaging()
+                    Log.d(TAG, "Local PagingSource created: ${pagingSource::class.simpleName}")
+                }
+
+                // Check total count flow
+                val totalCount = DbHolder.database.photoDao().getAllCountFlow()
+                Log.i(TAG, "Local total count flow created: ${totalCount::class.simpleName}")
+
+                Log.i(TAG, "=== END LOCAL PHOTOS DATABASE DEBUG ===")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error debugging local database state", e)
+            }
+        }
+    }
+
     companion object {
+        private const val TAG = "LocalViewModel"
         const val PAGE_SIZE = 32
         const val PREFETCH_DISTANCE = 5 * 32
         const val JUMP_THRESHOLD = 5 * 32

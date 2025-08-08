@@ -58,11 +58,13 @@ fun RemotePhotoGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
     totalCount: Int,
 ) {
+    Log.e(TAG, "🎯 === REMOTE PHOTO GRID COMPOSING ===")
     val context = LocalContext.current
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    var selectedPhoto by remember { mutableStateOf<RemotePhoto?>(null) }
 
-    // Debug logging for cloud photos data
-    LaunchedEffect(cloudPhotos.loadState, totalCount) {
+    // Comprehensive debug logging for cloud photos data
+    LaunchedEffect(cloudPhotos.loadState, totalCount, cloudPhotos.itemCount) {
         Log.d(TAG, "=== REMOTE PHOTO GRID DEBUG ===")
         Log.d(TAG, "Total count from ViewModel: $totalCount")
         Log.d(TAG, "CloudPhotos itemCount: ${cloudPhotos.itemCount}")
@@ -70,18 +72,45 @@ fun RemotePhotoGrid(
         Log.d(TAG, "LoadState.append: ${cloudPhotos.loadState.append}")
         Log.d(TAG, "LoadState.prepend: ${cloudPhotos.loadState.prepend}")
 
+        // Check if refresh is loading
+        if (cloudPhotos.loadState.refresh is LoadState.Loading) {
+            Log.i(TAG, "REFRESH is currently LOADING")
+        } else if (cloudPhotos.loadState.refresh is LoadState.Error) {
+            Log.e(TAG, "REFRESH ERROR: ${(cloudPhotos.loadState.refresh as LoadState.Error).error}")
+        } else {
+            Log.i(TAG, "REFRESH completed successfully")
+        }
+
+        // Check append state for scrolling
+        if (cloudPhotos.loadState.append is LoadState.Loading) {
+            Log.i(TAG, "APPEND is currently LOADING (scrolling down)")
+        } else if (cloudPhotos.loadState.append is LoadState.Error) {
+            Log.e(TAG, "APPEND ERROR: ${(cloudPhotos.loadState.append as LoadState.Error).error}")
+        }
+
         if (cloudPhotos.itemCount > 0) {
-            Log.i(TAG, "First few cloud photos:")
-            for (i in 0 until minOf(3, cloudPhotos.itemCount)) {
+            Log.i(TAG, "Checking first 5 cloud photos with peek():")
+            for (i in 0 until minOf(5, cloudPhotos.itemCount)) {
                 val photo = cloudPhotos.peek(i)
                 if (photo != null) {
-                    Log.d(TAG, "Photo[$i]: remoteId=${photo.remoteId}, type=${photo.photoType}, fileName=${photo.fileName}")
+                    Log.d(TAG, "Photo[$i] LOADED: remoteId=${photo.remoteId}, type=${photo.photoType}, fileName=${photo.fileName}")
                 } else {
-                    Log.d(TAG, "Photo[$i]: null (not loaded yet)")
+                    Log.w(TAG, "Photo[$i] NULL: not loaded yet or loading")
+                }
+            }
+
+            // Also check snapshot list
+            val snapshotItems = cloudPhotos.itemSnapshotList.items
+            Log.i(TAG, "Snapshot list size: ${snapshotItems.size}")
+            snapshotItems.take(3).forEachIndexed { index, item ->
+                if (item != null) {
+                    Log.d(TAG, "Snapshot[$index]: remoteId=${item.remoteId}")
+                } else {
+                    Log.w(TAG, "Snapshot[$index]: null")
                 }
             }
         } else {
-            Log.w(TAG, "No cloud photos to display")
+            Log.w(TAG, "CloudPhotos itemCount is 0!")
         }
         Log.d(TAG, "=== END REMOTE PHOTO GRID DEBUG ===")
     }
@@ -90,17 +119,44 @@ fun RemotePhotoGrid(
         // Unified cloud photos grid
         CloudPhotosGrid(
             cloudPhotos = cloudPhotos,
-            onPhotoClick = { index -> selectedIndex = index }
+            onPhotoClick = { index, photo ->
+                selectedIndex = index
+                selectedPhoto = photo
+            }
         )
 
         // Photo viewer overlay
         selectedIndex?.let { index ->
-            PhotoPageView(
-                initialPage = index,
-                onlyRemotePhotos = true,
-                photos = cloudPhotos.itemSnapshotList.items.map { it.toPhoto() }
-            ) {
+            // Build photo list from loaded items only
+            val loadedPhotos = mutableListOf<com.akslabs.cloudgallery.data.localdb.entities.Photo>()
+            var targetIndex = 0
+
+            // Collect all loaded photos and find the target index
+            for (i in 0 until cloudPhotos.itemCount) {
+                val photo = cloudPhotos.peek(i) // Use peek to get already loaded items
+                if (photo != null) {
+                    if (i == index) {
+                        targetIndex = loadedPhotos.size // Current position in loaded list
+                    }
+                    loadedPhotos.add(photo.toPhoto())
+                }
+            }
+
+            if (loadedPhotos.isNotEmpty()) {
+                // Ensure target index is within bounds
+                val safeIndex = targetIndex.coerceIn(0, loadedPhotos.size - 1)
+
+                PhotoPageView(
+                    initialPage = safeIndex,
+                    onlyRemotePhotos = true,
+                    photos = loadedPhotos
+                ) {
+                    selectedIndex = null
+                    selectedPhoto = null
+                }
+            } else {
                 selectedIndex = null
+                selectedPhoto = null
             }
         }
     }
@@ -109,7 +165,7 @@ fun RemotePhotoGrid(
 @Composable
 fun CloudPhotosGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
-    onPhotoClick: (Int) -> Unit,
+    onPhotoClick: (Int, RemotePhoto?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val gridState = rememberLazyGridState()
@@ -148,37 +204,49 @@ fun CloudPhotosGrid(
                 LazyVerticalGrid(
                     state = gridState,
                     modifier = Modifier.fillMaxSize(),
-                    columns = GridCells.Fixed(4),
+                    columns = GridCells.Fixed(columnCount),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    var lastHeader: String? = null
-                    for (i in 0 until cloudPhotos.itemCount) {
-                        val item = cloudPhotos.peek(i)
-                        val label = item?.uploadedAt?.let { ms ->
-                            java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(ms))
+                    Log.d(TAG, "=== LAZY GRID ITEMS BLOCK ===")
+                    Log.d(TAG, "Creating items for count: ${cloudPhotos.itemCount}")
+
+                    items(
+                        count = cloudPhotos.itemCount,
+                        key = { index ->
+                            val peekedItem = cloudPhotos.peek(index)
+                            val key = peekedItem?.remoteId ?: "placeholder_$index"
+                            Log.v(TAG, "Key for index $index: $key (peeked item: ${if (peekedItem != null) "exists" else "null"})")
+                            key
                         }
-                        if (label != null && label != lastHeader) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(top = 8.dp)
-                                )
+                    ) { index ->
+                        Log.d(TAG, "=== RENDERING ITEM AT INDEX $index ===")
+
+                        // First check what peek returns
+                        val peekedPhoto = cloudPhotos.peek(index)
+                        Log.d(TAG, "peek($index) returned: ${if (peekedPhoto != null) "RemotePhoto(${peekedPhoto.remoteId})" else "null"}")
+
+                        // Now get the actual item (this should trigger loading)
+                        val remotePhoto = cloudPhotos[index]
+                        Log.d(TAG, "cloudPhotos[$index] returned: ${if (remotePhoto != null) "RemotePhoto(${remotePhoto.remoteId})" else "null"}")
+
+                        if (remotePhoto == null && peekedPhoto == null) {
+                            Log.w(TAG, "Both peek and direct access returned null for index $index - this indicates loading issue")
+                        } else if (remotePhoto == null && peekedPhoto != null) {
+                            Log.w(TAG, "Direct access returned null but peek returned data - unusual paging behavior")
+                        } else if (remotePhoto != null && peekedPhoto == null) {
+                            Log.i(TAG, "Direct access loaded new data for index $index")
+                        }
+
+                        CloudPhotoItem(
+                            remotePhoto = remotePhoto,
+                            index = index, // Pass index for debugging
+                            onClick = {
+                                Log.d(TAG, "Photo clicked at index: $index, remoteId: ${remotePhoto?.remoteId}")
+                                onPhotoClick(index, remotePhoto)
                             }
-                            lastHeader = label
-                        }
-                        item(key = item?.remoteId ?: "rp_$i") {
-                            CloudPhotoItem(
-                                remotePhoto = item,
-                                onClick = { onPhotoClick(i) }
-                            )
-                        }
+                        )
                     }
                 }
             }
@@ -189,18 +257,20 @@ fun CloudPhotosGrid(
 @Composable
 fun CloudPhotoItem(
     remotePhoto: RemotePhoto?,
+    index: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
 
-    // Debug logging for each photo item
-    LaunchedEffect(remotePhoto) {
+    // Comprehensive debug logging for CloudPhotoItem
+    LaunchedEffect(remotePhoto, index) {
+        Log.d(TAG, "=== CLOUD PHOTO ITEM RENDER ===")
+        Log.d(TAG, "Index: $index")
         if (remotePhoto != null) {
-            Log.d(TAG, "CloudPhotoItem: Loading photo remoteId=${remotePhoto.remoteId}, type=${remotePhoto.photoType}")
-            Log.v(TAG, "Photo details: fileName=${remotePhoto.fileName}, size=${remotePhoto.fileSize}, uploadedAt=${remotePhoto.uploadedAt}")
+            Log.i(TAG, "Item[$index] RENDERING with data: remoteId=${remotePhoto.remoteId}, type=${remotePhoto.photoType}, fileName=${remotePhoto.fileName}")
         } else {
-            Log.v(TAG, "CloudPhotoItem: remotePhoto is null")
+            Log.w(TAG, "Item[$index] RENDERING with NULL data - will show placeholder")
         }
     }
 
@@ -213,26 +283,30 @@ fun CloudPhotoItem(
         contentAlignment = Alignment.Center
     ) {
         if (remotePhoto != null) {
+            Log.d(TAG, "Item[$index] Creating ImageRequest for remoteId=${remotePhoto.remoteId}")
+
             val imageRequest = ImageRequest.Builder(context)
                 .data(remotePhoto)
-                .size(Size(300, 300)) // Thumbnail size for better performance
-                .placeholderMemoryCacheKey("thumb_${remotePhoto.remoteId}")
-                .memoryCacheKey("thumb_${remotePhoto.remoteId}")
-                .diskCacheKey("thumb_${remotePhoto.remoteId}")
+                .size(Size(150, 150)) // Even smaller for faster loading
+                .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
+                .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
+                .crossfade(100) // Faster transition
+                .allowHardware(true) // Use hardware acceleration
+                .allowRgb565(true) // Use less memory
                 .listener(
                     onStart = {
-                        Log.d(TAG, "Image loading started for remoteId=${remotePhoto.remoteId}")
+                        Log.i(TAG, "Item[$index] Image loading STARTED for remoteId=${remotePhoto.remoteId}")
                     },
-                    onSuccess = { _, _ ->
-                        Log.i(TAG, "Image loading SUCCESS for remoteId=${remotePhoto.remoteId}")
+                    onSuccess = { _, result ->
+                        Log.i(TAG, "Item[$index] Image loading SUCCESS for remoteId=${remotePhoto.remoteId}, dataSource=${result.dataSource}")
                     },
                     onError = { _, error ->
-                        Log.e(TAG, "Image loading ERROR for remoteId=${remotePhoto.remoteId}: ${error.throwable?.message}", error.throwable)
+                        Log.e(TAG, "Item[$index] Image loading ERROR for remoteId=${remotePhoto.remoteId}: ${error.throwable?.message}")
                     }
                 )
                 .build()
 
-            Log.v(TAG, "Creating ImageRequest for remoteId=${remotePhoto.remoteId} with thumbnailImageLoader")
+            Log.d(TAG, "Item[$index] ImageRequest created, starting SubcomposeAsyncImage")
 
             SubcomposeAsyncImage(
                 imageLoader = ImageLoaderModule.thumbnailImageLoader,
@@ -241,37 +315,41 @@ fun CloudPhotoItem(
                 modifier = Modifier.fillMaxSize(),
                 contentDescription = stringResource(id = R.string.photo),
                 loading = {
-                    Log.v(TAG, "Showing loading state for remoteId=${remotePhoto.remoteId}")
+                    Log.d(TAG, "Item[$index] Showing LOADING state for remoteId=${remotePhoto.remoteId}")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                    )
+                },
+                error = { error ->
+                    Log.e(TAG, "Item[$index] Showing ERROR state for remoteId=${remotePhoto.remoteId}: ${error.result.throwable?.message}")
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        LoadAnimation()
-                    }
-                },
-                error = { error ->
-                    Log.e(TAG, "Showing error state for remoteId=${remotePhoto.remoteId}: ${error.result.throwable?.message}")
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.errorContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
                         Icon(
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             imageVector = Icons.Rounded.CloudOff,
-                            contentDescription = stringResource(id = R.string.load_error),
-                            modifier = Modifier.size(24.dp)
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
+                },
+                success = { success ->
+                    Log.i(TAG, "Item[$index] Showing SUCCESS state for remoteId=${remotePhoto.remoteId}")
                 }
             )
         } else {
-            // Placeholder for null items during loading
-            Log.v(TAG, "Showing placeholder for null remotePhoto")
-            LoadAnimation()
+            Log.w(TAG, "Item[$index] Showing PLACEHOLDER - remotePhoto is null")
+            // Simplified placeholder for null items during loading - just background color
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
         }
     }
 }

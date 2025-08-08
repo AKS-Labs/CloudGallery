@@ -59,25 +59,26 @@ object ImageLoaderModule {
         // Optimized thumbnail loader for grid views
         Log.d(TAG, "Creating thumbnailImageLoader...")
         thumbnailImageLoader = ImageLoader.Builder(appContext)
-            .crossfade(true)
+            .crossfade(false) // Disable crossfade for faster loading
             .respectCacheHeaders(false)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
+            .allowHardware(true) // Enable hardware acceleration
+            .allowRgb565(true) // Use less memory per image
             .memoryCache {
                 MemoryCache.Builder(appContext)
-                    .maxSizePercent(0.25) // More memory for thumbnails
+                    .maxSizePercent(0.30) // More memory for thumbnails
                     .strongReferencesEnabled(true)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(appContext.cacheDir.resolve("thumbnail_cache"))
-                    .maxSizePercent(0.05) // 5% of available disk space for thumbnails
+                    .maxSizePercent(0.08) // Slightly more disk space for thumbnails
                     .build()
             }
             .okHttpClient(okHttpClient)
             .components { add(NetworkFetcher.Factory()) }
-            .logger(DebugLogger()) // Enable debug logging for thumbnails too
             .build()
         Log.i(TAG, "thumbnailImageLoader created successfully")
 
