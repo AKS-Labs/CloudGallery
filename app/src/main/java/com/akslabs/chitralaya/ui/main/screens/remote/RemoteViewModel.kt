@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 class RemoteViewModel : ViewModel() {
 
     // Single unified flow for all cloud photos
-    val allCloudPhotosFlow: Flow<PagingData<RemotePhoto>> =
+    val allCloudPhotosFlow: Flow<PagingData<RemotePhoto>> by lazy {
         Pager(
             config = PagingConfig(
                 pageSize = PAGE_SIZE,
@@ -34,11 +34,13 @@ class RemoteViewModel : ViewModel() {
                 pagingSource
             }
         ).flow.cachedIn(viewModelScope)
+    }
 
     // Total count of cloud photos
-    val totalCloudPhotosCount: StateFlow<Int> =
+    val totalCloudPhotosCount: StateFlow<Int> by lazy {
         DbHolder.database.remotePhotoDao().getTotalCountFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    }
 
     init {
         Log.e(TAG, "🚀 === REMOTE VIEW MODEL INITIALIZED ===")
@@ -46,15 +48,23 @@ class RemoteViewModel : ViewModel() {
 
         // Monitor paging data changes
         viewModelScope.launch {
-            allCloudPhotosFlow.collect { pagingData ->
-                Log.e(TAG, "📄 New PagingData received in ViewModel")
+            try {
+                allCloudPhotosFlow.collect { pagingData ->
+                    Log.e(TAG, "📄 New PagingData received in ViewModel")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error collecting from allCloudPhotosFlow", e)
             }
         }
 
         // Monitor total count changes
         viewModelScope.launch {
-            totalCloudPhotosCount.collect { count ->
-                Log.e(TAG, "📊 Total count updated: $count")
+            try {
+                totalCloudPhotosCount.collect { count ->
+                    Log.e(TAG, "📊 Total count updated: $count")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error collecting from totalCloudPhotosCount", e)
             }
         }
     }
@@ -102,12 +112,6 @@ class RemoteViewModel : ViewModel() {
                     Log.d(TAG, "PagingSource created: ${pagingSource::class.simpleName}")
                 }
 
-                // FOR TESTING: Add some sample RemotePhoto data if database is empty
-                if (allRemotePhotos.isEmpty()) {
-                    Log.w(TAG, "🧪 Adding test RemotePhoto data for grid testing...")
-                    addTestRemotePhotos()
-                }
-
                 // Check total count flow
                 val totalCount = DbHolder.database.remotePhotoDao().getTotalCountFlow()
                 Log.i(TAG, "Total count flow created: ${totalCount::class.simpleName}")
@@ -116,59 +120,6 @@ class RemoteViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error debugging database state", e)
             }
-        }
-    }
-
-    private suspend fun addTestRemotePhotos() {
-        try {
-            val testPhotos = listOf(
-                RemotePhoto(
-                    remoteId = "test_photo_1",
-                    photoType = "jpg",
-                    fileName = "test_image_1.jpg",
-                    fileSize = 1024000,
-                    uploadedAt = System.currentTimeMillis() - 86400000, // 1 day ago
-                    thumbnailCached = false
-                ),
-                RemotePhoto(
-                    remoteId = "test_photo_2",
-                    photoType = "png",
-                    fileName = "test_image_2.png",
-                    fileSize = 2048000,
-                    uploadedAt = System.currentTimeMillis() - 172800000, // 2 days ago
-                    thumbnailCached = false
-                ),
-                RemotePhoto(
-                    remoteId = "test_photo_3",
-                    photoType = "jpg",
-                    fileName = "test_image_3.jpg",
-                    fileSize = 1536000,
-                    uploadedAt = System.currentTimeMillis() - 259200000, // 3 days ago
-                    thumbnailCached = false
-                ),
-                RemotePhoto(
-                    remoteId = "test_photo_4",
-                    photoType = "jpg",
-                    fileName = "test_image_4.jpg",
-                    fileSize = 1792000,
-                    uploadedAt = System.currentTimeMillis() - 345600000, // 4 days ago
-                    thumbnailCached = false
-                ),
-                RemotePhoto(
-                    remoteId = "test_photo_5",
-                    photoType = "png",
-                    fileName = "test_image_5.png",
-                    fileSize = 2304000,
-                    uploadedAt = System.currentTimeMillis() - 432000000, // 5 days ago
-                    thumbnailCached = false
-                )
-            )
-
-            DbHolder.database.remotePhotoDao().insertAll(*testPhotos.toTypedArray())
-            Log.i(TAG, "✅ Added ${testPhotos.size} test RemotePhoto records")
-
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error adding test RemotePhoto data", e)
         }
     }
 

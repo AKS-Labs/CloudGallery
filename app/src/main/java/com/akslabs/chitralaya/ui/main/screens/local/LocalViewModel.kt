@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 
 class LocalViewModel : ViewModel() {
 
-    val localPhotosFlow: Flow<PagingData<Photo>> =
+    val localPhotosFlow: Flow<PagingData<Photo>> by lazy {
         Pager(
             config = PagingConfig(
                 pageSize = PAGE_SIZE,
@@ -36,10 +36,12 @@ class LocalViewModel : ViewModel() {
                 pagingSource
             }
         ).flow.cachedIn(viewModelScope)
+    }
 
-    val localPhotosCount: StateFlow<Int> =
+    val localPhotosCount: StateFlow<Int> by lazy {
         DbHolder.database.photoDao().getAllCountFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    }
 
     init {
         Log.e(TAG, "🚀 === LOCAL VIEW MODEL INITIALIZED ===")
@@ -47,15 +49,23 @@ class LocalViewModel : ViewModel() {
 
         // Monitor paging data changes
         viewModelScope.launch {
-            localPhotosFlow.collect { pagingData ->
-                Log.e(TAG, "📄 New PagingData received in LocalViewModel")
+            try {
+                localPhotosFlow.collect { pagingData ->
+                    Log.e(TAG, "📄 New PagingData received in LocalViewModel")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error collecting from localPhotosFlow", e)
             }
         }
 
         // Monitor total count changes
         viewModelScope.launch {
-            localPhotosCount.collect { count ->
-                Log.e(TAG, "📊 Local photos count updated: $count")
+            try {
+                localPhotosCount.collect { count ->
+                    Log.e(TAG, "📊 Local photos count updated: $count")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error collecting from localPhotosCount", e)
             }
         }
     }

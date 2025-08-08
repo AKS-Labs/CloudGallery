@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -170,9 +171,19 @@ fun CloudPhotosGrid(
 ) {
     val gridState = rememberLazyGridState()
 
-    // Get dynamic column count from preferences
-    val columnCount = remember {
-        Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount)
+    // Responsive grid configuration (3-6 columns, default 4) - matches LocalPhotoGrid
+    val columns = remember {
+        Preferences.getInt("grid_column_count", 4).coerceIn(3, 6)
+    }
+    val horizontalSpacing = 12.dp
+    val verticalSpacing = 12.dp
+
+    fun getDateLabel(uploadedAt: Long): String? {
+        return try {
+            java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(uploadedAt))
+        } catch (e: Exception) {
+            null
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -194,7 +205,7 @@ fun CloudPhotosGrid(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "No photos in cloud",
+                        text = "Sync images to view here",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -204,10 +215,10 @@ fun CloudPhotosGrid(
                 LazyVerticalGrid(
                     state = gridState,
                     modifier = Modifier.fillMaxSize(),
-                    columns = GridCells.Fixed(columnCount),
+                    columns = GridCells.Fixed(columns),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+                    horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
                 ) {
                     Log.d(TAG, "=== LAZY GRID ITEMS BLOCK ===")
                     Log.d(TAG, "Creating items for count: ${cloudPhotos.itemCount}")
@@ -221,7 +232,7 @@ fun CloudPhotosGrid(
                             key
                         }
                     ) { index ->
-                        Log.d(TAG, "=== RENDERING ITEM AT INDEX $index ===")
+                        Log.d(TAG, "=== RENDERING REMOTE ITEM AT INDEX $index ===")
 
                         // First check what peek returns
                         val peekedPhoto = cloudPhotos.peek(index)
@@ -241,7 +252,7 @@ fun CloudPhotosGrid(
 
                         CloudPhotoItem(
                             remotePhoto = remotePhoto,
-                            index = index, // Pass index for debugging
+                            index = index,
                             onClick = {
                                 Log.d(TAG, "Photo clicked at index: $index, remoteId: ${remotePhoto?.remoteId}")
                                 onPhotoClick(index, remotePhoto)

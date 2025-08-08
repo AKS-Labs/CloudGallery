@@ -59,8 +59,10 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<Photo?>(null) }
 
-    // Fixed grid to match screenshot
-    val columns = 4
+    // Responsive grid configuration (3-6 columns, default 4)
+    val columns = remember {
+        Preferences.getInt("grid_column_count", 4).coerceIn(3, 6)
+    }
     val horizontalSpacing = 12.dp
     val verticalSpacing = 12.dp
 
