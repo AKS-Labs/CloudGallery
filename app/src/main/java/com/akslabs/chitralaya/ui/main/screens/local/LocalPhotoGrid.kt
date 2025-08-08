@@ -52,6 +52,57 @@ import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.components.itemsPaging
 
+// Sealed class for grid items to support date grouping
+sealed class LocalGridItem {
+    data class PhotoItem(val photo: Photo, val originalIndex: Int) : LocalGridItem()
+    data class HeaderItem(val dateLabel: String, val id: String) : LocalGridItem()
+}
+
+// Function to get date label from localId
+private fun getDateLabelFromLocalId(localId: String): String? {
+    return try {
+        val dateAdded = MediaStore.Images.Media.EXTERNAL_CONTENT_URI.let { uri ->
+            val projection = arrayOf(MediaStore.Images.Media.DATE_ADDED)
+            val selection = "${MediaStore.Images.Media._ID} = ?"
+            val selectionArgs = arrayOf(localId)
+
+            // This is a simplified version - in real implementation you'd need context
+            // For now, let's use a simple date format based on the localId
+            val timestamp = localId.toLongOrNull() ?: System.currentTimeMillis()
+            java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
+        }
+        dateAdded
+    } catch (e: Exception) {
+        null
+    }
+}
+
+// Function to safely create grouped grid items
+private fun createGroupedGridItems(
+    localPhotos: LazyPagingItems<Photo>
+): List<LocalGridItem> {
+    val items = mutableListOf<LocalGridItem>()
+    var lastDateLabel: String? = null
+    var headerIndex = 0
+
+    for (i in 0 until localPhotos.itemCount) {
+        val photo = localPhotos.peek(i) ?: continue
+        val dateLabel = getDateLabelFromLocalId(photo.localId)
+
+        // Add header if this is a new date group
+        if (dateLabel != null && dateLabel != lastDateLabel) {
+            items.add(LocalGridItem.HeaderItem(dateLabel, "header_${headerIndex}_$dateLabel"))
+            lastDateLabel = dateLabel
+            headerIndex++
+        }
+
+        // Add photo item
+        items.add(LocalGridItem.PhotoItem(photo, i))
+    }
+
+    return items
+}
+
 @Composable
 fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
     Log.e(TAG, "🎯 === LOCAL PHOTO GRID COMPOSING ===")
@@ -66,8 +117,22 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
     val horizontalSpacing = 12.dp
     val verticalSpacing = 12.dp
 
+    // Layout mode configuration
+    val isDateGroupedLayout = remember {
+        Preferences.getBoolean("date_grouped_layout", false)
+    }
+
     // Cache date lookups
     val dateCache = remember { mutableStateMapOf<String, Long>() }
+
+    // Create grouped grid items for date grouped layout
+    val groupedGridItems = remember(localPhotos.itemSnapshotList, isDateGroupedLayout) {
+        if (!isDateGroupedLayout) {
+            emptyList()
+        } else {
+            createGroupedGridItems(localPhotos)
+        }
+    }
 
     // Comprehensive debug logging for local photos data
     LaunchedEffect(localPhotos.loadState, totalCount, localPhotos.itemCount) {
@@ -154,45 +219,94 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                 horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
             ) {
                 Log.d(TAG, "=== LAZY GRID ITEMS BLOCK ===")
+                Log.d(TAG, "Layout mode: ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"}")
                 Log.d(TAG, "Creating items for count: ${localPhotos.itemCount}")
 
-                items(
-                    count = localPhotos.itemCount,
-                    key = { index ->
-                        val peekedItem = localPhotos.peek(index)
-                        val key = peekedItem?.localId ?: "placeholder_$index"
-                        Log.v(TAG, "Key for index $index: $key (peeked item: ${if (peekedItem != null) "exists" else "null"})")
-                        key
-                    }
-                ) { index ->
-                    Log.d(TAG, "=== RENDERING LOCAL ITEM AT INDEX $index ===")
-
-                    // First check what peek returns
-                    val peekedPhoto = localPhotos.peek(index)
-                    Log.d(TAG, "peek($index) returned: ${if (peekedPhoto != null) "Photo(${peekedPhoto.localId})" else "null"}")
-
-                    // Now get the actual item (this should trigger loading)
-                    val photo = localPhotos[index]
-                    Log.d(TAG, "localPhotos[$index] returned: ${if (photo != null) "Photo(${photo.localId})" else "null"}")
-
-                    if (photo == null && peekedPhoto == null) {
-                        Log.w(TAG, "Both peek and direct access returned null for index $index - this indicates loading issue")
-                    } else if (photo == null && peekedPhoto != null) {
-                        Log.w(TAG, "Direct access returned null but peek returned data - unusual paging behavior")
-                    } else if (photo != null && peekedPhoto == null) {
-                        Log.i(TAG, "Direct access loaded new data for index $index")
-                    }
-
-                    LocalPhotoItem(
-                        photo = photo,
-                        index = index,
-                        getDateLabel = ::getDateLabel,
-                        onClick = {
-                            Log.d(TAG, "Photo clicked at index: $index, localId: ${photo?.localId}")
-                            selectedIndex = index
-                            selectedPhoto = photo
+                if (isDateGroupedLayout) {
+                    // Date grouped layout
+                    items(
+                        count = groupedGridItems.size,
+                        key = { index ->
+                            when (val item = groupedGridItems[index]) {
+                                is LocalGridItem.HeaderItem -> item.id
+                                is LocalGridItem.PhotoItem -> item.photo.localId
+                            }
+                        },
+                        span = { index ->
+                            when (groupedGridItems[index]) {
+                                is LocalGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
+                                is LocalGridItem.PhotoItem -> GridItemSpan(1)
+                            }
                         }
-                    )
+                    ) { index ->
+                        when (val item = groupedGridItems[index]) {
+                            is LocalGridItem.HeaderItem -> {
+                                // Date header
+                                Text(
+                                    text = item.dateLabel,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp, bottom = 4.dp)
+                                )
+                            }
+                            is LocalGridItem.PhotoItem -> {
+                                // Photo item
+                                LocalPhotoItem(
+                                    photo = item.photo,
+                                    index = item.originalIndex,
+                                    getDateLabel = ::getDateLabel,
+                                    onClick = {
+                                        Log.d(TAG, "Photo clicked at index: ${item.originalIndex}, localId: ${item.photo.localId}")
+                                        selectedIndex = item.originalIndex
+                                        selectedPhoto = item.photo
+                                    }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Normal grid layout
+                    items(
+                        count = localPhotos.itemCount,
+                        key = { index ->
+                            val peekedItem = localPhotos.peek(index)
+                            val key = peekedItem?.localId ?: "placeholder_$index"
+                            Log.v(TAG, "Key for index $index: $key (peeked item: ${if (peekedItem != null) "exists" else "null"})")
+                            key
+                        }
+                    ) { index ->
+                        Log.d(TAG, "=== RENDERING LOCAL ITEM AT INDEX $index ===")
+
+                        // First check what peek returns
+                        val peekedPhoto = localPhotos.peek(index)
+                        Log.d(TAG, "peek($index) returned: ${if (peekedPhoto != null) "Photo(${peekedPhoto.localId})" else "null"}")
+
+                        // Now get the actual item (this should trigger loading)
+                        val photo = localPhotos[index]
+                        Log.d(TAG, "localPhotos[$index] returned: ${if (photo != null) "Photo(${photo.localId})" else "null"}")
+
+                        if (photo == null && peekedPhoto == null) {
+                            Log.w(TAG, "Both peek and direct access returned null for index $index - this indicates loading issue")
+                        } else if (photo == null && peekedPhoto != null) {
+                            Log.w(TAG, "Direct access returned null but peek returned data - unusual paging behavior")
+                        } else if (photo != null && peekedPhoto == null) {
+                            Log.i(TAG, "Direct access loaded new data for index $index")
+                        }
+
+                        LocalPhotoItem(
+                            photo = photo,
+                            index = index,
+                            getDateLabel = ::getDateLabel,
+                            onClick = {
+                                Log.d(TAG, "Photo clicked at index: $index, localId: ${photo?.localId}")
+                                selectedIndex = index
+                                selectedPhoto = photo
+                            }
+                        )
+                    }
                 }
             }
         }

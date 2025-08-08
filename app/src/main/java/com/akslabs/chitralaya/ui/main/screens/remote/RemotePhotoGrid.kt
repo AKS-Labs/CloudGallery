@@ -54,6 +54,47 @@ import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.components.itemsPaging
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 
+// Sealed class for remote grid items to support date grouping
+sealed class RemoteGridItem {
+    data class PhotoItem(val photo: RemotePhoto, val originalIndex: Int) : RemoteGridItem()
+    data class HeaderItem(val dateLabel: String, val id: String) : RemoteGridItem()
+}
+
+// Function to get date label from upload timestamp
+private fun getDateLabelFromTimestamp(uploadedAt: Long): String? {
+    return try {
+        java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(uploadedAt))
+    } catch (e: Exception) {
+        null
+    }
+}
+
+// Function to safely create grouped grid items for remote photos
+private fun createGroupedRemoteGridItems(
+    cloudPhotos: LazyPagingItems<RemotePhoto>
+): List<RemoteGridItem> {
+    val items = mutableListOf<RemoteGridItem>()
+    var lastDateLabel: String? = null
+    var headerIndex = 0
+
+    for (i in 0 until cloudPhotos.itemCount) {
+        val photo = cloudPhotos.peek(i) ?: continue
+        val dateLabel = getDateLabelFromTimestamp(photo.uploadedAt)
+
+        // Add header if this is a new date group
+        if (dateLabel != null && dateLabel != lastDateLabel) {
+            items.add(RemoteGridItem.HeaderItem(dateLabel, "header_${headerIndex}_$dateLabel"))
+            lastDateLabel = dateLabel
+            headerIndex++
+        }
+
+        // Add photo item
+        items.add(RemoteGridItem.PhotoItem(photo, i))
+    }
+
+    return items
+}
+
 @Composable
 fun RemotePhotoGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
@@ -178,11 +219,25 @@ fun CloudPhotosGrid(
     val horizontalSpacing = 12.dp
     val verticalSpacing = 12.dp
 
+    // Layout mode configuration
+    val isDateGroupedLayout = remember {
+        Preferences.getBoolean("date_grouped_layout", false)
+    }
+
     fun getDateLabel(uploadedAt: Long): String? {
         return try {
             java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(uploadedAt))
         } catch (e: Exception) {
             null
+        }
+    }
+
+    // Create grouped grid items for date grouped layout
+    val groupedGridItems = remember(cloudPhotos.itemSnapshotList, isDateGroupedLayout) {
+        if (!isDateGroupedLayout) {
+            emptyList()
+        } else {
+            createGroupedRemoteGridItems(cloudPhotos)
         }
     }
 
@@ -221,43 +276,90 @@ fun CloudPhotosGrid(
                     horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
                 ) {
                     Log.d(TAG, "=== LAZY GRID ITEMS BLOCK ===")
+                    Log.d(TAG, "Layout mode: ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"}")
                     Log.d(TAG, "Creating items for count: ${cloudPhotos.itemCount}")
 
-                    items(
-                        count = cloudPhotos.itemCount,
-                        key = { index ->
-                            val peekedItem = cloudPhotos.peek(index)
-                            val key = peekedItem?.remoteId ?: "placeholder_$index"
-                            Log.v(TAG, "Key for index $index: $key (peeked item: ${if (peekedItem != null) "exists" else "null"})")
-                            key
-                        }
-                    ) { index ->
-                        Log.d(TAG, "=== RENDERING REMOTE ITEM AT INDEX $index ===")
-
-                        // First check what peek returns
-                        val peekedPhoto = cloudPhotos.peek(index)
-                        Log.d(TAG, "peek($index) returned: ${if (peekedPhoto != null) "RemotePhoto(${peekedPhoto.remoteId})" else "null"}")
-
-                        // Now get the actual item (this should trigger loading)
-                        val remotePhoto = cloudPhotos[index]
-                        Log.d(TAG, "cloudPhotos[$index] returned: ${if (remotePhoto != null) "RemotePhoto(${remotePhoto.remoteId})" else "null"}")
-
-                        if (remotePhoto == null && peekedPhoto == null) {
-                            Log.w(TAG, "Both peek and direct access returned null for index $index - this indicates loading issue")
-                        } else if (remotePhoto == null && peekedPhoto != null) {
-                            Log.w(TAG, "Direct access returned null but peek returned data - unusual paging behavior")
-                        } else if (remotePhoto != null && peekedPhoto == null) {
-                            Log.i(TAG, "Direct access loaded new data for index $index")
-                        }
-
-                        CloudPhotoItem(
-                            remotePhoto = remotePhoto,
-                            index = index,
-                            onClick = {
-                                Log.d(TAG, "Photo clicked at index: $index, remoteId: ${remotePhoto?.remoteId}")
-                                onPhotoClick(index, remotePhoto)
+                    if (isDateGroupedLayout) {
+                        // Date grouped layout
+                        items(
+                            count = groupedGridItems.size,
+                            key = { index ->
+                                when (val item = groupedGridItems[index]) {
+                                    is RemoteGridItem.HeaderItem -> item.id
+                                    is RemoteGridItem.PhotoItem -> item.photo.remoteId
+                                }
+                            },
+                            span = { index ->
+                                when (groupedGridItems[index]) {
+                                    is RemoteGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
+                                    is RemoteGridItem.PhotoItem -> GridItemSpan(1)
+                                }
                             }
-                        )
+                        ) { index ->
+                            when (val item = groupedGridItems[index]) {
+                                is RemoteGridItem.HeaderItem -> {
+                                    // Date header
+                                    Text(
+                                        text = item.dateLabel,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp, bottom = 4.dp)
+                                    )
+                                }
+                                is RemoteGridItem.PhotoItem -> {
+                                    // Photo item
+                                    CloudPhotoItem(
+                                        remotePhoto = item.photo,
+                                        index = item.originalIndex,
+                                        onClick = {
+                                            Log.d(TAG, "Photo clicked at index: ${item.originalIndex}, remoteId: ${item.photo.remoteId}")
+                                            onPhotoClick(item.originalIndex, item.photo)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Normal grid layout
+                        items(
+                            count = cloudPhotos.itemCount,
+                            key = { index ->
+                                val peekedItem = cloudPhotos.peek(index)
+                                val key = peekedItem?.remoteId ?: "placeholder_$index"
+                                Log.v(TAG, "Key for index $index: $key (peeked item: ${if (peekedItem != null) "exists" else "null"})")
+                                key
+                            }
+                        ) { index ->
+                            Log.d(TAG, "=== RENDERING REMOTE ITEM AT INDEX $index ===")
+
+                            // First check what peek returns
+                            val peekedPhoto = cloudPhotos.peek(index)
+                            Log.d(TAG, "peek($index) returned: ${if (peekedPhoto != null) "RemotePhoto(${peekedPhoto.remoteId})" else "null"}")
+
+                            // Now get the actual item (this should trigger loading)
+                            val remotePhoto = cloudPhotos[index]
+                            Log.d(TAG, "cloudPhotos[$index] returned: ${if (remotePhoto != null) "RemotePhoto(${remotePhoto.remoteId})" else "null"}")
+
+                            if (remotePhoto == null && peekedPhoto == null) {
+                                Log.w(TAG, "Both peek and direct access returned null for index $index - this indicates loading issue")
+                            } else if (remotePhoto == null && peekedPhoto != null) {
+                                Log.w(TAG, "Direct access returned null but peek returned data - unusual paging behavior")
+                            } else if (remotePhoto != null && peekedPhoto == null) {
+                                Log.i(TAG, "Direct access loaded new data for index $index")
+                            }
+
+                            CloudPhotoItem(
+                                remotePhoto = remotePhoto,
+                                index = index,
+                                onClick = {
+                                    Log.d(TAG, "Photo clicked at index: $index, remoteId: ${remotePhoto?.remoteId}")
+                                    onPhotoClick(index, remotePhoto)
+                                }
+                            )
+                        }
                     }
                 }
             }

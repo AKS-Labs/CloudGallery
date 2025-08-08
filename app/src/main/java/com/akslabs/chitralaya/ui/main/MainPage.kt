@@ -83,10 +83,13 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         Triple("Cloud", Icons.Default.Cloud, Screens.RemotePhotos.route)
     )
 
-    // State for grid column customization
-    var showColumnDropdown by remember { mutableStateOf(false) }
+    // State for grid customization menu
+    var showGridOptionsDropdown by remember { mutableStateOf(false) }
     var currentColumnCount by remember {
-        mutableStateOf(Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount))
+        mutableStateOf(Preferences.getInt("grid_column_count", 4))
+    }
+    var isDateGroupedLayout by remember {
+        mutableStateOf(Preferences.getBoolean("date_grouped_layout", false))
     }
 
     // Get photo counts for TopAppBar titles
@@ -169,23 +172,94 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                             )
                         },
                         actions = {
-                            // Grid column customization button
+                            // Grid options menu button
                             Box {
                                 IconButton(
-                                    onClick = { showColumnDropdown = true }
+                                    onClick = { showGridOptionsDropdown = true }
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.GridView,
-                                        contentDescription = "Customize grid columns",
+                                        contentDescription = "Grid options",
                                         tint = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
 
                                 DropdownMenu(
-                                    expanded = showColumnDropdown,
-                                    onDismissRequest = { showColumnDropdown = false }
+                                    expanded = showGridOptionsDropdown,
+                                    onDismissRequest = { showGridOptionsDropdown = false }
                                 ) {
-                                    listOf(2, 3, 4, 5).forEach { columnCount ->
+                                    // Layout options section
+                                    Text(
+                                        text = "Layout",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    )
+
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "Grid View",
+                                                color = if (!isDateGroupedLayout) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                }
+                                            )
+                                        },
+                                        onClick = {
+                                            isDateGroupedLayout = false
+                                            Preferences.edit {
+                                                putBoolean("date_grouped_layout", false)
+                                            }
+                                            showGridOptionsDropdown = false
+                                            // Trigger recomposition
+                                            val currentRoute = tabs[selectedTab].third
+                                            navController.navigate(currentRoute) {
+                                                popUpTo(currentRoute) { inclusive = true }
+                                            }
+                                        }
+                                    )
+
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "Date Grouped",
+                                                color = if (isDateGroupedLayout) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                }
+                                            )
+                                        },
+                                        onClick = {
+                                            isDateGroupedLayout = true
+                                            Preferences.edit {
+                                                putBoolean("date_grouped_layout", true)
+                                            }
+                                            showGridOptionsDropdown = false
+                                            // Trigger recomposition
+                                            val currentRoute = tabs[selectedTab].third
+                                            navController.navigate(currentRoute) {
+                                                popUpTo(currentRoute) { inclusive = true }
+                                            }
+                                        }
+                                    )
+
+                                    // Divider
+                                    androidx.compose.material3.HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+
+                                    // Column count section
+                                    Text(
+                                        text = "Columns",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    )
+
+                                    listOf(3, 4, 5, 6).forEach { columnCount ->
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
@@ -200,10 +274,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                             onClick = {
                                                 currentColumnCount = columnCount
                                                 Preferences.edit {
-                                                    putInt(Preferences.gridColumnCountKey, columnCount)
+                                                    putInt("grid_column_count", columnCount)
                                                 }
-                                                showColumnDropdown = false
-                                                // Trigger recomposition by navigating to current route
+                                                showGridOptionsDropdown = false
+                                                // Trigger recomposition
                                                 val currentRoute = tabs[selectedTab].third
                                                 navController.navigate(currentRoute) {
                                                     popUpTo(currentRoute) { inclusive = true }
