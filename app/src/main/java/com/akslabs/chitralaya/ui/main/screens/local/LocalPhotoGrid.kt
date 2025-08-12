@@ -44,16 +44,11 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import coil.request.ImageRequest
 import coil.size.Size
-import androidx.paging.insertSeparators
-import androidx.paging.map
-import kotlinx.coroutines.flow.map
-import com.akslabs.cloudgallery.ui.main.nav.screenScopedViewModel
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.Preferences
@@ -217,28 +212,6 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
             dateMap = buildPhotoDateMap(context)
         }
     }
-    // Build grouped paging stream that inserts date headers across pages
-    val viewModel: LocalViewModel = screenScopedViewModel()
-    val groupedItems = remember(dateMap) {
-        viewModel.localPhotosFlow
-            .map { pagingData ->
-                pagingData.map { photo -> LocalGridItem.PhotoItem(photo, -1) }
-                    .insertSeparators { before: LocalGridItem.PhotoItem?, after: LocalGridItem.PhotoItem? ->
-                        if (after == null) return@insertSeparators null
-                        val beforeLabel: String? = before?.let {
-                            val ts = dateMap[it.photo.localId] ?: safeTimestampFromLocalId(it.photo.localId)
-                            formatPhotoDate(ts)
-                        }
-                        val afterLabel: String = run {
-                            val ts = dateMap[after.photo.localId] ?: safeTimestampFromLocalId(after.photo.localId)
-                            formatPhotoDate(ts)
-                        }
-                        if (beforeLabel == null || beforeLabel != afterLabel) {
-                            LocalGridItem.HeaderItem(afterLabel, "header_${afterLabel}")
-                        } else null
-                    }
-            }
-    }.collectAsLazyPagingItems()
 
     // Comprehensive debug logging for local photos data
     LaunchedEffect(localPhotos.loadState, totalCount, localPhotos.itemCount) {
@@ -312,26 +285,22 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                 horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
             ) {
                 if (isDateGroupedLayout) {
-                    items(
-                        count = groupedItems.itemCount,
-                        key = { index ->
-                            when (val item = groupedItems[index]) {
-                                is LocalGridItem.HeaderItem -> item.id
-                                is LocalGridItem.PhotoItem -> item.photo.localId
-                                else -> index
-                            }
-                        },
-                        span = { index ->
-                            when (groupedItems[index]) {
-                                is LocalGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
-                                else -> GridItemSpan(1)
-                            }
+                    // Build headers and items on the fly using current paging window
+                    for (index in 0 until localPhotos.itemCount) {
+                        val current = localPhotos.peek(index)
+                        val prev = if (index > 0) localPhotos.peek(index - 1) else null
+                        val currentLabel = current?.let {
+                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
+                            formatPhotoDate(ts)
                         }
-                    ) { index ->
-                        when (val item = groupedItems[index]) {
-                            is LocalGridItem.HeaderItem -> {
+                        val prevLabel = prev?.let {
+                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
+                            formatPhotoDate(ts)
+                        }
+                        if (currentLabel != null && currentLabel != prevLabel) {
+                            item(key = "header_$currentLabel", span = { GridItemSpan(maxLineSpan) }) {
                                 Text(
-                                    text = item.dateLabel,
+                                    text = currentLabel,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -340,26 +309,18 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                                         .padding(top = 8.dp, bottom = 4.dp)
                                 )
                             }
-                            is LocalGridItem.PhotoItem -> {
-                                LocalPhotoItem(
-                                    photo = item.photo,
-                                    index = index,
-                                    getDateLabel = ::getDateLabel,
-                                    onClick = {
-                                        selectedIndex = index
-                                        selectedPhoto = item.photo
-                                    }
-                                )
-                            }
-                            else -> {
-                                // Placeholder for not-yet-loaded items
-                                Box(
-                                    modifier = Modifier
-                                        .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                                )
-                            }
+                        }
+                        val key = current?.localId ?: "photo_placeholder_$index"
+                        item(key = key) {
+                            LocalPhotoItem(
+                                photo = localPhotos[index],
+                                index = index,
+                                getDateLabel = ::getDateLabel,
+                                onClick = {
+                                    selectedIndex = index
+                                    selectedPhoto = localPhotos.peek(index)
+                                }
+                            )
                         }
                     }
                 } else {
