@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import coil.compose.SubcomposeAsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import coil.request.ImageRequest
 import coil.size.Size
 import com.akslabs.cloudgallery.R
@@ -78,6 +80,38 @@ data class LayoutCache(
 // Avoid heavy per-item resolver calls in UI thread
 private fun safeTimestampFromLocalId(localId: String): Long = localId.toLongOrNull()?.times(1000L) ?: 0L
 
+private suspend fun buildPhotoDateMap(context: android.content.Context): Map<String, Long> = withContext(Dispatchers.IO) {
+    val resolver = context.contentResolver
+    val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+    val projection = arrayOf(
+        MediaStore.Images.ImageColumns._ID,
+        MediaStore.Images.ImageColumns.DATE_TAKEN,
+        MediaStore.Images.ImageColumns.DATE_ADDED,
+        MediaStore.Images.ImageColumns.DATE_MODIFIED
+    )
+    val map = HashMap<String, Long>(4096)
+    resolver.query(collection, projection, null, null, null)?.use { cursor ->
+        val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns._ID)
+        val takenIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_TAKEN)
+        val addedIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_ADDED)
+        val modIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_MODIFIED)
+        while (cursor.moveToNext()) {
+            val id = cursor.getLong(idIdx).toString()
+            val taken = runCatching { cursor.getLong(takenIdx) }.getOrDefault(0L)
+            val added = runCatching { cursor.getLong(addedIdx) }.getOrDefault(0L)
+            val modified = runCatching { cursor.getLong(modIdx) }.getOrDefault(0L)
+            val tsSec = when {
+                taken > 0L -> taken / 1000L
+                added > 0L -> added
+                modified > 0L -> modified
+                else -> 0L
+            }
+            map[id] = tsSec * 1000L
+        }
+    }
+    map
+}
+
 // Function to format date with fallback
 private fun formatPhotoDate(timestamp: Long): String {
     return try {
@@ -90,6 +124,7 @@ private fun formatPhotoDate(timestamp: Long): String {
 // Optimized function to group photos by date ensuring ALL photos are included
 private fun groupPhotosByDateOptimized(
     localPhotos: LazyPagingItems<Photo>,
+    dateMap: Map<String, Long>
 ): List<DateGroup> {
     val photosByDate = mutableMapOf<String, MutableList<Pair<Photo, Int>>>()
     var processedCount = 0
@@ -101,7 +136,7 @@ private fun groupPhotosByDateOptimized(
     for (i in 0 until localPhotos.itemCount) {
         val photo = localPhotos.peek(i)
         if (photo != null) {
-            val timestamp = safeTimestampFromLocalId(photo.localId)
+            val timestamp = dateMap[photo.localId] ?: safeTimestampFromLocalId(photo.localId)
             val dateLabel = formatPhotoDate(timestamp)
 
             photosByDate.getOrPut(dateLabel) { mutableListOf() }.add(photo to i)
@@ -121,10 +156,10 @@ private fun groupPhotosByDateOptimized(
 
     // Convert to sorted list of DateGroups (most recent first)
     return photosByDate.map { (dateLabel, photos) ->
-        val sortKey = photos.maxOfOrNull { safeTimestampFromLocalId(it.first.localId) } ?: 0L
+        val sortKey = photos.maxOfOrNull { dateMap[it.first.localId] ?: safeTimestampFromLocalId(it.first.localId) } ?: 0L
         DateGroup(
             dateLabel = dateLabel,
-            photos = photos.sortedByDescending { safeTimestampFromLocalId(it.first.localId) },
+            photos = photos.sortedByDescending { dateMap[it.first.localId] ?: safeTimestampFromLocalId(it.first.localId) },
             sortKey = sortKey
         )
     }.sortedByDescending { it.sortKey }
@@ -133,6 +168,7 @@ private fun groupPhotosByDateOptimized(
 // Optimized function to create layout cache
 private fun createLayoutCache(
     localPhotos: LazyPagingItems<Photo>,
+    dateMap: Map<String, Long>
 ): LayoutCache {
     val start = System.currentTimeMillis()
     val normalGridItems = buildList {
@@ -141,7 +177,7 @@ private fun createLayoutCache(
             add(LocalGridItem.PhotoItem(p, i))
         }
     }
-    val dateGroups = groupPhotosByDateOptimized(localPhotos)
+    val dateGroups = groupPhotosByDateOptimized(localPhotos, dateMap)
     val dateGroupedItems = buildList {
         dateGroups.forEachIndexed { idx, group ->
             add(LocalGridItem.HeaderItem(group.dateLabel, "header_${idx}_${group.dateLabel}"))
@@ -169,9 +205,14 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
     // Layout mode configuration
     val isDateGroupedLayout = remember { Preferences.getBoolean("date_grouped_layout", false) }
 
+    // Build MediaStore date map in background (once per dataset size change)
+    var dateMap by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    LaunchedEffect(totalCount) {
+        dateMap = buildPhotoDateMap(context)
+    }
     // Optimized layout cache with instant switching
-    val layoutCache = remember(localPhotos.itemSnapshotList.items.hashCode()) {
-        createLayoutCache(localPhotos)
+    val layoutCache = remember(localPhotos.itemSnapshotList.items.hashCode(), dateMap.hashCode()) {
+        createLayoutCache(localPhotos, dateMap)
     }
 
     // Get current layout items instantly (no recomputation)
@@ -237,20 +278,7 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
     }
 
     fun getDateLabel(localId: String): String? {
-        val millis = runCatching {
-            val idLong = localId.toLongOrNull() ?: return null
-            val uri = ContentUris.withAppendedId(
-                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL), idLong
-            )
-            context.contentResolver.query(
-                uri,
-                arrayOf(MediaStore.Images.ImageColumns.DATE_MODIFIED),
-                null,
-                null,
-                null
-            )?.use { c -> if (c.moveToFirst()) (c.getLong(0) * 1000L) else null }
-        }.getOrNull()
-        millis ?: return null
+        val millis = dateMap[localId] ?: return null
         return java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
     }
 
@@ -272,60 +300,70 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                 Log.d(TAG, "Layout mode: ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"}")
                 Log.d(TAG, "Rendering ${currentLayoutItems.size} items (Total photos in cache: ${layoutCache.totalPhotos})")
 
-                // Unified layout rendering with smooth transitions
-                items(
-                    count = currentLayoutItems.size,
-                    key = { index ->
-                        when (val item = currentLayoutItems[index]) {
-                            is LocalGridItem.HeaderItem -> item.id
-                            is LocalGridItem.PhotoItem -> item.photo.localId
+                if (isDateGroupedLayout) {
+                    items(
+                        count = currentLayoutItems.size,
+                        key = { index ->
+                            when (val item = currentLayoutItems[index]) {
+                                is LocalGridItem.HeaderItem -> item.id
+                                is LocalGridItem.PhotoItem -> item.photo.localId
+                            }
+                        },
+                        span = { index ->
+                            when (currentLayoutItems[index]) {
+                                is LocalGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
+                                is LocalGridItem.PhotoItem -> GridItemSpan(1)
+                            }
                         }
-                    },
-                    span = { index ->
-                        when (currentLayoutItems[index]) {
-                            is LocalGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
-                            is LocalGridItem.PhotoItem -> GridItemSpan(1)
+                    ) { index ->
+                        when (val item = currentLayoutItems[index]) {
+                            is LocalGridItem.HeaderItem -> {
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = true,
+                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(),
+                                    exit = androidx.compose.animation.fadeOut()
+                                ) {
+                                    Text(
+                                        text = item.dateLabel,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp, bottom = 4.dp)
+                                    )
+                                }
+                            }
+                            is LocalGridItem.PhotoItem -> {
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = true,
+                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
+                                    exit = androidx.compose.animation.fadeOut()
+                                ) {
+                                    LocalPhotoItem(
+                                        photo = item.photo,
+                                        index = item.originalIndex,
+                                        getDateLabel = ::getDateLabel,
+                                        onClick = {
+                                            selectedIndex = item.originalIndex
+                                            selectedPhoto = item.photo
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
-                ) { index ->
-                    when (val item = currentLayoutItems[index]) {
-                        is LocalGridItem.HeaderItem -> {
-                            // Date header with smooth animation
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = true,
-                                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(),
-                                exit = androidx.compose.animation.fadeOut()
-                            ) {
-                                Text(
-                                    text = item.dateLabel,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp, bottom = 4.dp)
-                                )
+                } else {
+                    itemsPaging(items = localPhotos, key = { it.localId }) { item, index ->
+                        LocalPhotoItem(
+                            photo = item,
+                            index = index,
+                            getDateLabel = ::getDateLabel,
+                            onClick = {
+                                selectedIndex = index
+                                selectedPhoto = item
                             }
-                        }
-                        is LocalGridItem.PhotoItem -> {
-                            // Photo item with smooth animation
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = true,
-                                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
-                                exit = androidx.compose.animation.fadeOut()
-                            ) {
-                                LocalPhotoItem(
-                                    photo = item.photo,
-                                    index = item.originalIndex,
-                                    getDateLabel = ::getDateLabel,
-                                    onClick = {
-                                        Log.d(TAG, "Photo clicked at index: ${item.originalIndex}, localId: ${item.photo.localId}")
-                                        selectedIndex = item.originalIndex
-                                        selectedPhoto = item.photo
-                                    }
-                                )
-                            }
-                        }
+                        )
                     }
                 }
             }
