@@ -498,9 +498,6 @@ fun CloudPhotoItem(
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                },
-                success = { success ->
-                    Log.i(TAG, "Item[$index] Showing SUCCESS state for remoteId=${remotePhoto.remoteId}")
                 }
             )
         } else {

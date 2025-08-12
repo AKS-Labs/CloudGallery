@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PhotoDao {
 
-    @Query("SELECT * FROM photos")
+    @Query("SELECT * FROM photos ORDER BY CAST(localId AS INTEGER) DESC")
     suspend fun getAll(): List<Photo>
 
     @Query("SELECT * FROM photos ORDER BY CAST(localId AS INTEGER) DESC")

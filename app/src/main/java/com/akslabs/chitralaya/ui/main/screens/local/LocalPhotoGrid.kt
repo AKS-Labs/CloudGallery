@@ -44,11 +44,16 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import coil.request.ImageRequest
 import coil.size.Size
+import androidx.paging.insertSeparators
+import androidx.paging.map
+import kotlinx.coroutines.flow.map
+import com.akslabs.cloudgallery.ui.main.nav.screenScopedViewModel
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.Preferences
@@ -207,23 +212,33 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
 
     // Build MediaStore date map in background (once per dataset size change)
     var dateMap by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
-    LaunchedEffect(totalCount) {
-        dateMap = buildPhotoDateMap(context)
-    }
-    // Optimized layout cache with instant switching
-    val layoutCache = remember(localPhotos.itemSnapshotList.items.hashCode(), dateMap.hashCode()) {
-        createLayoutCache(localPhotos, dateMap)
-    }
-
-    // Get current layout items instantly (no recomputation)
-    val currentLayoutItems = remember(isDateGroupedLayout, layoutCache) {
-        Log.d(TAG, "⚡ Switching to ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"} layout")
-        if (isDateGroupedLayout) {
-            layoutCache.dateGroupedItems
-        } else {
-            layoutCache.normalGridItems
+    LaunchedEffect(Unit) {
+        if (dateMap.isEmpty()) {
+            dateMap = buildPhotoDateMap(context)
         }
     }
+    // Build grouped paging stream that inserts date headers across pages
+    val viewModel: LocalViewModel = screenScopedViewModel()
+    val groupedItems = remember(dateMap) {
+        viewModel.localPhotosFlow
+            .map { pagingData ->
+                pagingData.map { photo -> LocalGridItem.PhotoItem(photo, -1) }
+                    .insertSeparators { before: LocalGridItem.PhotoItem?, after: LocalGridItem.PhotoItem? ->
+                        if (after == null) return@insertSeparators null
+                        val beforeLabel: String? = before?.let {
+                            val ts = dateMap[it.photo.localId] ?: safeTimestampFromLocalId(it.photo.localId)
+                            formatPhotoDate(ts)
+                        }
+                        val afterLabel: String = run {
+                            val ts = dateMap[after.photo.localId] ?: safeTimestampFromLocalId(after.photo.localId)
+                            formatPhotoDate(ts)
+                        }
+                        if (beforeLabel == null || beforeLabel != afterLabel) {
+                            LocalGridItem.HeaderItem(afterLabel, "header_${afterLabel}")
+                        } else null
+                    }
+            }
+    }.collectAsLazyPagingItems()
 
     // Comprehensive debug logging for local photos data
     LaunchedEffect(localPhotos.loadState, totalCount, localPhotos.itemCount) {
@@ -296,60 +311,54 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                 verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                 horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
             ) {
-                Log.d(TAG, "=== OPTIMIZED LAZY GRID ITEMS BLOCK ===")
-                Log.d(TAG, "Layout mode: ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"}")
-                Log.d(TAG, "Rendering ${currentLayoutItems.size} items (Total photos in cache: ${layoutCache.totalPhotos})")
-
                 if (isDateGroupedLayout) {
                     items(
-                        count = currentLayoutItems.size,
+                        count = groupedItems.itemCount,
                         key = { index ->
-                            when (val item = currentLayoutItems[index]) {
+                            when (val item = groupedItems[index]) {
                                 is LocalGridItem.HeaderItem -> item.id
                                 is LocalGridItem.PhotoItem -> item.photo.localId
+                                else -> index
                             }
                         },
                         span = { index ->
-                            when (currentLayoutItems[index]) {
+                            when (groupedItems[index]) {
                                 is LocalGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
-                                is LocalGridItem.PhotoItem -> GridItemSpan(1)
+                                else -> GridItemSpan(1)
                             }
                         }
                     ) { index ->
-                        when (val item = currentLayoutItems[index]) {
+                        when (val item = groupedItems[index]) {
                             is LocalGridItem.HeaderItem -> {
-                                androidx.compose.animation.AnimatedVisibility(
-                                    visible = true,
-                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(),
-                                    exit = androidx.compose.animation.fadeOut()
-                                ) {
-                                    Text(
-                                        text = item.dateLabel,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 8.dp, bottom = 4.dp)
-                                    )
-                                }
+                                Text(
+                                    text = item.dateLabel,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp, bottom = 4.dp)
+                                )
                             }
                             is LocalGridItem.PhotoItem -> {
-                                androidx.compose.animation.AnimatedVisibility(
-                                    visible = true,
-                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
-                                    exit = androidx.compose.animation.fadeOut()
-                                ) {
-                                    LocalPhotoItem(
-                                        photo = item.photo,
-                                        index = item.originalIndex,
-                                        getDateLabel = ::getDateLabel,
-                                        onClick = {
-                                            selectedIndex = item.originalIndex
-                                            selectedPhoto = item.photo
-                                        }
-                                    )
-                                }
+                                LocalPhotoItem(
+                                    photo = item.photo,
+                                    index = index,
+                                    getDateLabel = ::getDateLabel,
+                                    onClick = {
+                                        selectedIndex = index
+                                        selectedPhoto = item.photo
+                                    }
+                                )
+                            }
+                            else -> {
+                                // Placeholder for not-yet-loaded items
+                                Box(
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                )
                             }
                         }
                     }
