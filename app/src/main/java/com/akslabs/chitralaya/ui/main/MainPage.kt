@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.work.WorkInfo
 import com.akslabs.cloudgallery.R
@@ -88,9 +89,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     var currentColumnCount by remember {
         mutableStateOf(Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount))
     }
-    var isDateGroupedLayout by remember {
-        mutableStateOf(Preferences.getBoolean("date_grouped_layout", false))
-    }
+    var isDateGroupedLayout by remember { mutableStateOf(Preferences.getBoolean("date_grouped_layout", false)) }
 
     // Get photo counts for TopAppBar titles
     val localPhotosCount by DbHolder.database.photoDao().getAllCountFlow()
@@ -113,25 +112,12 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     }
 
     LaunchedEffect(viewModel) {
-        if (viewModel.currentDestination in Screens.drawerScreens) {
-            val lastSelectedTab = Preferences.getString(Preferences.startTabKey, "")
-            val tabIndex = tabs.indexOfFirst { it.third == lastSelectedTab }
-            if (tabIndex >= 0) {
-                selectedTab = tabIndex
-                navController.navigate(lastSelectedTab)
-            } else {
-                navController.navigate(tabs[0].third)
-            }
-        } else {
-            navController.navigate(tabs[0].third)
-        }
-
-        navController.addOnDestinationChangedListener { _, destination, _ ->
-            val tabIndex = tabs.indexOfFirst { it.third == destination.route }
-            if (tabIndex >= 0) {
-                selectedTab = tabIndex
-                Preferences.edit { putString(Preferences.startTabKey, destination.route) }
-            }
+        // Always open on Device screen on app start
+        selectedTab = 0
+        navController.navigate(Screens.LocalPhotos.route) {
+            popUpTo(0) { inclusive = false }
+            launchSingleTop = true
+            restoreState = true
         }
     }
 
@@ -158,155 +144,92 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
+        val backStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = backStackEntry?.destination?.route
+        val isSettingsScreen = currentRoute == Screens.Settings.route
+
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
-                Column(
-                    modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
-                ) {
-                    TopAppBar(
-                        title = {
-                            Text(
-                                text = "${tabs[selectedTab].first} ${photoCounts[selectedTab]}",
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        },
-                        actions = {
-                            // Grid options menu button
-                            Box {
-                                IconButton(
-                                    onClick = { showGridOptionsDropdown = true }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.GridView,
-                                        contentDescription = "Grid options",
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-
-                                DropdownMenu(
-                                    expanded = showGridOptionsDropdown,
-                                    onDismissRequest = { showGridOptionsDropdown = false }
-                                ) {
-                                    // Layout options section
-                                    Text(
-                                        text = "Layout",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                    )
-
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = "Grid View",
-                                                color = if (!isDateGroupedLayout) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurface
-                                                }
-                                            )
-                                        },
-                                        onClick = {
-                                            isDateGroupedLayout = false
-                                            Preferences.edit {
-                                                putBoolean("date_grouped_layout", false)
-                                            }
-                                            showGridOptionsDropdown = false
-                                            // Trigger recomposition
-                                            val currentRoute = tabs[selectedTab].third
-                                            navController.navigate(currentRoute) {
-                                                popUpTo(currentRoute) { inclusive = true }
-                                            }
-                                        }
-                                    )
-
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = "Date Grouped",
-                                                color = if (isDateGroupedLayout) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurface
-                                                }
-                                            )
-                                        },
-                                        onClick = {
-                                            isDateGroupedLayout = true
-                                            Preferences.edit {
-                                                putBoolean("date_grouped_layout", true)
-                                            }
-                                            showGridOptionsDropdown = false
-                                            // Trigger recomposition
-                                            val currentRoute = tabs[selectedTab].third
-                                            navController.navigate(currentRoute) {
-                                                popUpTo(currentRoute) { inclusive = true }
-                                            }
-                                        }
-                                    )
-
-                                    // Divider
-                                    androidx.compose.material3.HorizontalDivider(
-                                        modifier = Modifier.padding(vertical = 4.dp)
-                                    )
-
-                                    // Column count section
-                                    Text(
-                                        text = "Columns",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                    )
-
-                                    listOf(3, 4, 5, 6).forEach { columnCount ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = "$columnCount columns",
-                                                    color = if (columnCount == currentColumnCount) {
-                                                        MaterialTheme.colorScheme.primary
-                                                    } else {
-                                                        MaterialTheme.colorScheme.onSurface
-                                                    }
-                                                )
-                                            },
-                                            onClick = {
-                                                currentColumnCount = columnCount
-                                                Preferences.edit {
-                                                    putInt(Preferences.gridColumnCountKey, columnCount)
-                                                }
-                                                showGridOptionsDropdown = false
-                                                // Trigger recomposition
-                                                val currentRoute = tabs[selectedTab].third
-                                                navController.navigate(currentRoute) {
-                                                    popUpTo(currentRoute) { inclusive = true }
-                                                }
-                                            }
+                if (!isSettingsScreen) {
+                    Column(
+                        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
+                    ) {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    text = "${tabs[selectedTab].first} ${photoCounts[selectedTab]}",
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            actions = {
+                                // Grid options menu button
+                                Box {
+                                    IconButton(onClick = { showGridOptionsDropdown = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.GridView,
+                                            contentDescription = "Grid options",
+                                            tint = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
-                                }
-                            }
 
-                            // Settings button
-                            IconButton(
-                                onClick = {
-                                    navController.navigate(Screens.Settings.route)
+                                    DropdownMenu(
+                                        expanded = showGridOptionsDropdown,
+                                        onDismissRequest = { showGridOptionsDropdown = false }
+                                    ) {
+                                        Text(
+                                            text = "Layout",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+
+                                        DropdownMenuItem(
+                                            text = { Text(text = "Grid View", color = if (!isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
+                                            onClick = {
+                                                isDateGroupedLayout = false
+                                                Preferences.edit { putBoolean("date_grouped_layout", false) }
+                                                showGridOptionsDropdown = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(text = "Date Grouped", color = if (isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
+                                            onClick = {
+                                                isDateGroupedLayout = true
+                                                Preferences.edit { putBoolean("date_grouped_layout", true) }
+                                                showGridOptionsDropdown = false
+                                            }
+                                        )
+                                        androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                        Text(
+                                            text = "Columns",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+                                        listOf(3, 4, 5, 6).forEach { columnCount ->
+                                            DropdownMenuItem(
+                                                text = { Text(text = "$columnCount columns", color = if (columnCount == currentColumnCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
+                                                onClick = {
+                                                    currentColumnCount = columnCount
+                                                    Preferences.edit { putInt(Preferences.gridColumnCountKey, columnCount) }
+                                                    showGridOptionsDropdown = false
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "Settings",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        },
-                        scrollBehavior = scrollBehavior,
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+
+                                // Settings button
+                                IconButton(onClick = { navController.navigate(Screens.Settings.route) }) {
+                                    Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
+                                }
+                            },
+                            scrollBehavior = scrollBehavior,
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
                         )
-                    )
-                    ConnectivityStatusPopup()
+                        ConnectivityStatusPopup()
+                    }
                 }
             },
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
@@ -320,45 +243,35 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         }
 
         // Truly floating bottom navigation
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 16.dp),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            BottomAppBar(
+        if (!isSettingsScreen) {
+            Box(
                 modifier = Modifier
-                    .width(200.dp)
-                    .clip(RoundedCornerShape(24.dp)),
-                containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.9f),
-                tonalElevation = 12.dp
+                    .fillMaxSize()
+                    .padding(bottom = 16.dp),
+                contentAlignment = Alignment.BottomCenter
             ) {
-                tabs.forEachIndexed { index, (title, icon, route) ->
-                    NavigationBarItem(
-                        selected = selectedTab == index,
-                        onClick = {
-                            selectedTab = index
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.startDestinationId) {
-                                    saveState = true
+                BottomAppBar(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .clip(RoundedCornerShape(24.dp)),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.9f),
+                    tonalElevation = 12.dp
+                ) {
+                    tabs.forEachIndexed { index, (title, icon, route) ->
+                        NavigationBarItem(
+                            selected = selectedTab == index,
+                            onClick = {
+                                selectedTab = index
+                                navController.navigate(route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = title
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    )
+                            },
+                            icon = { Icon(imageVector = icon, contentDescription = title) },
+                            label = { Text(text = title, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
                 }
             }
         }

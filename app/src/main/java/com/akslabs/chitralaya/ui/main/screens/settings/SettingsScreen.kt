@@ -14,7 +14,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.CloudSync
@@ -40,6 +44,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.work.NetworkType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,6 +61,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.BuildConfig
@@ -241,10 +248,12 @@ private fun SettingsItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
 
     fun openLinkFromHref(href: String) {
         context.startActivity(
@@ -309,6 +318,22 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .verticalScroll(scrollState)
     ) {
+        TopAppBar(
+            title = { Text(text = "Settings") },
+            navigationIcon = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .size(24.dp)
+                        .clickable { (context as? androidx.activity.ComponentActivity)?.onBackPressedDispatcher?.onBackPressed() }
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+            )
+        )
         Spacer(modifier = Modifier.height(8.dp))
 
         // BACKUP & SYNC SECTION

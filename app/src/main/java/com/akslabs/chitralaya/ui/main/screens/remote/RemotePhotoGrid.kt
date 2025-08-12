@@ -476,12 +476,8 @@ fun CloudPhotoItem(
                 modifier = Modifier.fillMaxSize(),
                 contentDescription = stringResource(id = R.string.photo),
                 loading = {
-                    Log.d(TAG, "Item[$index] Showing LOADING state for remoteId=${remotePhoto.remoteId}")
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
-                    )
+                    // Use the same loading animation as full-screen image loader
+                    LoadAnimation()
                 },
                 error = { error ->
                     Log.e(TAG, "Item[$index] Showing ERROR state for remoteId=${remotePhoto.remoteId}: ${error.result.throwable?.message}")
