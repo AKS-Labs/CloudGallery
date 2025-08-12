@@ -60,39 +60,113 @@ sealed class RemoteGridItem {
     data class HeaderItem(val dateLabel: String, val id: String) : RemoteGridItem()
 }
 
-// Function to get date label from upload timestamp
-private fun getDateLabelFromTimestamp(uploadedAt: Long): String? {
+// Data class for remote date groups
+data class RemoteDateGroup(
+    val dateLabel: String,
+    val photos: List<Pair<RemotePhoto, Int>>, // RemotePhoto with original index
+    val sortKey: Long // For efficient sorting
+)
+
+// Optimized remote layout cache
+data class RemoteLayoutCache(
+    val normalGridItems: List<RemoteGridItem>,
+    val dateGroupedItems: List<RemoteGridItem>,
+    val totalPhotos: Int,
+    val lastUpdateTime: Long
+)
+
+// Function to format remote photo date with fallback
+private fun formatRemotePhotoDate(timestamp: Long): String {
     return try {
-        java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(uploadedAt))
+        java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
     } catch (e: Exception) {
-        null
+        "Unknown Date"
     }
 }
 
-// Function to safely create grouped grid items for remote photos
-private fun createGroupedRemoteGridItems(
+// Optimized function to group remote photos by date ensuring ALL photos are included
+private fun groupRemotePhotosByDateOptimized(
     cloudPhotos: LazyPagingItems<RemotePhoto>
-): List<RemoteGridItem> {
-    val items = mutableListOf<RemoteGridItem>()
-    var lastDateLabel: String? = null
-    var headerIndex = 0
+): List<RemoteDateGroup> {
+    val photosByDate = mutableMapOf<String, MutableList<Pair<RemotePhoto, Int>>>()
+    var processedCount = 0
+    var skippedCount = 0
 
+    Log.d(TAG, "🔍 Starting remote date grouping for ${cloudPhotos.itemCount} photos")
+
+    // Process ALL photos - no filtering
     for (i in 0 until cloudPhotos.itemCount) {
-        val photo = cloudPhotos.peek(i) ?: continue
-        val dateLabel = getDateLabelFromTimestamp(photo.uploadedAt)
+        val photo = cloudPhotos.peek(i)
+        if (photo != null) {
+            val dateLabel = formatRemotePhotoDate(photo.uploadedAt)
 
-        // Add header if this is a new date group
-        if (dateLabel != null && dateLabel != lastDateLabel) {
-            items.add(RemoteGridItem.HeaderItem(dateLabel, "header_${headerIndex}_$dateLabel"))
-            lastDateLabel = dateLabel
-            headerIndex++
+            photosByDate.getOrPut(dateLabel) { mutableListOf() }.add(photo to i)
+            processedCount++
+
+            if (processedCount % 100 == 0) {
+                Log.d(TAG, "📊 Processed $processedCount remote photos so far...")
+            }
+        } else {
+            skippedCount++
+            Log.w(TAG, "⚠️ Skipped null remote photo at index $i")
         }
-
-        // Add photo item
-        items.add(RemoteGridItem.PhotoItem(photo, i))
     }
 
-    return items
+    Log.d(TAG, "✅ Remote date grouping complete: $processedCount processed, $skippedCount skipped")
+    Log.d(TAG, "📅 Created ${photosByDate.size} remote date groups")
+
+    // Convert to sorted list of RemoteDateGroups (most recent first)
+    return photosByDate.map { (dateLabel, photos) ->
+        val sortKey = photos.maxOfOrNull { it.first.uploadedAt } ?: 0L
+        RemoteDateGroup(
+            dateLabel = dateLabel,
+            photos = photos.sortedByDescending { it.first.uploadedAt },
+            sortKey = sortKey
+        )
+    }.sortedByDescending { it.sortKey }
+}
+
+// Optimized function to create remote layout cache
+private fun createRemoteLayoutCache(
+    cloudPhotos: LazyPagingItems<RemotePhoto>
+): RemoteLayoutCache {
+    val startTime = System.currentTimeMillis()
+    Log.d(TAG, "🚀 Creating remote layout cache for ${cloudPhotos.itemCount} photos")
+
+    // Create normal grid items (simple list)
+    val normalGridItems = (0 until cloudPhotos.itemCount).mapNotNull { index ->
+        cloudPhotos.peek(index)?.let { photo ->
+            RemoteGridItem.PhotoItem(photo, index)
+        }
+    }
+
+    // Create date grouped items
+    val dateGroups = groupRemotePhotosByDateOptimized(cloudPhotos)
+    val dateGroupedItems = mutableListOf<RemoteGridItem>()
+
+    dateGroups.forEachIndexed { groupIndex, dateGroup ->
+        // Add date header
+        dateGroupedItems.add(RemoteGridItem.HeaderItem(
+            dateLabel = dateGroup.dateLabel,
+            id = "header_${groupIndex}_${dateGroup.dateLabel}"
+        ))
+
+        // Add all photos for this date
+        dateGroup.photos.forEach { (photo, originalIndex) ->
+            dateGroupedItems.add(RemoteGridItem.PhotoItem(photo, originalIndex))
+        }
+    }
+
+    val endTime = System.currentTimeMillis()
+    Log.d(TAG, "⚡ Remote layout cache created in ${endTime - startTime}ms")
+    Log.d(TAG, "📊 Normal grid: ${normalGridItems.size} items, Date grouped: ${dateGroupedItems.size} items")
+
+    return RemoteLayoutCache(
+        normalGridItems = normalGridItems,
+        dateGroupedItems = dateGroupedItems,
+        totalPhotos = cloudPhotos.itemCount,
+        lastUpdateTime = System.currentTimeMillis()
+    )
 }
 
 @Composable
@@ -213,16 +287,12 @@ fun CloudPhotosGrid(
     val gridState = rememberLazyGridState()
 
     // Responsive grid configuration (3-6 columns, default 4) - matches LocalPhotoGrid
-    val columns = remember {
-        Preferences.getInt("grid_column_count", 4).coerceIn(3, 6)
-    }
+    val columns = remember { Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount).coerceIn(3, 6) }
     val horizontalSpacing = 12.dp
     val verticalSpacing = 12.dp
 
     // Layout mode configuration
-    val isDateGroupedLayout = remember {
-        Preferences.getBoolean("date_grouped_layout", false)
-    }
+    val isDateGroupedLayout = remember { Preferences.getBoolean("date_grouped_layout", false) }
 
     fun getDateLabel(uploadedAt: Long): String? {
         return try {
@@ -232,12 +302,18 @@ fun CloudPhotosGrid(
         }
     }
 
-    // Create grouped grid items for date grouped layout
-    val groupedGridItems = remember(cloudPhotos.itemSnapshotList, isDateGroupedLayout) {
-        if (!isDateGroupedLayout) {
-            emptyList()
+    // Optimized remote layout cache with instant switching
+    val layoutCache = remember(cloudPhotos.itemSnapshotList.items.hashCode()) {
+        createRemoteLayoutCache(cloudPhotos)
+    }
+
+    // Get current layout items instantly (no recomputation)
+    val currentLayoutItems = remember(isDateGroupedLayout, layoutCache) {
+        Log.d(TAG, "⚡ Switching to ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"} remote layout")
+        if (isDateGroupedLayout) {
+            layoutCache.dateGroupedItems
         } else {
-            createGroupedRemoteGridItems(cloudPhotos)
+            layoutCache.normalGridItems
         }
     }
 
@@ -275,30 +351,34 @@ fun CloudPhotosGrid(
                     verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                     horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
                 ) {
-                    Log.d(TAG, "=== LAZY GRID ITEMS BLOCK ===")
+                    Log.d(TAG, "=== OPTIMIZED REMOTE LAZY GRID ITEMS BLOCK ===")
                     Log.d(TAG, "Layout mode: ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"}")
-                    Log.d(TAG, "Creating items for count: ${cloudPhotos.itemCount}")
+                    Log.d(TAG, "Rendering ${currentLayoutItems.size} items (Total photos in cache: ${layoutCache.totalPhotos})")
 
-                    if (isDateGroupedLayout) {
-                        // Date grouped layout
-                        items(
-                            count = groupedGridItems.size,
-                            key = { index ->
-                                when (val item = groupedGridItems[index]) {
-                                    is RemoteGridItem.HeaderItem -> item.id
-                                    is RemoteGridItem.PhotoItem -> item.photo.remoteId
-                                }
-                            },
-                            span = { index ->
-                                when (groupedGridItems[index]) {
-                                    is RemoteGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
-                                    is RemoteGridItem.PhotoItem -> GridItemSpan(1)
-                                }
+                    // Unified remote layout rendering with smooth transitions
+                    items(
+                        count = currentLayoutItems.size,
+                        key = { index ->
+                            when (val item = currentLayoutItems[index]) {
+                                is RemoteGridItem.HeaderItem -> item.id
+                                is RemoteGridItem.PhotoItem -> item.photo.remoteId
                             }
-                        ) { index ->
-                            when (val item = groupedGridItems[index]) {
-                                is RemoteGridItem.HeaderItem -> {
-                                    // Date header
+                        },
+                        span = { index ->
+                            when (currentLayoutItems[index]) {
+                                is RemoteGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
+                                is RemoteGridItem.PhotoItem -> GridItemSpan(1)
+                            }
+                        }
+                    ) { index ->
+                        when (val item = currentLayoutItems[index]) {
+                            is RemoteGridItem.HeaderItem -> {
+                                // Date header with smooth animation
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = true,
+                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(),
+                                    exit = androidx.compose.animation.fadeOut()
+                                ) {
                                     Text(
                                         text = item.dateLabel,
                                         style = MaterialTheme.typography.titleMedium,
@@ -309,8 +389,14 @@ fun CloudPhotosGrid(
                                             .padding(top = 8.dp, bottom = 4.dp)
                                     )
                                 }
-                                is RemoteGridItem.PhotoItem -> {
-                                    // Photo item
+                            }
+                            is RemoteGridItem.PhotoItem -> {
+                                // Photo item with smooth animation
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = true,
+                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
+                                    exit = androidx.compose.animation.fadeOut()
+                                ) {
                                     CloudPhotoItem(
                                         remotePhoto = item.photo,
                                         index = item.originalIndex,
@@ -321,44 +407,6 @@ fun CloudPhotosGrid(
                                     )
                                 }
                             }
-                        }
-                    } else {
-                        // Normal grid layout
-                        items(
-                            count = cloudPhotos.itemCount,
-                            key = { index ->
-                                val peekedItem = cloudPhotos.peek(index)
-                                val key = peekedItem?.remoteId ?: "placeholder_$index"
-                                Log.v(TAG, "Key for index $index: $key (peeked item: ${if (peekedItem != null) "exists" else "null"})")
-                                key
-                            }
-                        ) { index ->
-                            Log.d(TAG, "=== RENDERING REMOTE ITEM AT INDEX $index ===")
-
-                            // First check what peek returns
-                            val peekedPhoto = cloudPhotos.peek(index)
-                            Log.d(TAG, "peek($index) returned: ${if (peekedPhoto != null) "RemotePhoto(${peekedPhoto.remoteId})" else "null"}")
-
-                            // Now get the actual item (this should trigger loading)
-                            val remotePhoto = cloudPhotos[index]
-                            Log.d(TAG, "cloudPhotos[$index] returned: ${if (remotePhoto != null) "RemotePhoto(${remotePhoto.remoteId})" else "null"}")
-
-                            if (remotePhoto == null && peekedPhoto == null) {
-                                Log.w(TAG, "Both peek and direct access returned null for index $index - this indicates loading issue")
-                            } else if (remotePhoto == null && peekedPhoto != null) {
-                                Log.w(TAG, "Direct access returned null but peek returned data - unusual paging behavior")
-                            } else if (remotePhoto != null && peekedPhoto == null) {
-                                Log.i(TAG, "Direct access loaded new data for index $index")
-                            }
-
-                            CloudPhotoItem(
-                                remotePhoto = remotePhoto,
-                                index = index,
-                                onClick = {
-                                    Log.d(TAG, "Photo clicked at index: $index, remoteId: ${remotePhoto?.remoteId}")
-                                    onPhotoClick(index, remotePhoto)
-                                }
-                            )
                         }
                     }
                 }

@@ -97,7 +97,7 @@ fun GettingStartedScreen(
                 ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(25.dp))
             // App Icon
             Image(
                 painter = painterResource(id = R.drawable.chitralaya),
@@ -107,9 +107,9 @@ fun GettingStartedScreen(
                     .clip(CircleShape),
                 contentScale = ContentScale.FillBounds
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(30.dp))
             Text(
-                text = "Let's set up your SMS sync",
+                text = "Let's set up your Images sync",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -135,8 +135,8 @@ fun GettingStartedScreen(
                 description = "Open Official Telegram and search for @BotFather",
                 details = listOf(
                     "Send /newbot to @BotFather",
-                    "Choose a name for your bot (e.g., 'My SMS Bot')",
-                    "Choose a username ending in 'bot' (e.g., 'mysms_bot')",
+                    "Choose a name for your bot (e.g., 'Cloud Gallery Bot')",
+                    "Choose a username ending in 'bot' (e.g., 'cloudgallery_bot')",
                     "Copy the bot token that BotFather gives you"
                 ),
                 isActive = currentStep >= 1
@@ -197,11 +197,12 @@ fun GettingStartedScreen(
                 stepNumber = 3,
                 icon = Icons.Rounded.Group,
                 title = "Create a Private Group",
-                description = "Set up a private group for your SMS messages",
+                description = "Set up a private group for your Images",
                 details = listOf(
                     "Create a new private group in Official Telegram",
                     "Add your bot to the group as an admin",
                     "Send /start in the group",
+                    "Be patient it can take some time to show chat id",
                     "Copy the group ID that appears (including the minus sign if any)"
                 ),
                 isActive = currentStep >= 3

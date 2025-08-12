@@ -21,8 +21,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
+import coil.size.Size
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.Preferences
@@ -58,49 +60,96 @@ sealed class LocalGridItem {
     data class HeaderItem(val dateLabel: String, val id: String) : LocalGridItem()
 }
 
-// Function to get date label from localId
-private fun getDateLabelFromLocalId(localId: String): String? {
-    return try {
-        val dateAdded = MediaStore.Images.Media.EXTERNAL_CONTENT_URI.let { uri ->
-            val projection = arrayOf(MediaStore.Images.Media.DATE_ADDED)
-            val selection = "${MediaStore.Images.Media._ID} = ?"
-            val selectionArgs = arrayOf(localId)
+// Data class for date groups
+data class DateGroup(
+    val dateLabel: String,
+    val photos: List<Pair<Photo, Int>>, // Photo with original index
+    val sortKey: Long // For efficient sorting
+)
 
-            // This is a simplified version - in real implementation you'd need context
-            // For now, let's use a simple date format based on the localId
-            val timestamp = localId.toLongOrNull() ?: System.currentTimeMillis()
-            java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
-        }
-        dateAdded
+// Optimized layout cache
+data class LayoutCache(
+    val normalGridItems: List<LocalGridItem>,
+    val dateGroupedItems: List<LocalGridItem>,
+    val totalPhotos: Int,
+    val lastUpdateTime: Long
+)
+
+// Avoid heavy per-item resolver calls in UI thread
+private fun safeTimestampFromLocalId(localId: String): Long = localId.toLongOrNull()?.times(1000L) ?: 0L
+
+// Function to format date with fallback
+private fun formatPhotoDate(timestamp: Long): String {
+    return try {
+        java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
     } catch (e: Exception) {
-        null
+        "Unknown Date"
     }
 }
 
-// Function to safely create grouped grid items
-private fun createGroupedGridItems(
-    localPhotos: LazyPagingItems<Photo>
-): List<LocalGridItem> {
-    val items = mutableListOf<LocalGridItem>()
-    var lastDateLabel: String? = null
-    var headerIndex = 0
+// Optimized function to group photos by date ensuring ALL photos are included
+private fun groupPhotosByDateOptimized(
+    localPhotos: LazyPagingItems<Photo>,
+): List<DateGroup> {
+    val photosByDate = mutableMapOf<String, MutableList<Pair<Photo, Int>>>()
+    var processedCount = 0
+    var skippedCount = 0
 
+    Log.d(TAG, "🔍 Starting date grouping for ${localPhotos.itemCount} photos")
+
+    // Process ALL photos - no filtering
     for (i in 0 until localPhotos.itemCount) {
-        val photo = localPhotos.peek(i) ?: continue
-        val dateLabel = getDateLabelFromLocalId(photo.localId)
+        val photo = localPhotos.peek(i)
+        if (photo != null) {
+            val timestamp = safeTimestampFromLocalId(photo.localId)
+            val dateLabel = formatPhotoDate(timestamp)
 
-        // Add header if this is a new date group
-        if (dateLabel != null && dateLabel != lastDateLabel) {
-            items.add(LocalGridItem.HeaderItem(dateLabel, "header_${headerIndex}_$dateLabel"))
-            lastDateLabel = dateLabel
-            headerIndex++
+            photosByDate.getOrPut(dateLabel) { mutableListOf() }.add(photo to i)
+            processedCount++
+
+            if (processedCount % 100 == 0) {
+                Log.d(TAG, "📊 Processed $processedCount photos so far...")
+            }
+        } else {
+            skippedCount++
+            Log.w(TAG, "⚠️ Skipped null photo at index $i")
         }
-
-        // Add photo item
-        items.add(LocalGridItem.PhotoItem(photo, i))
     }
 
-    return items
+    Log.d(TAG, "✅ Date grouping complete: $processedCount processed, $skippedCount skipped")
+    Log.d(TAG, "📅 Created ${photosByDate.size} date groups")
+
+    // Convert to sorted list of DateGroups (most recent first)
+    return photosByDate.map { (dateLabel, photos) ->
+        val sortKey = photos.maxOfOrNull { safeTimestampFromLocalId(it.first.localId) } ?: 0L
+        DateGroup(
+            dateLabel = dateLabel,
+            photos = photos.sortedByDescending { safeTimestampFromLocalId(it.first.localId) },
+            sortKey = sortKey
+        )
+    }.sortedByDescending { it.sortKey }
+}
+
+// Optimized function to create layout cache
+private fun createLayoutCache(
+    localPhotos: LazyPagingItems<Photo>,
+): LayoutCache {
+    val start = System.currentTimeMillis()
+    val normalGridItems = buildList {
+        for (i in 0 until localPhotos.itemCount) {
+            val p = localPhotos.peek(i) ?: continue
+            add(LocalGridItem.PhotoItem(p, i))
+        }
+    }
+    val dateGroups = groupPhotosByDateOptimized(localPhotos)
+    val dateGroupedItems = buildList {
+        dateGroups.forEachIndexed { idx, group ->
+            add(LocalGridItem.HeaderItem(group.dateLabel, "header_${idx}_${group.dateLabel}"))
+            group.photos.forEach { (p, originalIndex) -> add(LocalGridItem.PhotoItem(p, originalIndex)) }
+        }
+    }
+    Log.d(TAG, "Layout cache in ${System.currentTimeMillis() - start}ms; normal=${normalGridItems.size}, grouped=${dateGroupedItems.size}")
+    return LayoutCache(normalGridItems, dateGroupedItems, localPhotos.itemCount, System.currentTimeMillis())
 }
 
 @Composable
@@ -110,27 +159,28 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<Photo?>(null) }
 
+    // Preserve scroll
+    val gridState = rememberLazyGridState()
     // Responsive grid configuration (3-6 columns, default 4)
-    val columns = remember {
-        Preferences.getInt("grid_column_count", 4).coerceIn(3, 6)
-    }
+    val columns = remember { Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount).coerceIn(3, 6) }
     val horizontalSpacing = 12.dp
     val verticalSpacing = 12.dp
 
     // Layout mode configuration
-    val isDateGroupedLayout = remember {
-        Preferences.getBoolean("date_grouped_layout", false)
+    val isDateGroupedLayout = remember { Preferences.getBoolean("date_grouped_layout", false) }
+
+    // Optimized layout cache with instant switching
+    val layoutCache = remember(localPhotos.itemSnapshotList.items.hashCode()) {
+        createLayoutCache(localPhotos)
     }
 
-    // Cache date lookups
-    val dateCache = remember { mutableStateMapOf<String, Long>() }
-
-    // Create grouped grid items for date grouped layout
-    val groupedGridItems = remember(localPhotos.itemSnapshotList, isDateGroupedLayout) {
-        if (!isDateGroupedLayout) {
-            emptyList()
+    // Get current layout items instantly (no recomputation)
+    val currentLayoutItems = remember(isDateGroupedLayout, layoutCache) {
+        Log.d(TAG, "⚡ Switching to ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"} layout")
+        if (isDateGroupedLayout) {
+            layoutCache.dateGroupedItems
         } else {
-            createGroupedGridItems(localPhotos)
+            layoutCache.normalGridItems
         }
     }
 
@@ -187,8 +237,7 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
     }
 
     fun getDateLabel(localId: String): String? {
-        val cached = dateCache[localId]
-        val millis = if (cached != null) cached else runCatching {
+        val millis = runCatching {
             val idLong = localId.toLongOrNull() ?: return null
             val uri = ContentUris.withAppendedId(
                 MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL), idLong
@@ -199,7 +248,7 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                 null,
                 null,
                 null
-            )?.use { c -> if (c.moveToFirst()) (c.getLong(0) * 1000L).also { dateCache[localId] = it } else null }
+            )?.use { c -> if (c.moveToFirst()) (c.getLong(0) * 1000L) else null }
         }.getOrNull()
         millis ?: return null
         return java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
@@ -212,36 +261,41 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
             LoadAnimation(modifier = Modifier.align(Alignment.Center))
         } else {
             LazyVerticalGrid(
+                state = gridState,
                 modifier = Modifier.fillMaxSize(),
                 columns = GridCells.Fixed(columns),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                 horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
             ) {
-                Log.d(TAG, "=== LAZY GRID ITEMS BLOCK ===")
+                Log.d(TAG, "=== OPTIMIZED LAZY GRID ITEMS BLOCK ===")
                 Log.d(TAG, "Layout mode: ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"}")
-                Log.d(TAG, "Creating items for count: ${localPhotos.itemCount}")
+                Log.d(TAG, "Rendering ${currentLayoutItems.size} items (Total photos in cache: ${layoutCache.totalPhotos})")
 
-                if (isDateGroupedLayout) {
-                    // Date grouped layout
-                    items(
-                        count = groupedGridItems.size,
-                        key = { index ->
-                            when (val item = groupedGridItems[index]) {
-                                is LocalGridItem.HeaderItem -> item.id
-                                is LocalGridItem.PhotoItem -> item.photo.localId
-                            }
-                        },
-                        span = { index ->
-                            when (groupedGridItems[index]) {
-                                is LocalGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
-                                is LocalGridItem.PhotoItem -> GridItemSpan(1)
-                            }
+                // Unified layout rendering with smooth transitions
+                items(
+                    count = currentLayoutItems.size,
+                    key = { index ->
+                        when (val item = currentLayoutItems[index]) {
+                            is LocalGridItem.HeaderItem -> item.id
+                            is LocalGridItem.PhotoItem -> item.photo.localId
                         }
-                    ) { index ->
-                        when (val item = groupedGridItems[index]) {
-                            is LocalGridItem.HeaderItem -> {
-                                // Date header
+                    },
+                    span = { index ->
+                        when (currentLayoutItems[index]) {
+                            is LocalGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
+                            is LocalGridItem.PhotoItem -> GridItemSpan(1)
+                        }
+                    }
+                ) { index ->
+                    when (val item = currentLayoutItems[index]) {
+                        is LocalGridItem.HeaderItem -> {
+                            // Date header with smooth animation
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = true,
+                                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(),
+                                exit = androidx.compose.animation.fadeOut()
+                            ) {
                                 Text(
                                     text = item.dateLabel,
                                     style = MaterialTheme.typography.titleMedium,
@@ -252,8 +306,14 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                                         .padding(top = 8.dp, bottom = 4.dp)
                                 )
                             }
-                            is LocalGridItem.PhotoItem -> {
-                                // Photo item
+                        }
+                        is LocalGridItem.PhotoItem -> {
+                            // Photo item with smooth animation
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = true,
+                                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
+                                exit = androidx.compose.animation.fadeOut()
+                            ) {
                                 LocalPhotoItem(
                                     photo = item.photo,
                                     index = item.originalIndex,
@@ -266,46 +326,6 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                                 )
                             }
                         }
-                    }
-                } else {
-                    // Normal grid layout
-                    items(
-                        count = localPhotos.itemCount,
-                        key = { index ->
-                            val peekedItem = localPhotos.peek(index)
-                            val key = peekedItem?.localId ?: "placeholder_$index"
-                            Log.v(TAG, "Key for index $index: $key (peeked item: ${if (peekedItem != null) "exists" else "null"})")
-                            key
-                        }
-                    ) { index ->
-                        Log.d(TAG, "=== RENDERING LOCAL ITEM AT INDEX $index ===")
-
-                        // First check what peek returns
-                        val peekedPhoto = localPhotos.peek(index)
-                        Log.d(TAG, "peek($index) returned: ${if (peekedPhoto != null) "Photo(${peekedPhoto.localId})" else "null"}")
-
-                        // Now get the actual item (this should trigger loading)
-                        val photo = localPhotos[index]
-                        Log.d(TAG, "localPhotos[$index] returned: ${if (photo != null) "Photo(${photo.localId})" else "null"}")
-
-                        if (photo == null && peekedPhoto == null) {
-                            Log.w(TAG, "Both peek and direct access returned null for index $index - this indicates loading issue")
-                        } else if (photo == null && peekedPhoto != null) {
-                            Log.w(TAG, "Direct access returned null but peek returned data - unusual paging behavior")
-                        } else if (photo != null && peekedPhoto == null) {
-                            Log.i(TAG, "Direct access loaded new data for index $index")
-                        }
-
-                        LocalPhotoItem(
-                            photo = photo,
-                            index = index,
-                            getDateLabel = ::getDateLabel,
-                            onClick = {
-                                Log.d(TAG, "Photo clicked at index: $index, localId: ${photo?.localId}")
-                                selectedIndex = index
-                                selectedPhoto = photo
-                            }
-                        )
                     }
                 }
             }
@@ -379,23 +399,27 @@ fun LocalPhotoItem(
         contentAlignment = Alignment.Center
     ) {
         if (photo != null) {
-            Log.d(TAG, "Item[$index] Creating image for localId=${photo.localId}, pathUri=${photo.pathUri}")
+            val request = ImageRequest.Builder(context)
+                .data(photo.pathUri)
+                .size(Size(150, 150))
+                .crossfade(100)
+                .allowHardware(true)
+                .allowRgb565(true)
+                .build()
 
             SubcomposeAsyncImage(
-                model = photo.pathUri,
+                model = request,
                 contentDescription = stringResource(id = R.string.photo),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
                 loading = {
-                    Log.d(TAG, "Item[$index] Showing LOADING state for localId=${photo.localId}")
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
                     )
                 },
-                error = { error ->
-                    Log.e(TAG, "Item[$index] Showing ERROR state for localId=${photo.localId}: ${error.result.throwable?.message}")
+                error = {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -409,9 +433,6 @@ fun LocalPhotoItem(
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                },
-                onSuccess = { success ->
-                    Log.i(TAG, "Item[$index] Image SUCCESS for localId=${photo.localId}, dataSource=${success.result.dataSource}")
                 }
             )
         } else {

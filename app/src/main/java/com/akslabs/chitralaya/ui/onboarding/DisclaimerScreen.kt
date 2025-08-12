@@ -118,7 +118,7 @@ fun DisclaimerScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Syncs Your Messages Before They Fade",
+                text = "Where Your Memories Get To Live Forever",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -141,7 +141,7 @@ fun DisclaimerScreen(
                 icon = Icons.Rounded.Security,
                 title = "🔐 Privacy & Data Handling",
                 content = """
-                    • Your SMS messages are synced directly to YOUR Telegram bot
+                    • Your images are synced directly to YOUR Telegram bot
                     • We do NOT store, access, or transmit your data to any servers
                     • All data remains under YOUR complete control
                     • Zero analytics, tracking, or third-party data sharing
@@ -159,7 +159,7 @@ fun DisclaimerScreen(
                 content = """
                     • You are responsible for creating and managing your Telegram bot
                     • Ensure your bot token is kept secure and not shared
-                    • Use this app only for legitimate SMS synchronization purposes
+                    • Use this app only for legitimate Images synchronization purposes
                     • Comply with Telegram's Terms of Service and local laws
                     • This app is not intended for spam or malicious activities
                     • Use at your own responsibility and discretion
@@ -173,9 +173,9 @@ fun DisclaimerScreen(
                 icon = Icons.Rounded.CheckCircle,
                 title = "📋 Terms of Use",
                 content = """
-                    • This app requires READ_SMS permission to access your messages
+                    • This app requires READ_IMAGES permission to access your Images
                     • Internet permission is used ONLY for Telegram API communication
-                    • Background services monitor SMS changes for real-time sync
+                    • Background services monitor Images changes for real-time sync
                     • The app is provided "as-is" without warranties
                     • We are not liable for any data loss or service interruptions
                     • You can stop using the app and delete all data at any time
@@ -190,11 +190,11 @@ fun DisclaimerScreen(
                 title = "🤖 Telegram Bot Requirements",
                 content = """
                     • You must create your own Telegram bot using @BotFather
-                    • The bot acts as a secure bridge for your SMS messages
-                    • You need to create a private group/channel for message storage
+                    • The bot acts as a secure bridge for your Images
+                    • You need to create a private group/channel for images storage
                     • Your bot token is like a password - keep it secure
                     • Only you have access to your bot and synced messages
-                    • The bot operates independently of our servers
+                    • The bot operates independently of any servers
                 """.trimIndent()
             )
             

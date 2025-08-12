@@ -86,7 +86,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     // State for grid customization menu
     var showGridOptionsDropdown by remember { mutableStateOf(false) }
     var currentColumnCount by remember {
-        mutableStateOf(Preferences.getInt("grid_column_count", 4))
+        mutableStateOf(Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount))
     }
     var isDateGroupedLayout by remember {
         mutableStateOf(Preferences.getBoolean("date_grouped_layout", false))
@@ -274,7 +274,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                             onClick = {
                                                 currentColumnCount = columnCount
                                                 Preferences.edit {
-                                                    putInt("grid_column_count", columnCount)
+                                                    putInt(Preferences.gridColumnCountKey, columnCount)
                                                 }
                                                 showGridOptionsDropdown = false
                                                 // Trigger recomposition

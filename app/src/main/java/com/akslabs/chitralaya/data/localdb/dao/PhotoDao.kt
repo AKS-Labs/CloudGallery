@@ -18,7 +18,7 @@ interface PhotoDao {
     @Query("SELECT * FROM photos")
     suspend fun getAll(): List<Photo>
 
-    @Query("SELECT * FROM photos")
+    @Query("SELECT * FROM photos ORDER BY CAST(localId AS INTEGER) DESC")
     fun getAllPaging(): PagingSource<Int, Photo>
 
     @Query("SELECT * FROM photos WHERE remoteId IS NOT NULL")
