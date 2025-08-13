@@ -300,7 +300,7 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                             formatPhotoDate(ts)
                         }
                         if (currentLabel != null && currentLabel != prevLabel) {
-                            item(key = "header_$currentLabel", span = { GridItemSpan(maxLineSpan) }) {
+                            item(key = "header_${index}_$currentLabel", span = { GridItemSpan(maxLineSpan) }) {
                                 Text(
                                     text = currentLabel,
                                     style = MaterialTheme.typography.titleMedium,
