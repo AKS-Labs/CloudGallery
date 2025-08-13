@@ -34,6 +34,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -86,10 +87,9 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 
     // State for grid customization menu
     var showGridOptionsDropdown by remember { mutableStateOf(false) }
-    var currentColumnCount by remember {
-        mutableStateOf(Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount))
-    }
-    var isDateGroupedLayout by remember { mutableStateOf(Preferences.getBoolean("date_grouped_layout", false)) }
+    
+    // Shared grid state holder
+    val gridState = remember { GridStateHolder() }
 
     // Get photo counts for TopAppBar titles
     val localPhotosCount by DbHolder.database.photoDao().getAllCountFlow()
@@ -185,18 +185,16 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                         )
 
                                         DropdownMenuItem(
-                                            text = { Text(text = "Grid View", color = if (!isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
+                                            text = { Text(text = "Grid View", color = if (!gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
                                             onClick = {
-                                                isDateGroupedLayout = false
-                                                Preferences.edit { putBoolean("date_grouped_layout", false) }
+                                                gridState.updateDateGroupedLayout(false)
                                                 showGridOptionsDropdown = false
                                             }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text(text = "Date Grouped", color = if (isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
+                                            text = { Text(text = "Date Grouped", color = if (gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
                                             onClick = {
-                                                isDateGroupedLayout = true
-                                                Preferences.edit { putBoolean("date_grouped_layout", true) }
+                                                gridState.updateDateGroupedLayout(true)
                                                 showGridOptionsDropdown = false
                                             }
                                         )
@@ -209,10 +207,9 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                         )
                                         listOf(3, 4, 5, 6).forEach { columnCount ->
                                             DropdownMenuItem(
-                                                text = { Text(text = "$columnCount columns", color = if (columnCount == currentColumnCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
+                                                text = { Text(text = "$columnCount columns", color = if (columnCount == gridState.columnCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
                                                 onClick = {
-                                                    currentColumnCount = columnCount
-                                                    Preferences.edit { putInt(Preferences.gridColumnCountKey, columnCount) }
+                                                    gridState.updateColumnCount(columnCount)
                                                     showGridOptionsDropdown = false
                                                 }
                                             )
@@ -234,12 +231,14 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             },
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { paddingValues ->
-            AppNavHost(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize(),
-                navController = navController
-            )
+            CompositionLocalProvider(LocalGridState provides gridState) {
+                AppNavHost(
+                    modifier = Modifier
+                        .padding(paddingValues)
+                        .fillMaxSize(),
+                    navController = navController
+                )
+            }
         }
 
         // Truly floating bottom navigation

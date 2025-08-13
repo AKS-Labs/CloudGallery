@@ -55,6 +55,7 @@ import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.components.itemsPaging
+import com.akslabs.cloudgallery.ui.main.rememberGridState
 
 // Sealed class for grid items to support date grouping
 sealed class LocalGridItem {
@@ -196,14 +197,15 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
     var selectedPhoto by remember { mutableStateOf<Photo?>(null) }
 
     // Preserve scroll
-    val gridState = rememberLazyGridState()
+    val lazyGridState = rememberLazyGridState()
     // Responsive grid configuration (3-6 columns, default 4)
-    val columns = remember { Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount).coerceIn(3, 6) }
+    val gridState = rememberGridState()
+    val columns = gridState.columnCount.coerceIn(3, 6)
     val horizontalSpacing = 12.dp
     val verticalSpacing = 12.dp
 
     // Layout mode configuration
-    val isDateGroupedLayout = remember { Preferences.getBoolean("date_grouped_layout", false) }
+    val isDateGroupedLayout = gridState.isDateGroupedLayout
 
     // Build MediaStore date map in background (once per dataset size change)
     var dateMap by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
@@ -277,7 +279,7 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
             LoadAnimation(modifier = Modifier.align(Alignment.Center))
         } else {
             LazyVerticalGrid(
-                state = gridState,
+                state = lazyGridState,
                 modifier = Modifier.fillMaxSize(),
                 columns = GridCells.Fixed(columns),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),

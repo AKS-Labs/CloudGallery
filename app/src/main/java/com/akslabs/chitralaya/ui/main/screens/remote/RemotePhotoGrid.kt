@@ -52,6 +52,7 @@ import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.components.itemsPaging
+import com.akslabs.cloudgallery.ui.main.rememberGridState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 
 // Sealed class for remote grid items to support date grouping
@@ -284,15 +285,16 @@ fun CloudPhotosGrid(
     onPhotoClick: (Int, RemotePhoto?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val gridState = rememberLazyGridState()
+    val lazyGridState = rememberLazyGridState()
 
     // Responsive grid configuration (3-6 columns, default 4) - matches LocalPhotoGrid
-    val columns = remember { Preferences.getInt(Preferences.gridColumnCountKey, Preferences.defaultGridColumnCount).coerceIn(3, 6) }
+    val gridState = rememberGridState()
+    val columns = gridState.columnCount.coerceIn(3, 6)
     val horizontalSpacing = 12.dp
     val verticalSpacing = 12.dp
 
     // Layout mode configuration
-    val isDateGroupedLayout = remember { Preferences.getBoolean("date_grouped_layout", false) }
+    val isDateGroupedLayout = gridState.isDateGroupedLayout
 
     fun getDateLabel(uploadedAt: Long): String? {
         return try {
@@ -344,7 +346,7 @@ fun CloudPhotosGrid(
             }
             else -> {
                 LazyVerticalGrid(
-                    state = gridState,
+                    state = lazyGridState,
                     modifier = Modifier.fillMaxSize(),
                     columns = GridCells.Fixed(columns),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
