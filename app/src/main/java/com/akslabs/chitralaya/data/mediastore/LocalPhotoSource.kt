@@ -5,23 +5,22 @@ import android.content.Context
 import android.provider.MediaStore
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-object LocalPhotoSource : PagingSource<Int, Photo>() {
+object LocalPhotoSource : PagingSource<Int, LocalUiPhoto>() {
 
     private lateinit var contentResolver: ContentResolver
     private val imageCollection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
 
     override val jumpingSupported: Boolean = true
 
-    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Photo> {
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, LocalUiPhoto> {
         val page = params.key ?: 1
         val pageSize = params.loadSize
         val limit = pageSize
         val offset = (page - 1) * pageSize
-        val pagePhotoList = mutableListOf<Photo>()
+        val pagePhotoList = mutableListOf<LocalUiPhoto>()
         val query =
             Query.PhotoQuery().copy(
                 bundle = Query.PhotoQuery().bundle?.apply {
@@ -50,7 +49,20 @@ object LocalPhotoSource : PagingSource<Int, Photo>() {
                 cursor?.use { _ ->
                     while (cursor.moveToNext()) {
                         try {
-                            pagePhotoList.add(cursor.getPhotoFromCursor())
+                            val id: Long = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns._ID))
+                            val mime: String = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.MIME_TYPE))
+                            val dateTaken = runCatching { cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_TAKEN)) }.getOrDefault(0L)
+                            val dateAdded = runCatching { cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_ADDED)) }.getOrDefault(0L) * 1000L
+                            val dateModified = runCatching { cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_MODIFIED)) }.getOrDefault(0L) * 1000L
+                            val ts = when {
+                                dateTaken > 0L -> dateTaken
+                                dateModified > 0L -> dateModified
+                                dateAdded > 0L -> dateAdded
+                                else -> 0L
+                            }
+                            val contentUri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                            val uri = android.content.ContentUris.withAppendedId(contentUri, id)
+                            pagePhotoList.add(LocalUiPhoto(id.toString(), uri.toString(), mime, ts))
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -64,8 +76,10 @@ object LocalPhotoSource : PagingSource<Int, Photo>() {
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, Photo>): Int? {
-        return state.anchorPosition
+    override fun getRefreshKey(state: PagingState<Int, LocalUiPhoto>): Int? {
+        val anchor = state.anchorPosition ?: return null
+        val closest = state.closestPageToPosition(anchor)
+        return closest?.prevKey?.plus(1) ?: closest?.nextKey?.minus(1)
     }
 
     fun create(applicationContext: Context) {

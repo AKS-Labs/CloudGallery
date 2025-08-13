@@ -121,43 +121,56 @@ suspend fun sendFileApi(
     file: File,
     extension: String,
 ) {
-    var resFile: Document? = null
+    var message: com.github.kotlintelegrambot.entities.Message? = null
     botApi.sendFile(file, channelId).fold(
-        { response ->
-            resFile = response?.result?.document
+        { apiResponse ->
+            message = apiResponse?.result
         }
     )
-    resFile?.let {
-        // Find the existing photo record by pathUri
-        val existingPhotos = DbHolder.database.photoDao().getAll()
-        val existingPhoto = existingPhotos.find { photo -> photo.pathUri == pathUri.toString() }
 
-        if (existingPhoto != null) {
-            // Update the existing photo with remoteId
-            val updatedPhoto = existingPhoto.copy(remoteId = it.fileId)
-            DbHolder.database.photoDao().updatePhotos(updatedPhoto)
-        } else {
-            // Create new photo record if not found (fallback)
-            val photo = Photo(
-                pathUri.lastPathSegment ?: "",
-                it.fileId,
-                extension,
-                pathUri.toString()
-            )
-            DbHolder.database.photoDao().updatePhotos(photo)
+    val doc = message?.document
+    val photoSize = message?.photo?.maxByOrNull { it.fileSize ?: 0 }
+    val fileId = doc?.fileId ?: photoSize?.fileId
+
+    if (fileId != null) {
+        // Resolve extension from Telegram metadata if available
+        val resolvedExt = when {
+            doc?.mimeType != null -> getExtFromMimeType(doc.mimeType!!) ?: extension
+            photoSize != null -> "jpg"
+            else -> extension
         }
 
-        val remotePhoto = RemotePhoto(
-            remoteId = it.fileId,
-            photoType = extension,
-            fileName = file.name,
-            fileSize = file.length(),
-            uploadedAt = System.currentTimeMillis(),
-            thumbnailCached = false
+        // Update or insert device Photo with remoteId for linkage
+        val existingPhotos = DbHolder.database.photoDao().getAll()
+        val existingPhoto = existingPhotos.find { photo -> photo.pathUri == pathUri.toString() }
+        if (existingPhoto != null) {
+            DbHolder.database.photoDao().updatePhotos(existingPhoto.copy(remoteId = fileId))
+        } else {
+            DbHolder.database.photoDao().insertPhotos(
+                Photo(
+                    localId = pathUri.lastPathSegment ?: fileId,
+                    remoteId = fileId,
+                    photoType = resolvedExt,
+                    pathUri = pathUri.toString()
+                )
+            )
+        }
+
+        // Insert/replace RemotePhoto so Cloud screen picks it up immediately
+        DbHolder.database.remotePhotoDao().insertAll(
+            RemotePhoto(
+                remoteId = fileId,
+                photoType = resolvedExt,
+                fileName = file.name,
+                fileSize = file.length(),
+                uploadedAt = System.currentTimeMillis(),
+                thumbnailCached = false
+            )
         )
-        DbHolder.database.remotePhotoDao().insertAll(remotePhoto)
         Log.d(TAG, "sendFile: Success!")
-    } ?: Log.d(TAG, "sendFile: Failed!")
+    } else {
+        Log.d(TAG, "sendFile: Failed!")
+    }
 }
 
 suspend fun Context.toastFromMainThread(msg: String?, length: Int = Toast.LENGTH_LONG) =

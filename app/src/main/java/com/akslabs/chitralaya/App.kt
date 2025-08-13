@@ -5,6 +5,7 @@ import android.app.Application
 import com.akslabs.cloudgallery.api.BotApi
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
+import com.akslabs.cloudgallery.data.mediastore.LocalPhotoSource
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 import com.akslabs.cloudgallery.utils.connectivity.ConnectivityObserver
 import com.akslabs.cloudgallery.workers.WorkModule
@@ -17,6 +18,7 @@ class App : Application() {
 
         Preferences.init(applicationContext)
         DbHolder.create(applicationContext)
+        LocalPhotoSource.create(applicationContext)
         WorkModule.create(applicationContext)
         ImageLoaderModule.create(applicationContext)
         ConnectivityObserver.init(applicationContext)

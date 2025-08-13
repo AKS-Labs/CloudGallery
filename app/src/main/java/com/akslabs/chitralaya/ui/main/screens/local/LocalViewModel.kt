@@ -10,7 +10,8 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.akslabs.cloudgallery.data.localdb.DbHolder
-import com.akslabs.cloudgallery.data.localdb.entities.Photo
+import com.akslabs.cloudgallery.data.mediastore.LocalPhotoSource
+import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.workers.WorkModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -21,19 +22,18 @@ import kotlinx.coroutines.launch
 
 class LocalViewModel : ViewModel() {
 
-    val localPhotosFlow: Flow<PagingData<Photo>> by lazy {
+    val localPhotosFlow: Flow<PagingData<LocalUiPhoto>> by lazy {
         Pager(
             config = PagingConfig(
                 pageSize = PAGE_SIZE,
                 prefetchDistance = PREFETCH_DISTANCE,
-                jumpThreshold = JUMP_THRESHOLD
+                jumpThreshold = JUMP_THRESHOLD,
+                enablePlaceholders = false
             ),
             pagingSourceFactory = {
                 Log.d(TAG, "=== CREATING NEW LOCAL PAGING SOURCE ===")
                 Log.d(TAG, "PageSize: $PAGE_SIZE, PrefetchDistance: $PREFETCH_DISTANCE, JumpThreshold: $JUMP_THRESHOLD")
-                val pagingSource = DbHolder.database.photoDao().getAllPaging()
-                Log.d(TAG, "Local PagingSource created: ${pagingSource::class.simpleName}")
-                pagingSource
+                LocalPhotoSource
             }
         ).flow.cachedIn(viewModelScope)
     }
@@ -119,7 +119,7 @@ class LocalViewModel : ViewModel() {
     companion object {
         private const val TAG = "LocalViewModel"
         const val PAGE_SIZE = 32
-        const val PREFETCH_DISTANCE = 5 * 32
+        const val PREFETCH_DISTANCE = 2 * 32
         const val JUMP_THRESHOLD = 5 * 32
     }
 }

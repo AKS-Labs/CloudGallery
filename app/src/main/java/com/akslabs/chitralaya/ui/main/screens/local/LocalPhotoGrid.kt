@@ -43,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
+import com.akslabs.cloudgallery.BuildConfig
 import androidx.paging.compose.LazyPagingItems
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +51,7 @@ import kotlinx.coroutines.withContext
 import coil.request.ImageRequest
 import coil.size.Size
 import com.akslabs.cloudgallery.R
-import com.akslabs.cloudgallery.data.localdb.entities.Photo
+import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
@@ -59,14 +60,14 @@ import com.akslabs.cloudgallery.ui.main.rememberGridState
 
 // Sealed class for grid items to support date grouping
 sealed class LocalGridItem {
-    data class PhotoItem(val photo: Photo, val originalIndex: Int) : LocalGridItem()
+    data class PhotoItem(val photo: LocalUiPhoto, val originalIndex: Int) : LocalGridItem()
     data class HeaderItem(val dateLabel: String, val id: String) : LocalGridItem()
 }
 
 // Data class for date groups
 data class DateGroup(
     val dateLabel: String,
-    val photos: List<Pair<Photo, Int>>, // Photo with original index
+    val photos: List<Pair<LocalUiPhoto, Int>>, // Photo with original index
     val sortKey: Long // For efficient sorting
 )
 
@@ -124,10 +125,10 @@ private fun formatPhotoDate(timestamp: Long): String {
 
 // Optimized function to group photos by date ensuring ALL photos are included
 private fun groupPhotosByDateOptimized(
-    localPhotos: LazyPagingItems<Photo>,
+    localPhotos: LazyPagingItems<LocalUiPhoto>,
     dateMap: Map<String, Long>
 ): List<DateGroup> {
-    val photosByDate = mutableMapOf<String, MutableList<Pair<Photo, Int>>>()
+    val photosByDate = mutableMapOf<String, MutableList<Pair<LocalUiPhoto, Int>>>()
     var processedCount = 0
     var skippedCount = 0
 
@@ -168,7 +169,7 @@ private fun groupPhotosByDateOptimized(
 
 // Optimized function to create layout cache
 private fun createLayoutCache(
-    localPhotos: LazyPagingItems<Photo>,
+    localPhotos: LazyPagingItems<LocalUiPhoto>,
     dateMap: Map<String, Long>
 ): LayoutCache {
     val start = System.currentTimeMillis()
@@ -190,11 +191,11 @@ private fun createLayoutCache(
 }
 
 @Composable
-fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
-    Log.e(TAG, "🎯 === LOCAL PHOTO GRID COMPOSING ===")
+fun LocalPhotoGrid(localPhotos: LazyPagingItems<LocalUiPhoto>, totalCount: Int) {
+    if (BuildConfig.DEBUG) Log.d(TAG, "🎯 LocalPhotoGrid composing")
     val context = LocalContext.current
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
-    var selectedPhoto by remember { mutableStateOf<Photo?>(null) }
+    var selectedPhoto by remember { mutableStateOf<LocalUiPhoto?>(null) }
 
     // Preserve scroll
     val lazyGridState = rememberLazyGridState()
@@ -215,57 +216,20 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
         }
     }
 
-    // Comprehensive debug logging for local photos data
+    // Debug logging (guarded)
     LaunchedEffect(localPhotos.loadState, totalCount, localPhotos.itemCount) {
-        Log.d(TAG, "=== LOCAL PHOTO GRID DEBUG ===")
-        Log.d(TAG, "Total count from ViewModel: $totalCount")
-        Log.d(TAG, "LocalPhotos itemCount: ${localPhotos.itemCount}")
-        Log.d(TAG, "LoadState.refresh: ${localPhotos.loadState.refresh}")
-        Log.d(TAG, "LoadState.append: ${localPhotos.loadState.append}")
-        Log.d(TAG, "LoadState.prepend: ${localPhotos.loadState.prepend}")
-
-        // Check if refresh is loading
-        if (localPhotos.loadState.refresh is LoadState.Loading) {
-            Log.i(TAG, "REFRESH is currently LOADING")
-        } else if (localPhotos.loadState.refresh is LoadState.Error) {
-            Log.e(TAG, "REFRESH ERROR: ${(localPhotos.loadState.refresh as LoadState.Error).error}")
-        } else {
-            Log.i(TAG, "REFRESH completed successfully")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "=== LOCAL PHOTO GRID DEBUG ===")
+            Log.d(TAG, "Total count from ViewModel: $totalCount")
+            Log.d(TAG, "LocalPhotos itemCount: ${localPhotos.itemCount}")
+            Log.d(TAG, "LoadState.refresh: ${localPhotos.loadState.refresh}")
+            Log.d(TAG, "LoadState.append: ${localPhotos.loadState.append}")
+            Log.d(TAG, "LoadState.prepend: ${localPhotos.loadState.prepend}")
+            Log.d(TAG, "=== END LOCAL PHOTO GRID DEBUG ===")
         }
-
-        // Check append state for scrolling
-        if (localPhotos.loadState.append is LoadState.Loading) {
-            Log.i(TAG, "APPEND is currently LOADING (scrolling down)")
-        } else if (localPhotos.loadState.append is LoadState.Error) {
-            Log.e(TAG, "APPEND ERROR: ${(localPhotos.loadState.append as LoadState.Error).error}")
-        }
-
-        if (localPhotos.itemCount > 0) {
-            Log.i(TAG, "Checking first 5 local photos with peek():")
-            for (i in 0 until minOf(5, localPhotos.itemCount)) {
-                val photo = localPhotos.peek(i)
-                if (photo != null) {
-                    Log.d(TAG, "Photo[$i] LOADED: localId=${photo.localId}, pathUri=${photo.pathUri}")
-                } else {
-                    Log.w(TAG, "Photo[$i] NULL: not loaded yet or loading")
-                }
-            }
-
-            // Also check snapshot list
-            val snapshotItems = localPhotos.itemSnapshotList.items
-            Log.i(TAG, "Snapshot list size: ${snapshotItems.size}")
-            snapshotItems.take(3).forEachIndexed { index, item ->
-                if (item != null) {
-                    Log.d(TAG, "Snapshot[$index]: localId=${item.localId}")
-                } else {
-                    Log.w(TAG, "Snapshot[$index]: null")
-                }
-            }
-        } else {
-            Log.w(TAG, "LocalPhotos itemCount is 0!")
-        }
-        Log.d(TAG, "=== END LOCAL PHOTO GRID DEBUG ===")
     }
+
+    // No heavy cache for grouped layout; we stream headers/items inline for parity with normal grid
 
     fun getDateLabel(localId: String): String? {
         val millis = dateMap[localId] ?: return null
@@ -287,7 +251,7 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                 horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
             ) {
                 if (isDateGroupedLayout) {
-                    // Build headers and items on the fly using current paging window
+                    // Stream grouped headers/items inline to match normal grid count
                     for (index in 0 until localPhotos.itemCount) {
                         val current = localPhotos.peek(index)
                         val prev = if (index > 0) localPhotos.peek(index - 1) else null
@@ -312,28 +276,37 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                                 )
                             }
                         }
-                        val key = current?.localId ?: "photo_placeholder_$index"
-                        item(key = key) {
+                        val key = current?.localId ?: "placeholder"
+                        item(key = "photo_${index}_$key") {
+                            val p = localPhotos[index]
                             LocalPhotoItem(
-                                photo = localPhotos[index],
+                                photo = p,
                                 index = index,
                                 getDateLabel = ::getDateLabel,
                                 onClick = {
                                     selectedIndex = index
-                                    selectedPhoto = localPhotos.peek(index)
+                                    selectedPhoto = p
                                 }
                             )
                         }
                     }
                 } else {
-                    itemsPaging(items = localPhotos, key = { it.localId }) { item, index ->
+                    // Normal grid with stable unique keys per index to avoid duplicate key crashes
+                    items(
+                        count = localPhotos.itemCount,
+                        key = { i ->
+                            val p = localPhotos.peek(i)
+                            if (p != null) "photo_${i}_${p.localId}" else "photo_placeholder_${i}"
+                        }
+                    ) { i ->
+                        val p = localPhotos[i]
                         LocalPhotoItem(
-                            photo = item,
-                            index = index,
+                            photo = p,
+                            index = i,
                             getDateLabel = ::getDateLabel,
                             onClick = {
-                                selectedIndex = index
-                                selectedPhoto = item
+                                selectedIndex = i
+                                selectedPhoto = p
                             }
                         )
                     }
@@ -343,7 +316,7 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
         // Photo viewer overlay
         selectedIndex?.let { index ->
             // Build photo list from loaded items only
-            val loadedPhotos = mutableListOf<Photo>()
+            val loadedPhotos = mutableListOf<com.akslabs.cloudgallery.data.localdb.entities.Photo>()
             var targetIndex = 0
 
             // Collect all loaded photos and find the target index
@@ -353,7 +326,15 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
                     if (i == index) {
                         targetIndex = loadedPhotos.size // Current position in loaded list
                     }
-                    loadedPhotos.add(photo)
+                    // Map UI photo to entity for viewer compatibility
+                    loadedPhotos.add(
+                        com.akslabs.cloudgallery.data.localdb.entities.Photo(
+                            localId = photo.localId,
+                            remoteId = null,
+                            photoType = photo.mimeType.substringAfter('/').ifEmpty { "jpg" },
+                            pathUri = photo.pathUri
+                        )
+                    )
                 }
             }
 
@@ -381,7 +362,7 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<Photo>, totalCount: Int) {
 
 @Composable
 fun LocalPhotoItem(
-    photo: Photo?,
+    photo: LocalUiPhoto?,
     index: Int,
     getDateLabel: (String) -> String?,
     onClick: () -> Unit,
@@ -389,16 +370,7 @@ fun LocalPhotoItem(
 ) {
     val context = LocalContext.current
 
-    // Comprehensive debug logging for LocalPhotoItem
-    LaunchedEffect(photo, index) {
-        Log.d(TAG, "=== LOCAL PHOTO ITEM RENDER ===")
-        Log.d(TAG, "Index: $index")
-        if (photo != null) {
-            Log.i(TAG, "Item[$index] RENDERING with data: localId=${photo.localId}, pathUri=${photo.pathUri}")
-        } else {
-            Log.w(TAG, "Item[$index] RENDERING with NULL data - will show placeholder")
-        }
-    }
+    // Per-item logging removed to avoid main-thread overhead during fast scroll
 
     Box(
         modifier = modifier
