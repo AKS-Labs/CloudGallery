@@ -88,6 +88,9 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     // State for grid customization menu
     var showGridOptionsDropdown by remember { mutableStateOf(false) }
     
+    // State to track if settings is being navigated to
+    var isNavigatingToSettings by remember { mutableStateOf(false) }
+    
     // Shared grid state holder
     val gridState = remember { GridStateHolder() }
 
@@ -146,7 +149,17 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     ) {
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = backStackEntry?.destination?.route
-        val isSettingsScreen = currentRoute == Screens.Settings.route
+        val isSettingsScreen = currentRoute == Screens.Settings.route || isNavigatingToSettings
+
+        // Reset navigation flag when route changes
+        LaunchedEffect(currentRoute) {
+            if (currentRoute == Screens.Settings.route) {
+                isNavigatingToSettings = false
+            } else if (currentRoute != Screens.Settings.route && isNavigatingToSettings) {
+                // Reset flag when navigating away from settings
+                isNavigatingToSettings = false
+            }
+        }
 
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -218,7 +231,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                 }
 
                                 // Settings button
-                                IconButton(onClick = { navController.navigate(Screens.Settings.route) }) {
+                                IconButton(onClick = { 
+                                    isNavigatingToSettings = true
+                                    navController.navigate(Screens.Settings.route)
+                                }) {
                                     Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             },
