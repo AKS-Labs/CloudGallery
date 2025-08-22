@@ -111,7 +111,17 @@ Transform **Telegram into your personal, unlimited photo vault!** CloudGallery i
 
 ## 📱 **Screenshots**
 
-*Screenshots available in `fastlane/metadata/android/en-US/images/phoneScreenshots/`*
+<div align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="200" alt="Main Screen">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="200" alt="Photo Gallery">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="200" alt="Settings">
+</div>
+
+<div align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="200" alt="Cloud Sync">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" width="200" alt="Backup Progress">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6.png" width="200" alt="Photo Viewer">
+</div>
 
 ---
 

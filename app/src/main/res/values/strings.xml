@@ -1,6 +1,6 @@
 <resources>
     <!-- Non translatable -->
-    <string name="app_name" translatable="false">CloudGallery</string>
+    <string name="app_name" translatable="false">Chitralaya</string>
     <string name="upload_single" translatable="false">upload-single</string>
     <string name="enabled_periodic_backup" translatable="false">enabled-periodic-backup</string>
     <string name="disabled_periodic_backup" translatable="false">disabled-periodic-backup</string>
