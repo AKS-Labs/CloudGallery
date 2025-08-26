@@ -132,6 +132,37 @@ object WorkModule {
         }
     }
 
+    class InstantDownload(private val remoteId: String, private val forceDownload: Boolean = false) {
+
+        private val constraints: Constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        private val instantDownloadRequest =
+            OneTimeWorkRequestBuilder<InstantPhotoDownloadWorker>()
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setInputData(
+                    workDataOf(
+                        InstantPhotoDownloadWorker.KEY_REMOTE_ID to remoteId,
+                        InstantPhotoDownloadWorker.KEY_FORCE_DOWNLOAD to forceDownload
+                    )
+                )
+                .setConstraints(constraints)
+                .build()
+
+        fun enqueue() {
+            manager.enqueueUniqueWork(
+                "$DOWNLOADING_ID:$remoteId",
+                if (forceDownload) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+                instantDownloadRequest
+            )
+        }
+
+        fun cancel() {
+            manager.cancelUniqueWork("$DOWNLOADING_ID:$remoteId")
+        }
+    }
+
     object RestoreMissingFromDevice {
 
         private val constraints: Constraints = Constraints.Builder()
@@ -293,6 +324,7 @@ object WorkModule {
     const val QUICK_CLOUD_SYNC_WORK = "QuickCloudSyncWork"
     const val DAILY_DATABASE_BACKUP_WORK = "DailyDatabaseBackupWork"
     const val UPLOADING_ID = "UploadingId"
+    const val DOWNLOADING_ID = "DownloadingId"
     val VERBOSE_NOTIFICATION_CHANNEL_NAME: CharSequence = "Verbose WorkManager Notifications"
     const val VERBOSE_NOTIFICATION_CHANNEL_DESCRIPTION = "Shows notifications whenever work starts"
     val NOTIFICATION_TITLE: CharSequence = "Whitehole"

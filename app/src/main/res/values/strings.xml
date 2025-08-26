@@ -25,6 +25,13 @@
     <string name="upload_failed">Upload failed</string>
     <string name="upload_enqueued">Upload enqueued</string>
     <string name="upload_blocked">Upload blocked</string>
+    <string name="downloading">Downloading</string>
+    <string name="downloaded">Downloaded to Device</string>
+    <string name="download_to_device">Download to Device</string>
+    <string name="download_failed">Download failed</string>
+    <string name="download_enqueued">Download enqueued</string>
+    <string name="download_blocked">Download blocked</string>
+    <string name="checking_download_status">Checking Download Status</string>
     <string name="icon">icon</string>
     <string name="theme_switch">Theme Switch</string>
     <string name="oops_looks_like_there_s_no_internet_connection">"Oops, looks like there's no Internet connection. "</string>
