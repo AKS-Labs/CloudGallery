@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.ArrowOutward
 import androidx.compose.material.icons.rounded.AutoMode
 import androidx.compose.material.icons.rounded.SignalCellularAlt
 import androidx.compose.material.icons.rounded.Stars
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -70,6 +71,7 @@ import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.backup.BackupHelper
 import com.akslabs.cloudgallery.services.CloudPhotoSyncService
 import com.akslabs.cloudgallery.utils.Constants
+import com.akslabs.cloudgallery.utils.MetadataConfig
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import android.net.Uri
 import com.akslabs.cloudgallery.workers.WorkModule
@@ -303,6 +305,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     var isAutoExportDatabaseEnabled by remember {
         mutableStateOf(Preferences.getBoolean(Preferences.isAutoExportDatabaseEnabledKey, false))
     }
+    var isMetadataUploadEnabled by remember {
+        mutableStateOf(MetadataConfig.shouldIncludeMetadata())
+    }
     var backupStats by remember { mutableStateOf<BackupHelper.BackupStats?>(null) }
     val totalCloudPhotosCount by DbHolder.database.remotePhotoDao()
         .getTotalCountFlow().collectAsStateWithLifecycle(initialValue = 0)
@@ -408,6 +413,25 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     putString(Preferences.autoBackupNetworkTypeKey, value)
                 }
                 WorkModule.PeriodicBackup.enqueue(forceUpdate = true)
+            }
+        )
+
+        SettingsSwitchItem(
+            icon = Icons.Rounded.Description,
+            title = "Include Image Metadata",
+            subtitle = "Upload EXIF data, camera info, and location with images",
+            isChecked = isMetadataUploadEnabled,
+            onCheckedChange = { enabled ->
+                isMetadataUploadEnabled = enabled
+                MetadataConfig.setIncludeMetadata(enabled)
+                scope.launch {
+                    val message = if (enabled) {
+                        "Image metadata will be included with uploads"
+                    } else {
+                        "Image metadata will not be included with uploads"
+                    }
+                    context.toastFromMainThread(message)
+                }
             }
         )
 
