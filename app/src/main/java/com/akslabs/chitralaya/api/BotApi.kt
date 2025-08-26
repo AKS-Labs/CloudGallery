@@ -81,11 +81,13 @@ object BotApi {
     suspend fun sendFile(
         file: File,
         channelId: Long,
+        caption: String? = null
     ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
         return withContext(Dispatchers.IO) {
             bot.sendDocument(
                 chatId = ChatId.fromId(channelId),
                 document = TelegramFile.ByFile(file),
+                caption = caption,
                 disableContentTypeDetection = false
             )
         }

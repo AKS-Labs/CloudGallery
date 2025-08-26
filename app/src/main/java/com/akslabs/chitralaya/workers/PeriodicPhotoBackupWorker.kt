@@ -72,7 +72,7 @@ class PeriodicPhotoBackupWorker(
                             ".$ext"
                         )
                         tempFile.writeBytes(outputBytes)
-                        sendFileApi(botApi, channelId, uri, tempFile, ext!!)
+                        sendFileApi(botApi, channelId, uri, tempFile, ext!!, appContext)
                     } catch (e: IOException) {
                         return@withContext Result.failure(
                             workDataOf(KEY_RESULT_ERROR to "${e.message}")

@@ -33,7 +33,7 @@ class InstantPhotoUploadWorker(
             try {
                 val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
                 val photoUri = photoUriString.toUri()
-                sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi)
+                sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext)
                 setForeground(
                     ForegroundInfo(
                         NOTIFICATION_ID,

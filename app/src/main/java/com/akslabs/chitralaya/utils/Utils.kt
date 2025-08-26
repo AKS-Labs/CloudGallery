@@ -93,6 +93,7 @@ suspend fun sendFileViaUri(
     contentResolver: ContentResolver,
     channelId: Long,
     botApi: BotApi,
+    context: android.content.Context
 ) {
     val mimeType: String? = getMimeTypeFromUri(contentResolver, uri)
     val fileExtension = getExtFromMimeType(mimeType!!)
@@ -106,7 +107,8 @@ suspend fun sendFileViaUri(
             channelId,
             uri,
             tempFile,
-            fileExtension!!
+            fileExtension!!,
+            context
         )
         outputStream.close()
         Log.d(TAG, tempFile.name)
@@ -120,9 +122,19 @@ suspend fun sendFileApi(
     pathUri: Uri,
     file: File,
     extension: String,
+    context: android.content.Context
 ) {
     var message: com.github.kotlintelegrambot.entities.Message? = null
-    botApi.sendFile(file, channelId).fold(
+    
+    // Extract metadata and create caption if enabled
+    val caption = if (MetadataConfig.shouldIncludeMetadata()) {
+        val metadata = ImageMetadataExtractor.extractMetadata(context, pathUri)
+        metadata?.toTelegramCaption()
+    } else {
+        null
+    }
+    
+    botApi.sendFile(file, channelId, caption).fold(
         { apiResponse ->
             message = apiResponse?.result
         }
@@ -167,7 +179,7 @@ suspend fun sendFileApi(
                 thumbnailCached = false
             )
         )
-        Log.d(TAG, "sendFile: Success!")
+        Log.d(TAG, "sendFile: Success! Metadata included in caption.")
     } else {
         Log.d(TAG, "sendFile: Failed!")
     }

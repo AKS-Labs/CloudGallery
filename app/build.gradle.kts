@@ -15,8 +15,8 @@ android {
         applicationId = "com.akslabs.cloudgallery"
         minSdk = 29  // Keep Android 10 as minimum
         targetSdk = 35  // Updated to target Android 15 (latest stable)
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 3
+        versionName = "0.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -174,5 +174,7 @@ dependencies {
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)
 
+    // ExifInterface for metadata extraction
+    implementation("androidx.exifinterface:exifinterface:1.3.6")
 
 }
