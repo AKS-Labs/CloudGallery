@@ -82,9 +82,9 @@ RepoType: git
 Repo: https://github.com/AKS-Labs/CloudGallery
 
 Builds:
-    - versionName: '0.4'
-      versionCode: 4
-      commit: v0.4
+    - versionName: '0.2'
+      versionCode: 2
+      commit: v0.2
       subdir: app
       gradle:
           - yes
@@ -97,5 +97,5 @@ MaintainerNotes: |
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: '0.4'
-CurrentVersionCode: 4
+CurrentVersion: '0.2'
+CurrentVersionCode: 2
