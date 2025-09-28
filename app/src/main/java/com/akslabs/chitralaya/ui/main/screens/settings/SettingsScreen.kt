@@ -1,6 +1,11 @@
 package com.akslabs.cloudgallery.ui.main.screens.settings
 
 import android.content.Intent
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -74,6 +79,11 @@ import com.akslabs.cloudgallery.utils.Constants
 import com.akslabs.cloudgallery.utils.MetadataConfig
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import android.net.Uri
+import androidx.compose.material.icons.rounded.Android
+import androidx.compose.material.icons.rounded.Balance
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.ThumbUp
+import androidx.compose.ui.res.painterResource
 import com.akslabs.cloudgallery.workers.WorkModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -209,7 +219,8 @@ private fun SettingsDialogItem(
  */
 @Composable
 private fun SettingsItem(
-    icon: ImageVector,
+    icon: ImageVector? = null,       // Built-in icon
+    iconPainter: Painter? = null,          // Custom drawable / SVG
     title: String,
     subtitle: String,
     onClick: () -> Unit,
@@ -225,16 +236,26 @@ private fun SettingsItem(
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
-        )
+        when {
+            icon != null -> {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+                )
+            }
+            iconPainter != null -> {
+                Image(
+                    painter = iconPainter,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.width(16.dp))
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
@@ -249,6 +270,7 @@ private fun SettingsItem(
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -611,6 +633,22 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         SettingsSection(title = "About")
 
         SettingsItem(
+            icon = Icons.Rounded.Android,
+            title = "More Apps",
+            subtitle = "More Apps By AKS-Labs",
+            onClick = {
+                openLinkFromHref(Constants.moreApps)
+            }
+        )
+
+        SettingsItem(
+            iconPainter = painterResource(id = R.drawable.telegram),
+            title = "Join Telegram",
+            subtitle = "Join Telegram Community 0f AKS-Labs",
+            onClick = { openLinkFromHref(Constants.joinTelegra) }
+        )
+
+        SettingsItem(
             icon = Icons.Rounded.Info,
             title = "Version",
             subtitle = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
@@ -622,7 +660,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         )
 
         SettingsItem(
-            icon = Icons.Rounded.AccountTree,
+            icon = Icons.Rounded.Code,
             title = "Source Code",
             subtitle = "View the project on GitHub",
             onClick = {
@@ -631,11 +669,20 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         )
 
         SettingsItem(
-            icon = Icons.Rounded.Stars,
+            icon = Icons.Rounded.Balance,
             title = "License",
             subtitle = "View the project license",
             onClick = {
                 openLinkFromHref(Constants.LICENSE)
+            }
+        )
+
+        SettingsItem(
+            icon = Icons.Rounded.ThumbUp,
+            title = "Donate",
+            subtitle = "Help me keep the app alive",
+            onClick = {
+                openLinkFromHref(Constants.Donate)
             }
         )
 

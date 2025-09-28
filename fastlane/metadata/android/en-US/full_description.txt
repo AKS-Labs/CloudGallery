@@ -6,7 +6,7 @@ Chitralaya CloudGallery (चित्रालय - "House of Images" in Sanskri
 
 Running out of phone storage? Worried about losing irreplaceable photos? Fed up with expensive cloud services that spy on your memories? Chitralaya CloudGallery has your back! It transforms YOUR Telegram bot into a private, unlimited photo Cloud storage - and the best part? YOU control everything!
 
-✨ What Makes CloudGallery Special:
+✨ What Makes Chitralaya CloudGallery Special:
 
 • 🔒 100% Private: Uses YOUR Telegram bot - no sneaky third parties, no data mining, no corporate surveillance. Your memories stay yours!
 • ⚡ Lightning Fast: Real-time photo backup to your personal Telegram channel
@@ -54,7 +54,7 @@ In a world full of apps that spy on your photos, CloudGallery is different:
 • Access your photos from Telegram Web on any computer
 • Enjoy truly unlimited storage - Telegram doesn't count against any limits!
 
-🌟 Why Choose CloudGallery?
+🌟 Why Choose Chitralaya CloudGallery?
 
 Because your memories are priceless, your privacy matters, and you deserve unlimited storage that works for YOU, not against you. Built by developers who actually care about user privacy and digital rights!
 

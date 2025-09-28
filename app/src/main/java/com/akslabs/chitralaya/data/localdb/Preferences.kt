@@ -24,7 +24,7 @@ object Preferences {
     const val autoExportDatabseLocation: String = "autoExportDatabaseLocation"
     const val defaultAutoExportDatabaseIntervalKey: Long = 7
     const val defaultAutoBackupInterval: Long = 7
-    const val defaultGridColumnCount: Int = 3
+    const val defaultGridColumnCount: Int = 4
 
     private const val prefFile: String = "preferences"
     private const val encryptedPrefFile: String = "encryptedPreferences"

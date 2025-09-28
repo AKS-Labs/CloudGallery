@@ -1,6 +1,6 @@
 Categories:
-  - Graphics
-  - Internet
+    - Graphics
+    - Internet
 License: Apache-2.0
 AuthorName: AKS-Labs
 AuthorEmail: akslabs.tech@gmail.com
@@ -76,21 +76,24 @@ Description: |
 
     Join the revolution of truly private, user-controlled photo backup solutions. Your future self (and your phone storage) will thank you! 🎉
 
+RequiresRoot: false
+
 RepoType: git
 Repo: https://github.com/AKS-Labs/CloudGallery
 
 Builds:
-  - versionName: '0.2'
-    versionCode: 2
-    commit: v0.2
-    subdir: app
-    sudo:
-      - apt-get update
-      - apt-get install -y openjdk-17-jdk-headless
-      - update-alternatives --auto java
-    gradle:
-      - yes
-    prebuild: sed -i -e '/keystoreProperties/,/^}/d' build.gradle.kts
+    - versionName: '0.2'
+      versionCode: 2
+      commit: v0.2
+      subdir: app
+      gradle:
+          - yes
+
+MaintainerNotes: |
+    The app uses Telegram Bot API for SMS synchronization.
+    The app uploads device photos to user-controlled Telegram bot only.
+    No proprietary dependencies, no telemetry, no ads.
+    Built with standard Android toolchain.
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

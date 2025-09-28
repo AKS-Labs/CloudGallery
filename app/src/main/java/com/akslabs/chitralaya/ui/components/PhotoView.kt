@@ -230,7 +230,7 @@ fun PhotoView(photo: Photo, isOnlyRemote: Boolean, showUiState: () -> MutableSta
                 ) {
                     FloatingBottomBar(
                         modifier = Modifier
-                            .padding(bottom = 30.dp)
+                            .padding(bottom = 80.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -262,7 +262,7 @@ fun PhotoView(photo: Photo, isOnlyRemote: Boolean, showUiState: () -> MutableSta
                 ) {
                     FloatingDownloadBar(
                         modifier = Modifier
-                            .padding(bottom = 30.dp)
+                            .padding(bottom = 80.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,

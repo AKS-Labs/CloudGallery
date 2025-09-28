@@ -162,11 +162,12 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         }
 
         Scaffold(
-            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+//            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            modifier = if (!isSettingsScreen) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else Modifier,
             topBar = {
                 if (!isSettingsScreen) {
                     Column(
-                        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
+//                        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
                     ) {
                         TopAppBar(
                             title = {
@@ -238,7 +239,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                     Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             },
-                            scrollBehavior = scrollBehavior,
+                            windowInsets = WindowInsets(0, 0, 0, 0),
+                            scrollBehavior = if (isNavigatingToSettings) null else scrollBehavior,
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
                         )
                         ConnectivityStatusPopup()
