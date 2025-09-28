@@ -3,14 +3,14 @@ Categories:
   - Internet
 License: Apache-2.0
 AuthorName: AKS-Labs
-AuthorEmail: akslabs.dev@gmail.com
+AuthorEmail: akslabs.tech@gmail.com
 AuthorWebSite: https://github.com/AKS-Labs
 SourceCode: https://github.com/AKS-Labs/CloudGallery
 IssueTracker: https://github.com/AKS-Labs/CloudGallery/issues
 Changelog: https://github.com/AKS-Labs/CloudGallery/releases
 
-AutoName: Chitralaya CloudGallery
-Name: Chitralaya CloudGallery
+AutoName: Chitralaya CloudGallery App
+Name: Chitralaya CloudGallery App
 Summary: Transform Telegram into your personal, unlimited photo vault! 100% private, no telemetry, your data under your control.
 
 Description: |
@@ -22,13 +22,13 @@ Description: |
 
     Running out of phone storage? Worried about losing irreplaceable photos? Fed up with expensive cloud services that spy on your memories? Chitralaya CloudGallery has your back! It transforms YOUR Telegram bot into a private, unlimited photo vault - and the best part? YOU control everything!
 
-    ✨ What Makes CloudGallery Special:
+    ✨ What Makes Chitralaya CloudGallery Special:
 
     • 🔒 100% Private: Uses YOUR Telegram bot - no sneaky third parties, no data mining, no corporate surveillance. Your memories stay yours!
     • ⚡ Lightning Fast: Real-time photo backup to your personal Telegram channel
     • 🎨 Gorgeous Interface: Stunning Material Design 3 with customizable photo grids (3-6 columns!)
     • 🔋 Battery Friendly: Smart background sync that won't drain your battery like other apps
-    • 🛡️ Fort Knox Security: AES-256 encryption keeps your precious memories locked up tight
+    • 🛡️ Fort Knox Security: AES-256 encryption keeps your precious API Keys locked up tight
     • 🌍 Universal Access: View your photos from ANY device with Telegram - phone, tablet, computer, you name it!
     • 🚫 Zero Bloat: No ads, no trackers, no unnecessary permissions - just pure photo backup magic
     • 📱 Smart Sync: Intelligent change detection - only backs up what's new, no duplicate chaos
@@ -70,7 +70,7 @@ Description: |
     • Access your photos from Telegram Web on any computer
     • Enjoy truly unlimited storage - Telegram doesn't count against any limits!
 
-    🌟 Why Choose CloudGallery?
+    🌟 Why Choose Chitralaya CloudGallery?
 
     Because your memories are priceless, your privacy matters, and you deserve unlimited storage that works for YOU, not against you. Built by developers who actually care about user privacy and digital rights!
 
