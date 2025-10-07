@@ -109,7 +109,7 @@ For me, Telegram felt like the lesser **evil.**
 
 But again — it’s your **choice.** I’m not telling you to trust Telegram.  
 I’m just saying: *here’s another option, do with it what you like.*  
-And if you want to dive deeper, check out the **[FAQ section](https://t.me/AKSLabs](https://github.com/AKS-Labs/CloudGallery/blob/main/FAQ.md )** where I go through all these questions in detail.  
+And if you want to dive deeper, check out the **[FAQ section](https://github.com/AKS-Labs/CloudGallery/blob/main/FAQ.md )** where I go through all these questions in detail.  
  
 **So my thought was simple:**  
 👉 If I’m anyway trusting a company, I’d rather trust Telegram (with unlimited space, no ads, no AI snooping)  
