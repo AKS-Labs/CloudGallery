@@ -1,6 +1,6 @@
 <!-- ---------- Header ---------- -->
 <div align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="120" height="120">
+  <img src="app/src/main/res/drawable/chitralaya.png" width="200" height="200">
   <h1>Chitralaya CloudGallery</h1>
   <h4><em>"Chitralaya" ((चित्रालय)) = "House of Images" in Sanskrit</em></h4>
   <h3>🚀 Your Personal Photo Vault with Unlimited Cloud Storage</h3>
