@@ -101,11 +101,11 @@ fun DisclaimerScreen(
                 painter = painterResource(id = R.drawable.chitralaya),
                 contentDescription = stringResource(R.string.app_icon),
                 modifier = Modifier
-                    .size(75.dp)
+                    .size(110.dp)
                     .clip(CircleShape),
                 contentScale = ContentScale.FillBounds
             )
-            Spacer(modifier = Modifier.height(16.dp))
+//            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "Chitralaya",
