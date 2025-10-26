@@ -72,8 +72,8 @@
     <string name="_4_copy_and_paste_the_unique_id_here">4. Benzersiz kimliği buraya kopyalayıp yapıştırın.</string>
     <string name="invalid_uid_or_token">Geçersiz UID veya token.</string>
     <string name="unique_id_start_in_gc">Benzersiz kimliği girin</string>
-    <string name="download_whitehole">İndir/Whitehole</string>
-    <string name="whitehole">whitehole_%1$s.%2$s</string>
+    <string name="download_Chitralaya">İndir/Chitralaya</string>
+    <string name="Chitralaya">Chitralaya_%1$s.%2$s</string>
     <string name="photo_upload_successful">Fotoğraf yükleme başarılı!</string>
     <string name="uploading_photo">Fotoğraf yükleniyor</string>
     <string name="exporting_database">Veritabanı dışa aktarılıyor</string>

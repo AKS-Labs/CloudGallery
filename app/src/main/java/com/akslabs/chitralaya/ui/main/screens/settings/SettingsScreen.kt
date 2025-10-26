@@ -616,18 +616,18 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         )
 
         // PRIVACY & SECURITY SECTION
-        SettingsSection(title = "Privacy & Security")
-
-        SettingsItem(
-            icon = Icons.Rounded.Security,
-            title = "Data Protection",
-            subtitle = "App is completely private with no telemetry",
-            onClick = {
-                scope.launch {
-                    context.toastFromMainThread("✅ App is 100% private - no data collection or tracking")
-                }
-            }
-        )
+//        SettingsSection(title = "Privacy & Security")
+//
+//        SettingsItem(
+//            icon = Icons.Rounded.Security,
+//            title = "Data Protection",
+//            subtitle = "App is completely private with no telemetry",
+//            onClick = {
+//                scope.launch {
+//                    context.toastFromMainThread("✅ App is 100% private - no data collection or tracking")
+//                }
+//            }
+//        )
 
         // ABOUT SECTION
         SettingsSection(title = "About")
@@ -644,7 +644,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         SettingsItem(
             iconPainter = painterResource(id = R.drawable.telegram),
             title = "Join Telegram",
-            subtitle = "Join Telegram Community 0f AKS-Labs",
+            subtitle = "Join Telegram Group 0f AKS-Labs",
             onClick = { openLinkFromHref(Constants.joinTelegra) }
         )
 
