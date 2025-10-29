@@ -178,15 +178,20 @@ It’s **not a full-featured cloud platform yet**, but it gives you **control ov
 
 Here’s where you come in. CloudGallery is community-powered. With your support, I want to add:
 
+* 📤 Batch Upload & Delete
+* 🌙 Auto Sync at Bedtime
+* 📆 Control How Many Photos to Back Up Per Day (e.g. 40 images/day)
+* ⏰ Schedule Time for Auto Periodic Backup (e.g. between 12 AM – 6 AM)
+* 📂 Folder-Specific Uploads
+* ☁️ Organized Folder Structure for Cloud Images
+* 🖼️ Share Images from Any App to Chitralaya CloudGallery to Upload Them Directly to Telegram via Chitralaya
+* 🧠 100% Offline On-Device OCR Search (Find Photos by Text Inside Them)
+* 🤖 Multiple Bot Support
 * 🔐 **On-device encryption layer** → so even Telegram can’t peek into your files
-* 📝 OCR search → find photos by text inside them
-* 📤 Batch upload & delete
-* 🤖 Multiple bot support
-* 📂 Folder-specific uploads
 * ✨ Even smoother Material 3 experience
 * 💡 And honestly… whatever *you* suggest in the Telegram group
 
-These aren’t “marketing slides”. They’re real ideas sitting in my notes, waiting for time and support.
+These aren’t “marketing slides”. They’re real ideas sitting in my notes, waiting for time and [**Support**](https://github.com/sponsors/AKS-Labs).
 
 
 ---
@@ -200,7 +205,7 @@ If you like CloudGallery and want to see it grow:
 
 * ⭐ Star the repo
 * 💬 Join the [AKS-Labs Telegram group](https://t.me/AKSLabs)
-* ☕ Maybe donate, if you can.
+* ☕ Maybe [**Donate**](https://github.com/sponsors/AKS-Labs), if you can.
 
 At the end of the day, this is about choice.
 If you don’t like it, you lose nothing.
@@ -210,14 +215,20 @@ Your photos, your choice.
 
 ---
 
-## 📥 **Get CloudGallery**
+## 📥 **Get Chitralaya CloudGallery**
 
 <div align="center">
+    <p align="center">
+  <a href="https://f-droid.org/packages/com.akslabs.cloudgallery/">
+    <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
+         alt="Get it on F-Droid"
+         height="80">
+  </a>
   <a href="https://github.com/AKS-Labs/CloudGallery/releases">
     <img alt="Get it on GitHub" src="https://user-images.githubusercontent.com/69304392/148696068-0cfea65d-b18f-4685-82b5-329a330b1c0d.png" height="80px">
   </a>
   <br>
-  <p><strong>🆓 Free Forever • 🔓 Open Source • 🚀 Ready to Use</strong></p>
+  <p><strong>• 🔓 Open Source    • 🚀 Ready to Use</strong></p>
 </div>
 
 ---
@@ -229,11 +240,39 @@ Your photos, your choice.
 2. Send `/newbot` → Follow prompts
 3. Copy your bot token 🔑
 4. Create private group → Add bot → Type `/start` → Get chat ID
+   - Usually, the **chat ID** will appear automatically.  
+   - If it **doesn’t**, click below for the alternate method 👇  
 
-### 📱 **Step 2: Connect App**
-1. Download CloudGallery from GitHub
-2. Enter bot token and chat ID
-3. Start backing up! 🎉
+<details>
+<summary>🔍 How to Find Chat ID (Alternate Method)👇</summary>
+
+1. Go to **[web.telegram.org](https://web.telegram.org)** and log in.  
+2. Open the **group** where you added your bot.  
+3. Look at your browser’s **address bar (URL)** — you’ll see something like:  
+
+          https://web.telegram.org/k/#123456789
+
+4. The number after the `#` is your **Group ID** → `123456789`.  
+5. Add `-100` in front to use it with the **Bot API**:  
+
+         -100123456789
+
+6. That’s your full **chat_id** ✅  
+Use it inside the app or in your API.
+
+</details>
+
+---
+
+### 📱 **Step 2: Connect the App**
+1. Download **CloudGallery** from GitHub.  
+2. Enter your **bot token** and **chat ID**.  
+3. Start backing up your photos! 🎉  
+
+---
+
+💬 **Need help?**  
+Join the community → [t.me/AKSLabs](https://t.me/AKSLabs)
 
 ---
 
