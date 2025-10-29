@@ -20,6 +20,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.LaunchedEffect
@@ -244,7 +247,7 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<LocalUiPhoto>, totalCount: Int) 
         } else {
             LazyVerticalGrid(
                 state = lazyGridState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.statusBars),
                 columns = GridCells.Fixed(columns),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(verticalSpacing),

@@ -55,6 +55,22 @@ object WorkModule {
                 .build()
 
         fun enqueue(forceUpdate: Boolean = false) {
+            // 1️⃣ Immediate one-time backup
+            val instantBackupRequest =
+                OneTimeWorkRequestBuilder<PeriodicPhotoBackupWorker>()
+                    .setInputData(
+                        workDataOf(PeriodicPhotoBackupWorker.KEY_COMPRESSION_THRESHOLD to 1024 * 50L)
+                    )
+                    .setConstraints(constraints)
+                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .build()
+
+            manager.enqueueUniqueWork(
+                "InstantPhotoBackupWork",
+                ExistingWorkPolicy.REPLACE,
+                instantBackupRequest
+            )
+
             manager.enqueueUniquePeriodicWork(
                 PERIODIC_PHOTO_BACKUP_WORK,
                 if (forceUpdate) ExistingPeriodicWorkPolicy.UPDATE else ExistingPeriodicWorkPolicy.KEEP,

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,8 +42,14 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -167,16 +174,33 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             topBar = {
                 if (!isSettingsScreen) {
                     Column(
+//                        modifier = Modifier.statusBarsPadding()
 //                        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
                     ) {
+
                         TopAppBar(
+
                             title = {
-                                Text(
-                                    text = "${tabs[selectedTab].first} ${photoCounts[selectedTab]}",
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            },
+//                                Column {
+//
+//                                    Spacer(modifier = Modifier.height(35.dp))
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+
+                                    Text(
+                                        text = "${tabs[selectedTab].first} ${photoCounts[selectedTab]}",
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(top = 30.dp)
+
+                                    )
+                                }
+                            },expandedHeight = 90.dp,
                             actions = {
+                                Row(
+                                    modifier = Modifier.padding(top = 30.dp)// यहां भी पैडिंग जोड़ें
+                                ) {
                                 // Grid options menu button
                                 Box {
                                     IconButton(onClick = { showGridOptionsDropdown = true }) {
@@ -233,21 +257,21 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 
                                 // Settings button
                                 IconButton(onClick = { 
-                                    isNavigatingToSettings = true
+//                                    isNavigatingToSettings = true
                                     navController.navigate(Screens.Settings.route)
                                 }) {
                                     Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
                                 }
-                            },
+                            }},
                             windowInsets = WindowInsets(0, 0, 0, 0),
-                            scrollBehavior = if (isNavigatingToSettings) null else scrollBehavior,
+                            scrollBehavior = scrollBehavior,
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
                         )
                         ConnectivityStatusPopup()
                     }
                 }
             },
-            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+            contentWindowInsets = WindowInsets.navigationBars
         ) { paddingValues ->
             CompositionLocalProvider(LocalGridState provides gridState) {
                 AppNavHost(
@@ -269,8 +293,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             ) {
                 BottomAppBar(
                     modifier = Modifier
-                        .width(200.dp)
-                        .clip(RoundedCornerShape(24.dp)),
+                        .width(250.dp)
+                        .clip(RoundedCornerShape(34.dp)),
                     containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.9f),
                     tonalElevation = 12.dp
                 ) {

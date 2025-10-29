@@ -2,7 +2,7 @@
 contentpager = "1.0.0"
 kotlin = "1.9.24"
 converterJackson = "2.11.0"
-androidGradlePlugin = "8.4.2"
+androidGradlePlugin = "8.6.0"
 activityCompose = "1.9.0"
 animation = "1.7.0-beta03"
 coilCompose = "2.6.0"
@@ -28,6 +28,7 @@ adaptiveNavigationSuite = "1.0.0-alpha07"
 material3-adaptive = "1.0.0-beta03"
 workRuntime = "2.9.0"
 securityCrypto = "1.0.0"
+foundationLayout = "1.9.4"
 
 
 [libraries]
@@ -71,6 +72,7 @@ okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 telegram = { module = "io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram", version.ref = "telegram" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 
 
 [plugins]

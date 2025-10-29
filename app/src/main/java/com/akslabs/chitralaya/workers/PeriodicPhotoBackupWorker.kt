@@ -47,26 +47,35 @@ class PeriodicPhotoBackupWorker(
                     try {
                         val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri)
                         val ext = getExtFromMimeType(mimeType!!)
+                        val FIFTY_MB = 50L * 1024 * 1024 // 50 MB in bytes
+
                         val bytes = appContext.contentResolver.openInputStream(uri)?.use {
                             it.readBytes()
                         }!!
-                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        var outputBytes: ByteArray
+
+                        var outputBytes = bytes // default — no compression
                         var quality = 100
-                        do {
-                            val outputStream = ByteArrayOutputStream()
+
+                        // Compress only if image > 50 MB
+                        if (bytes.size > FIFTY_MB) {
+                            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                             val compressFormat = when (mimeType) {
                                 MIME_TYPE_JPEG -> Bitmap.CompressFormat.JPEG
                                 MIME_TYPE_PNG -> Bitmap.CompressFormat.PNG
                                 MIME_TYPE_WEBP -> Bitmap.CompressFormat.WEBP
                                 else -> Bitmap.CompressFormat.JPEG
                             }
-                            outputStream.use {
-                                bitmap.compress(compressFormat, quality, it)
-                                outputBytes = it.toByteArray()
-                                quality -= (quality * 0.1).roundToInt()
-                            }
-                        } while (outputBytes.size > compressionThresholdInBytes && quality > 25)
+
+                            do {
+                                val outputStream = ByteArrayOutputStream()
+                                outputStream.use {
+                                    bitmap.compress(compressFormat, quality, it)
+                                    outputBytes = it.toByteArray()
+                                }
+                                quality -= 5 // reduce quality by 5 each iteration
+                            } while (outputBytes.size > FIFTY_MB && quality > 0)
+                        }
+
                         tempFile = File.createTempFile(
                             Random.nextLong().toString(),
                             ".$ext"
