@@ -157,6 +157,18 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = backStackEntry?.destination?.route
         val isSettingsScreen = currentRoute == Screens.Settings.route || isNavigatingToSettings
+        val showAppLayout = !isSettingsScreen
+
+        LaunchedEffect(isNavigatingToSettings) {
+            if (isNavigatingToSettings) {
+                // Wait 1 frame so UI update (AppBar hide) happens instantly
+//                kotlinx.coroutines.android.awaitFrame()
+
+                navController.navigate(Screens.Settings.route) {
+                    launchSingleTop = true
+                }
+            }
+        }
 
         // Reset navigation flag when route changes
         LaunchedEffect(currentRoute) {
@@ -168,112 +180,154 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             }
         }
 
-        Scaffold(
+        if (showAppLayout) {
+
+
+            Scaffold(
 //            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-            modifier = if (!isSettingsScreen) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else Modifier,
-            topBar = {
-                if (!isSettingsScreen) {
-                    Column(
+                modifier = if (!isSettingsScreen) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else Modifier,
+                topBar = {
+                    if (!isSettingsScreen) {
+                        Column(
 //                        modifier = Modifier.statusBarsPadding()
 //                        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
-                    ) {
+                        ) {
 
-                        TopAppBar(
+                            TopAppBar(
 
-                            title = {
+                                title = {
 //                                Column {
 //
 //                                    Spacer(modifier = Modifier.height(35.dp))
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
 
-                                    Text(
-                                        text = "${tabs[selectedTab].first} ${photoCounts[selectedTab]}",
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(top = 30.dp)
+                                        Text(
+                                            text = "${tabs[selectedTab].first} ${photoCounts[selectedTab]}",
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.padding(top = 30.dp)
 
-                                    )
-                                }
-                            },expandedHeight = 90.dp,
-                            actions = {
-                                Row(
-                                    modifier = Modifier.padding(top = 30.dp)// यहां भी पैडिंग जोड़ें
-                                ) {
-                                // Grid options menu button
-                                Box {
-                                    IconButton(onClick = { showGridOptionsDropdown = true }) {
-                                        Icon(
-                                            imageVector = Icons.Default.GridView,
-                                            contentDescription = "Grid options",
-                                            tint = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
-
-                                    DropdownMenu(
-                                        expanded = showGridOptionsDropdown,
-                                        onDismissRequest = { showGridOptionsDropdown = false }
+                                }, expandedHeight = 90.dp,
+                                actions = {
+                                    Row(
+                                        modifier = Modifier.padding(top = 30.dp)// यहां भी पैडिंग जोड़ें
                                     ) {
-                                        Text(
-                                            text = "Layout",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                        )
+                                        // Grid options menu button
+                                        Box {
+                                            IconButton(onClick = { showGridOptionsDropdown = true }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.GridView,
+                                                    contentDescription = "Grid options",
+                                                    tint = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
 
-                                        DropdownMenuItem(
-                                            text = { Text(text = "Grid View", color = if (!gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
-                                            onClick = {
-                                                gridState.updateDateGroupedLayout(false)
-                                                showGridOptionsDropdown = false
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(text = "Date Grouped", color = if (gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
-                                            onClick = {
-                                                gridState.updateDateGroupedLayout(true)
-                                                showGridOptionsDropdown = false
-                                            }
-                                        )
-                                        androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                                        Text(
-                                            text = "Columns",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                        )
-                                        listOf(3, 4, 5, 6).forEach { columnCount ->
-                                            DropdownMenuItem(
-                                                text = { Text(text = "$columnCount columns", color = if (columnCount == gridState.columnCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
-                                                onClick = {
-                                                    gridState.updateColumnCount(columnCount)
-                                                    showGridOptionsDropdown = false
+                                            DropdownMenu(
+                                                expanded = showGridOptionsDropdown,
+                                                onDismissRequest = { showGridOptionsDropdown = false }
+                                            ) {
+                                                Text(
+                                                    text = "Layout",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                                )
+
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            text = "Grid View",
+                                                            color = if (!gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        gridState.updateDateGroupedLayout(false)
+                                                        showGridOptionsDropdown = false
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            text = "Date Grouped",
+                                                            color = if (gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        gridState.updateDateGroupedLayout(true)
+                                                        showGridOptionsDropdown = false
+                                                    }
+                                                )
+                                                androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                                Text(
+                                                    text = "Columns",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                                )
+                                                listOf(3, 4, 5, 6).forEach { columnCount ->
+                                                    DropdownMenuItem(
+                                                        text = {
+                                                            Text(
+                                                                text = "$columnCount columns",
+                                                                color = if (columnCount == gridState.columnCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                            )
+                                                        },
+                                                        onClick = {
+                                                            gridState.updateColumnCount(columnCount)
+                                                            showGridOptionsDropdown = false
+                                                        }
+                                                    )
                                                 }
+                                            }
+                                        }
+
+                                        // Settings button
+                                        IconButton(onClick = {
+//                                            isNavigatingToSettings = true
+                                            // Stop any scroll animation immediately
+                                            scrollBehavior.state.heightOffset = 0f
+                                            scrollBehavior.state.heightOffsetLimit = 0f
+
+                                            // Navigate instantly without waiting
+                                            navController.navigate(Screens.Settings.route)
+//                                    navController.navigate(Screens.Settings.route)
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Settings,
+                                                contentDescription = "Settings",
+                                                tint = MaterialTheme.colorScheme.onSurface
                                             )
                                         }
                                     }
-                                }
-
-                                // Settings button
-                                IconButton(onClick = { 
-//                                    isNavigatingToSettings = true
-                                    navController.navigate(Screens.Settings.route)
-                                }) {
-                                    Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
-                                }
-                            }},
-                            windowInsets = WindowInsets(0, 0, 0, 0),
-                            scrollBehavior = scrollBehavior,
-                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
-                        )
-                        ConnectivityStatusPopup()
+                                },
+                                windowInsets = WindowInsets(0, 0, 0, 0),
+                                scrollBehavior = scrollBehavior,
+                                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                            )
+                            ConnectivityStatusPopup()
+                        }
                     }
+                },
+                contentWindowInsets = WindowInsets.navigationBars
+            ) { paddingValues ->
+                CompositionLocalProvider(LocalGridState provides gridState) {
+                    AppNavHost(
+                        modifier = Modifier
+                            .padding(paddingValues)
+                            .fillMaxSize(),
+                        navController = navController
+                    )
                 }
-            },
-            contentWindowInsets = WindowInsets.navigationBars
-        ) { paddingValues ->
-            CompositionLocalProvider(LocalGridState provides gridState) {
+            }
+        } else {
+            // Ye Scaffold Settings screen ke liye (AppBar aur BottomBar hata do)
+            Scaffold(
+                contentWindowInsets = WindowInsets.navigationBars
+            ) { paddingValues ->
                 AppNavHost(
                     modifier = Modifier
                         .padding(paddingValues)
@@ -282,7 +336,6 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 )
             }
         }
-
         // Truly floating bottom navigation
         if (!isSettingsScreen) {
             Box(
