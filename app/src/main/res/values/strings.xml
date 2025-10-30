@@ -58,7 +58,7 @@
     <string name="backup_network_type">Backup network type</string>
     <string name="backup_interval">Backup interval</string>
     <string name="restore_all_from_cloud">Restore all from cloud</string>
-    <string name="photos_not_found_on_this_device">%1$s photos not found on this device</string>
+    <string name="photos_not_found_on_this_device">%1$s photos are available on cloud</string>
     <string name="restoring_task_enqueued_in_the_background">Restoring task enqueued in the background.</string>
     <string name="import_export"><![CDATA[Import & Export]]></string>
     <string name="import_database">Import database</string>

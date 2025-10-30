@@ -5,6 +5,16 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.withContext
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -87,6 +97,7 @@ import androidx.compose.ui.res.painterResource
 import com.akslabs.cloudgallery.workers.WorkModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Section header component for grouping settings
@@ -278,6 +289,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    var showDialog by remember { mutableStateOf(false) }
+    var dialogMessage by remember { mutableStateOf("") }
+
 
     fun openLinkFromHref(href: String) {
         context.startActivity(
@@ -390,43 +404,62 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             }
         )
 
+        var currentInterval by remember {
+            mutableStateOf(
+                run {
+                    val intervals = listOf("Daily" to "1", "Weekly" to "7", "Biweekly" to "14", "Monthly" to "30")
+                    val current = Preferences.getString(Preferences.autoBackupIntervalKey, "7")
+                    intervals.find { it.second == current }?.first ?: "Weekly"
+                }
+            )
+        }
+
         SettingsDialogItem(
             icon = Icons.Rounded.AccessTime,
             title = stringResource(R.string.backup_interval),
             subtitle = "How often to backup photos",
-            currentValue = remember {
-                val intervals = listOf("Daily" to "1", "Weekly" to "7", "Biweekly" to "14", "Monthly" to "30")
-                val current = Preferences.getString(Preferences.autoBackupIntervalKey, "7")
-                intervals.find { it.second == current }?.first ?: "Weekly"
-            },
+            currentValue = currentInterval,
             options = listOf("Daily" to "1", "Weekly" to "7", "Biweekly" to "14", "Monthly" to "30"),
             enabled = isAutoPhotoBackupEnabled,
             onValueChange = { value ->
                 Preferences.edit {
                     putString(Preferences.autoBackupIntervalKey, value)
                 }
+                // Update UI instantly
+                val selectedLabel = listOf("Daily" to "1", "Weekly" to "7", "Biweekly" to "14", "Monthly" to "30")
+                    .find { it.second == value }?.first ?: "Weekly"
+                currentInterval = selectedLabel
+
+
                 WorkModule.PeriodicBackup.enqueue(forceUpdate = true)
             }
         )
+
+        // Backup Network Type
+        var currentNetwork by remember {
+            mutableStateOf(
+                run {
+                    val networkTypes = listOf(
+                        "All networks" to NetworkType.CONNECTED.name,
+                        "Wi-Fi" to NetworkType.UNMETERED.name,
+                        "Mobile Data" to NetworkType.METERED.name,
+                        "Not Roaming" to NetworkType.NOT_ROAMING.name
+                    )
+                    val current = Preferences.getString(Preferences.autoBackupNetworkTypeKey, NetworkType.CONNECTED.name)
+                    networkTypes.find { it.second == current }?.first ?: "All networks"
+                }
+            )
+        }
 
         SettingsDialogItem(
             icon = Icons.Rounded.SignalCellularAlt,
             title = stringResource(R.string.backup_network_type),
             subtitle = "Network type for backups",
-            currentValue = remember {
-                val networkTypes = listOf(
-                    "All networks" to NetworkType.CONNECTED.name,
-                    "Unmetered" to NetworkType.UNMETERED.name,
-                    "Metered" to NetworkType.METERED.name,
-                    "Not Roaming" to NetworkType.NOT_ROAMING.name
-                )
-                val current = Preferences.getString(Preferences.autoBackupNetworkTypeKey, NetworkType.CONNECTED.name)
-                networkTypes.find { it.second == current }?.first ?: "All networks"
-            },
+            currentValue = currentNetwork,
             options = listOf(
                 "All networks" to NetworkType.CONNECTED.name,
-                "Unmetered" to NetworkType.UNMETERED.name,
-                "Metered" to NetworkType.METERED.name,
+                "Wi-Fi" to NetworkType.UNMETERED.name,
+                "Mobile Data" to NetworkType.METERED.name,
                 "Not Roaming" to NetworkType.NOT_ROAMING.name
             ),
             enabled = isAutoPhotoBackupEnabled,
@@ -434,6 +467,14 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 Preferences.edit {
                     putString(Preferences.autoBackupNetworkTypeKey, value)
                 }
+                // Update UI instantly
+                val selectedLabel = listOf(
+                    "All networks" to NetworkType.CONNECTED.name,
+                    "Wi-Fi" to NetworkType.UNMETERED.name,
+                    "Mobile Data" to NetworkType.METERED.name,
+                    "Not Roaming" to NetworkType.NOT_ROAMING.name
+                ).find { it.second == value }?.first ?: "All networks"
+                currentNetwork = selectedLabel
                 WorkModule.PeriodicBackup.enqueue(forceUpdate = true)
             }
         )
@@ -489,7 +530,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         SettingsItem(
             icon = Icons.Rounded.CloudSync,
             title = "Sync Cloud Photos",
-            subtitle = "Discover and sync photos from Telegram channel",
+            subtitle = "Sync Manually Uploaded Photos From Telegram Channel",
             onClick = {
                 scope.launch {
                     try {
@@ -596,24 +637,97 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 scope.launch {
                     val stats = BackupHelper.getBackupStats()
                     val message = buildString {
-                        appendLine("📊 Database Status:")
-                        appendLine("• Photos: ${stats.currentPhotos}")
-                        appendLine("• Remote Photos: ${stats.currentRemotePhotos}")
+                        appendLine("📊 Database Status :")
+                        appendLine("• Photos in Device: ${stats.currentPhotos}")
+                        appendLine("• Photos in Cloud : ${stats.currentRemotePhotos}")
                         appendLine()
                         if (stats.lastBackupTime > 0) {
-                            appendLine("☁️ Last Backup:")
-                            appendLine("• File: ${stats.lastBackupFilename}")
-                            appendLine("• Time: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(stats.lastBackupTime))}")
-                            appendLine("• Status: ${if (stats.isUpToDate) "✅ Up to date" else "⚠️ Needs backup"}")
+                            appendLine("☁️ Last Backup :")
+                            appendLine("• File : ${stats.lastBackupFilename}")
+                            appendLine("• Time : ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(stats.lastBackupTime))}")
+                            appendLine("• Status : ${if (stats.isUpToDate) "✅ Up to date" else "⚠️ Needs backup"}")
                         } else {
                             appendLine("☁️ No backup found")
                         }
                     }
-                    android.util.Log.i("DatabaseStatus", message)
-                    context.toastFromMainThread("Database status logged - check logcat")
+                    withContext(Dispatchers.Main) {
+                        dialogMessage = message
+                        showDialog = true
+                    }
+
+
+//                    withContext(Dispatchers.Main) {
+//                        androidx.compose.ui.window.Dialog(onDismissRequest = { }) {
+//                            Surface(
+////                                shape = RoundedCornerShape(12.dp),
+//                                tonalElevation = 8.dp,
+//                                modifier = Modifier
+//                                    .padding(16.dp)
+//                                    .fillMaxWidth()
+//                            ) {
+//                                Column(
+//                                    modifier = Modifier
+//                                        .padding(20.dp)
+//                                        .verticalScroll(rememberScrollState())
+//                                ) {
+//                                    Text(
+//                                        text = "📊 Database Status",
+//                                        style = MaterialTheme.typography.titleMedium,
+//                                        fontWeight = FontWeight.Bold
+//                                    )
+//                                    Spacer(modifier = Modifier.height(12.dp))
+//                                    Text(text = message)
+//                                    Spacer(modifier = Modifier.height(16.dp))
+//                                    Button(
+//                                        onClick = { /* dismiss logic */ },
+//                                        modifier = Modifier.align(Alignment.End)
+//                                    ) {
+//                                        Text("OK")
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+
+//                    android.util.Log.i("DatabaseStatus", message)
+//                    context.toastFromMainThread("Database status logged - check logcat")
                 }
             }
         )
+
+        if (showDialog) {
+            Dialog(onDismissRequest = { showDialog = false }) {
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    tonalElevation = 8.dp,
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(20.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = "📊 Database Status",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = dialogMessage)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { showDialog = false },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("OK")
+                        }
+                    }
+                }
+            }
+        }
+
 
         // PRIVACY & SECURITY SECTION
 //        SettingsSection(title = "Privacy & Security")
