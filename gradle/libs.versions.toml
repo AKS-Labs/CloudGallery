@@ -29,6 +29,7 @@ material3-adaptive = "1.0.0-beta03"
 workRuntime = "2.9.0"
 securityCrypto = "1.0.0"
 foundationLayout = "1.9.4"
+runtimeSaveable = "1.9.4"
 
 
 [libraries]
@@ -73,6 +74,7 @@ retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit
 telegram = { module = "io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram", version.ref = "telegram" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
+androidx-compose-runtime-saveable = { group = "androidx.compose.runtime", name = "runtime-saveable", version.ref = "runtimeSaveable" }
 
 
 [plugins]

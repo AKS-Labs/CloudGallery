@@ -119,9 +119,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.animation)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.compose.foundation.layout)
+    implementation(libs.androidx.compose.runtime.saveable)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -177,5 +177,12 @@ dependencies {
 
     // ExifInterface for metadata extraction
     implementation("androidx.exifinterface:exifinterface:1.3.6")
+
+    implementation("androidx.compose.material3:material3:1.5.0-alpha07")
+    implementation("androidx.graphics:graphics-shapes:1.1.0")
+    // Material 3 (required for HorizontalFloatingToolbar)
+//    implementation("androidx.compose.material3:material3:1.3.0")
+// Material Icons Extended (for Icons.Filled.Menu/Search/Add)
+    implementation("androidx.compose.material:material-icons-extended:1.6.0")
 
 }

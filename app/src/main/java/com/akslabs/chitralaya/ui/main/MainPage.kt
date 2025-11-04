@@ -2,10 +2,30 @@ package com.akslabs.cloudgallery.ui.main
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
+
+
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -43,17 +63,30 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FloatingToolbarDefaults.ScreenOffset
+import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
@@ -61,10 +94,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.work.WorkInfo
+import com.akslabs.chitralaya.ui.components.FabState
+import com.akslabs.chitralaya.ui.components.TriStateFab
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
@@ -78,7 +114,7 @@ import com.akslabs.cloudgallery.workers.WorkModule.SYNC_MEDIA_STORE_WORK
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     val scope = rememberCoroutineScope()
@@ -94,10 +130,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 
     // State for grid customization menu
     var showGridOptionsDropdown by remember { mutableStateOf(false) }
-    
+
     // State to track if settings is being navigated to
     var isNavigatingToSettings by remember { mutableStateOf(false) }
-    
+
     // Shared grid state holder
     val gridState = remember { GridStateHolder() }
 
@@ -200,7 +236,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 //
 //                                    Spacer(modifier = Modifier.height(35.dp))
                                     Box(
-                                        modifier = Modifier.fillMaxSize(),
+                                        modifier = Modifier.fillMaxWidth(),
                                         contentAlignment = Alignment.CenterStart
                                     ) {
 
@@ -346,11 +382,12 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             ) {
                 BottomAppBar(
                     modifier = Modifier
-                        .width(250.dp)
-                        .clip(RoundedCornerShape(34.dp)),
+                        .width(300.dp)
+                        .clip(RoundedCornerShape(37.dp)),
                     containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.9f),
                     tonalElevation = 12.dp
-                ) {
+                )
+                {
                     tabs.forEachIndexed { index, (title, icon, route) ->
                         NavigationBarItem(
                             selected = selectedTab == index,
@@ -365,8 +402,28 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                             icon = { Icon(imageVector = icon, contentDescription = title) },
                             label = { Text(text = title, style = MaterialTheme.typography.labelSmall) }
                         )
+                        if (index == 0) Spacer(Modifier.width(34.dp))
                     }
                 }
+
+
+                var fabState by remember { mutableStateOf(FabState.Inactive) }
+
+                TriStateFab(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = (-24).dp),
+                    state = fabState,
+                    onClick = {
+                        fabState = when (fabState) {
+                            FabState.Inactive -> FabState.Loading
+                            FabState.Loading -> FabState.Active
+                            FabState.Active -> FabState.Inactive
+                        }
+                    }
+                )
+
+
             }
         }
 
