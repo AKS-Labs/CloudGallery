@@ -11,43 +11,55 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.akslabs.cloudgallery.ui.main.screens.local.LocalPhotoGrid
 import com.akslabs.cloudgallery.ui.main.screens.local.LocalViewModel
-import com.akslabs.cloudgallery.ui.main.screens.remote.RemotePhotoGrid
+//import com.akslabs.cloudgallery.ui.main.screens.remote.CloudPhotosGrid
+import com.akslabs.cloudgallery.ui.main.screens.remote.RemotePhotosGrid
+//import com.akslabs.cloudgallery.ui.main.screens.remote.RemotePhotoGrid
 import com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel
 import com.akslabs.cloudgallery.ui.main.screens.settings.SettingsScreen
 
 @Composable
 fun AppNavHost(
     modifier: Modifier = Modifier,
-    navController: NavHostController = rememberNavController(),
-    startDestination: String = Screens.LocalPhotos.route,
+    navController: NavHostController,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit
 ) {
     NavHost(
         modifier = modifier,
         navController = navController,
-        startDestination = startDestination
+        startDestination = Screens.LocalPhotos.route
     ) {
-        composable(
-            route = Screens.LocalPhotos.route
-        ) {
+        composable(route = Screens.LocalPhotos.route) {
             val viewModel: LocalViewModel = screenScopedViewModel()
             val localPhotos = viewModel.localPhotosFlow.collectAsLazyPagingItems()
             val localPhotosCount by viewModel.localPhotosCount.collectAsStateWithLifecycle()
-            LocalPhotoGrid(localPhotos = localPhotos, totalCount = localPhotosCount)
+
+            LocalPhotoGrid(
+                localPhotos = localPhotos,
+                totalCount = localPhotosCount,
+                expanded = expanded,
+                onExpandedChange = onExpandedChange
+            )
         }
-        composable(
-            route = Screens.RemotePhotos.route
-        ) {
+
+        composable(route = Screens.RemotePhotos.route) {
             val viewModel: RemoteViewModel = screenScopedViewModel()
             val allCloudPhotos = viewModel.allCloudPhotosFlow.collectAsLazyPagingItems()
             val totalCloudPhotosCount by viewModel.totalCloudPhotosCount.collectAsStateWithLifecycle()
-            RemotePhotoGrid(
+
+            RemotePhotosGrid(
                 cloudPhotos = allCloudPhotos,
-                totalCount = totalCloudPhotosCount
+                onPhotoClick = { _, _ -> },
+                expanded = expanded,
+                onExpandedChange = onExpandedChange
             )
+
         }
+
         composable(route = Screens.Settings.route) {
             SettingsScreen()
         }

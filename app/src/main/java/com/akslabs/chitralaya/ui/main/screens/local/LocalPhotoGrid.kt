@@ -7,6 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+
+import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -193,8 +197,15 @@ private fun createLayoutCache(
     return LayoutCache(normalGridItems, dateGroupedItems, localPhotos.itemCount, System.currentTimeMillis())
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun LocalPhotoGrid(localPhotos: LazyPagingItems<LocalUiPhoto>, totalCount: Int) {
+fun LocalPhotoGrid(
+    localPhotos: LazyPagingItems<LocalUiPhoto>,
+    totalCount: Int,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit
+) {
+
     if (BuildConfig.DEBUG) Log.d(TAG, "🎯 LocalPhotoGrid composing")
     val context = LocalContext.current
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
@@ -247,7 +258,14 @@ fun LocalPhotoGrid(localPhotos: LazyPagingItems<LocalUiPhoto>, totalCount: Int) 
         } else {
             LazyVerticalGrid(
                 state = lazyGridState,
-                modifier = Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.statusBars),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .consumeWindowInsets(WindowInsets.statusBars)
+                    .floatingToolbarVerticalNestedScroll(
+                        expanded = expanded,
+                        onExpand = { onExpandedChange(true) },
+                        onCollapse = { onExpandedChange(false) },
+                    ),
                 columns = GridCells.Fixed(columns),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(verticalSpacing),

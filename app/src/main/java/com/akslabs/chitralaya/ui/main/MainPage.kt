@@ -1,112 +1,69 @@
 package com.akslabs.cloudgallery.ui.main
 
+
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Dp
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.ui.unit.dp
-
-
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
+//import com.akslabs.chitralaya.ui.main.nav.AppNavHost
+
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FloatingToolbarDefaults.ScreenOffset
-import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
-import androidx.compose.material3.HorizontalFloatingToolbar
-import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.MediumTopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.work.WorkInfo
-import com.akslabs.chitralaya.ui.components.FabState
-import com.akslabs.chitralaya.ui.components.TriStateFab
+import com.akslabs.chitralaya.ui.components.BottomToolbarFAB
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
-import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.ui.components.ConnectivityStatusPopup
 import com.akslabs.cloudgallery.ui.main.nav.AppNavHost
-import com.akslabs.cloudgallery.ui.main.nav.NavDrawer
 import com.akslabs.cloudgallery.ui.main.nav.Screens
 import com.akslabs.cloudgallery.ui.main.nav.screenScopedViewModel
 import com.akslabs.cloudgallery.workers.WorkModule
@@ -215,7 +172,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 isNavigatingToSettings = false
             }
         }
-
+        var expanded by rememberSaveable { mutableStateOf(true) }
         if (showAppLayout) {
 
 
@@ -355,8 +312,14 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                         modifier = Modifier
                             .padding(paddingValues)
                             .fillMaxSize(),
-                        navController = navController
+                        navController = navController,
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it }
                     )
+
+
+
+
                 }
             }
         } else {
@@ -368,64 +331,31 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                     modifier = Modifier
                         .padding(paddingValues)
                         .fillMaxSize(),
-                    navController = navController
+                    navController = navController,
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
                 )
+
+
+
+
             }
         }
         // Truly floating bottom navigation
         if (!isSettingsScreen) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 16.dp),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                BottomAppBar(
-                    modifier = Modifier
-                        .width(300.dp)
-                        .clip(RoundedCornerShape(37.dp)),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.9f),
-                    tonalElevation = 12.dp
+            Box(modifier = Modifier.fillMaxSize()) {
+                BottomToolbarFAB(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it },
+                    navController = navController,
+                    modifier = Modifier.align(Alignment.BottomCenter)
                 )
-                {
-                    tabs.forEachIndexed { index, (title, icon, route) ->
-                        NavigationBarItem(
-                            selected = selectedTab == index,
-                            onClick = {
-                                selectedTab = index
-                                navController.navigate(route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(imageVector = icon, contentDescription = title) },
-                            label = { Text(text = title, style = MaterialTheme.typography.labelSmall) }
-                        )
-                        if (index == 0) Spacer(Modifier.width(34.dp))
-                    }
-                }
-
-
-                var fabState by remember { mutableStateOf(FabState.Inactive) }
-
-                TriStateFab(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .offset(y = (-24).dp),
-                    state = fabState,
-                    onClick = {
-                        fabState = when (fabState) {
-                            FabState.Inactive -> FabState.Loading
-                            FabState.Loading -> FabState.Active
-                            FabState.Active -> FabState.Inactive
-                        }
-                    }
-                )
-
-
             }
         }
+
+
+
+
 
         // Only show syncing animation on cloud photos screen, not device screen
         AnimatedVisibility(visible = syncState == SyncState.SYNCING && selectedTab == 1) {

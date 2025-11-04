@@ -6,6 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+
+import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
+
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -24,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -170,20 +174,24 @@ private fun createRemoteLayoutCache(
     )
 }
 
+
 @Composable
-fun RemotePhotoGrid(
+fun RemotePhotosGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
-    totalCount: Int,
-) {
+    onPhotoClick: (Int, RemotePhoto?) -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit
+)
+ {
     Log.e(TAG, "🎯 === REMOTE PHOTO GRID COMPOSING ===")
     val context = LocalContext.current
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<RemotePhoto?>(null) }
 
     // Comprehensive debug logging for cloud photos data
-    LaunchedEffect(cloudPhotos.loadState, totalCount, cloudPhotos.itemCount) {
+    LaunchedEffect(cloudPhotos.loadState, cloudPhotos.itemCount) {
         Log.d(TAG, "=== REMOTE PHOTO GRID DEBUG ===")
-        Log.d(TAG, "Total count from ViewModel: $totalCount")
+//        Log.d(TAG, "Total count from ViewModel: $totalCount")
         Log.d(TAG, "CloudPhotos itemCount: ${cloudPhotos.itemCount}")
         Log.d(TAG, "LoadState.refresh: ${cloudPhotos.loadState.refresh}")
         Log.d(TAG, "LoadState.append: ${cloudPhotos.loadState.append}")
@@ -234,13 +242,17 @@ fun RemotePhotoGrid(
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Unified cloud photos grid
+        // Unified cloud photos grid
         CloudPhotosGrid(
             cloudPhotos = cloudPhotos,
             onPhotoClick = { index, photo ->
                 selectedIndex = index
                 selectedPhoto = photo
-            }
+            },
+            expanded = expanded,
+            onExpandedChange = onExpandedChange
         )
+
 
         // Photo viewer overlay
         selectedIndex?.let { index ->
@@ -279,12 +291,16 @@ fun RemotePhotoGrid(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CloudPhotosGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
     onPhotoClick: (Int, RemotePhoto?) -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
-) {
+)
+ {
     val lazyGridState = rememberLazyGridState()
 
     // Responsive grid configuration (3-6 columns, default 4) - matches LocalPhotoGrid
@@ -347,7 +363,14 @@ fun CloudPhotosGrid(
             else -> {
                 LazyVerticalGrid(
                     state = lazyGridState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .floatingToolbarVerticalNestedScroll(
+                            expanded = expanded,
+                            onExpand = { onExpandedChange(true) },
+                            onCollapse = { onExpandedChange(false) },
+                        ),
+
                     columns = GridCells.Fixed(columns),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(verticalSpacing),
