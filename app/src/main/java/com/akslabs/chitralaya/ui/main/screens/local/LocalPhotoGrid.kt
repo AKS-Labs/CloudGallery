@@ -7,6 +7,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+
+
 
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 
@@ -25,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -57,6 +65,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import coil.request.ImageRequest
 import coil.size.Size
+//import com.akslabs.chitralaya.ui.components.GridVerticalScrollbar
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.data.localdb.Preferences
@@ -256,21 +265,34 @@ fun LocalPhotoGrid(
         if (localPhotos.loadState.refresh == LoadState.Loading) {
             LoadAnimation(modifier = Modifier.align(Alignment.Center))
         } else {
-            LazyVerticalGrid(
-                state = lazyGridState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .consumeWindowInsets(WindowInsets.statusBars)
-                    .floatingToolbarVerticalNestedScroll(
-                        expanded = expanded,
-                        onExpand = { onExpandedChange(true) },
-                        onCollapse = { onExpandedChange(false) },
+            Box(modifier = Modifier.fillMaxSize()) {
+//                GridVerticalScrollbar(
+//                    lazyGridState = lazyGridState,
+//                    modifier = Modifier
+//                        .align(Alignment.CenterEnd)
+//                        .padding(end = 4.dp)
+//                )
+                // the grid (unchanged except keep the same lazyGridState variable)
+                LazyVerticalGrid(
+                    state = lazyGridState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .floatingToolbarVerticalNestedScroll(
+                            expanded = expanded,
+                            onExpand = { onExpandedChange(true) },
+                            onCollapse = { onExpandedChange(false) },
+                        ),
+                    columns = GridCells.Fixed(columns),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        top = 8.dp,
+                        end = 16.dp,
+                        bottom = 96.dp
                     ),
-                columns = GridCells.Fixed(columns),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(verticalSpacing),
-                horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
-            ) {
+                    verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+                    horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
+                )
+                {
                 if (isDateGroupedLayout) {
                     // Stream grouped headers/items inline to match normal grid count
                     for (index in 0 until localPhotos.itemCount) {
@@ -331,6 +353,9 @@ fun LocalPhotoGrid(
                             }
                         )
                     }
+
+                }
+
                 }
             }
         }

@@ -8,9 +8,22 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalFloatingToolbar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.*
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -21,6 +34,11 @@ import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -36,6 +54,29 @@ fun BottomToolbarFAB(
     navController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
+    var fabState by remember { mutableStateOf(FabState.Inactive) }
+    var isUploading by remember { mutableStateOf(false) }
+
+    val transition = rememberInfiniteTransition(label = "")
+    val offsetY by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = -60f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = ""
+    )
+    val alpha by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = ""
+    )
+
     HorizontalFloatingToolbar(
         modifier = modifier
             .offset(y = -ScreenOffset)
@@ -44,15 +85,28 @@ fun BottomToolbarFAB(
         leadingContent = { LeadingContent(navController) },
         trailingContent = { TrailingContent(navController) },
         content = {
+
             FilledIconButton(
                 modifier = Modifier.width(64.dp),
-                onClick = { /* TODO: action */ },
+                onClick = { isUploading = !isUploading }
             ) {
-                androidx.compose.material3.Icon(
-                    Icons.Filled.Add,
-                    contentDescription = "Add"
-                )
+                if (isUploading) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowUpward,
+                        contentDescription = "Uploading",
+                        modifier = Modifier
+                            .offset(y = offsetY.dp)
+//                            .alpha(alpha)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowUpward,
+                        contentDescription = "Upload"
+                    )
+                }
+//                Icon(Icons.Filled.ArrowUpward, contentDescription = "Localized description")
             }
+
         },
     )
 }
@@ -65,6 +119,7 @@ private fun LeadingContent(navController: NavHostController) {
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
+
             }
         }
     ) {

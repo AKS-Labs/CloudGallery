@@ -184,5 +184,6 @@ dependencies {
 //    implementation("androidx.compose.material3:material3:1.3.0")
 // Material Icons Extended (for Icons.Filled.Menu/Search/Add)
     implementation("androidx.compose.material:material-icons-extended:1.6.0")
+    implementation("androidx.compose.foundation:foundation:1.6.8")
 
 }

@@ -46,7 +46,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.PaintingStyle.Companion.Fill
+import androidx.compose.ui.graphics.PaintingStyle.Companion.Stroke
 import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
@@ -64,7 +67,7 @@ enum class FabState(internal val progress: Float) {
 }
 
 object TriStateFab {
-    val size = 128.dp
+    val size = 100.dp
     val safeInsets: WindowInsets
         @Composable get() = WindowInsets.displayCutout.union(WindowInsets.systemBars)
 }
@@ -273,5 +276,92 @@ private class RotatingMorphShape(
         path.transform(matrix)
 
         return Outline.Generic(path.asComposePath())
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun TriStateFabInnerShape(
+    state: FabState,
+    modifier: Modifier = Modifier
+) {
+    val contentColor by animateColorAsState(
+        targetValue = when (state) {
+            FabState.Active -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onPrimary
+        },
+        animationSpec = MaterialTheme.motionScheme.slowEffectsSpec(),
+        label = "contentColor",
+    )
+
+    val inactiveShape = remember {
+        RoundedPolygon(numVertices = 3, rounding = CornerRounding(0.2f))
+    }
+    val loadingShape = remember {
+        RoundedPolygon.star(
+            numVerticesPerRadius = 12,
+            radius = 2f,
+            rounding = CornerRounding(0.2f)
+        )
+    }
+    val activeShape = remember {
+        RoundedPolygon(numVertices = 4, radius = 0.9f, rounding = CornerRounding(0.2f))
+    }
+
+    val inactiveToLoadingMorph = remember { Morph(inactiveShape, loadingShape) }
+    val loadingToActiveMorph = remember { Morph(loadingShape, activeShape) }
+
+    val progress by animateFloatAsState(
+        targetValue = state.progress,
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+    )
+
+    val infiniteTransition = rememberInfiniteTransition()
+    val infiniteAnimatedRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 6000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        )
+    )
+
+    val animatedRotation by animateFloatAsState(
+        targetValue = when (state) {
+            FabState.Inactive -> 360f
+            FabState.Active -> 405f
+            FabState.Loading -> infiniteAnimatedRotation
+        },
+        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+    )
+
+    Canvas(modifier = modifier) {
+        val shape = when {
+            progress < 1f -> RotatingMorphShape(
+                morph = inactiveToLoadingMorph,
+                percentage = progress,
+                rotation = if (state == FabState.Inactive) animatedRotation else infiniteAnimatedRotation
+            )
+            progress > 1f -> RotatingMorphShape(
+                morph = loadingToActiveMorph,
+                percentage = progress - 1f,
+                rotation = if (state == FabState.Active) animatedRotation else infiniteAnimatedRotation
+            )
+            else -> RotatingMorphShape(
+                morph = inactiveToLoadingMorph,
+                percentage = 1f,
+                rotation = infiniteAnimatedRotation
+            )
+        }
+
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val path = (outline as? Outline.Generic)?.path ?: return@Canvas
+
+        // ✨ Draw only filled shape — no stroke, no outer circle
+        drawPath(
+            path = path,
+            color = contentColor,
+//            style = Stroke
+        )
     }
 }
