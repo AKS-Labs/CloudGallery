@@ -13,7 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 
-
+import coil.request.CachePolicy
+import android.graphics.Bitmap
 
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 
@@ -429,11 +430,14 @@ fun LocalPhotoItem(
         if (photo != null) {
             val request = ImageRequest.Builder(context)
                 .data(photo.pathUri)
-                .size(Size(150, 150))
-                .crossfade(100)
-                .allowHardware(true)
-                .allowRgb565(true)
+                .size(Size(110, 110))
+                .crossfade(false)
+                .allowHardware(false)
+//                .allowRgb565(true)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
                 .build()
+
 
             SubcomposeAsyncImage(
                 model = request,
@@ -444,7 +448,7 @@ fun LocalPhotoItem(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                     )
                 },
                 error = {

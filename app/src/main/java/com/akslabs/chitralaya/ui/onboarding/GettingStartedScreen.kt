@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalClipboardManager
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
 import com.akslabs.cloudgallery.api.TelegramRawApi
@@ -46,6 +47,26 @@ import com.akslabs.cloudgallery.utils.connectivity.ConnectivityStatus
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import com.github.kotlintelegrambot.entities.ChatId
 import kotlinx.coroutines.launch
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.ui.platform.LocalClipboardManager
+
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+
+import kotlinx.coroutines.flow.collect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalClipboardManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboardManager
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +76,9 @@ fun GettingStartedScreen(
     onBack: (() -> Unit)? = null,
     botApi: BotApi = BotApi
 ) {
+
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var isVisible by remember { mutableStateOf(false) }
     var botToken by remember { mutableStateOf("") }
@@ -81,11 +104,23 @@ fun GettingStartedScreen(
         botApi.create()
         botApi.startPolling()
     }
-
+    val snackbarHostState = remember { SnackbarHostState() }
     Scaffold(
+
         modifier = modifier.alpha(alpha),
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .padding(bottom = 80.dp) // 👈 ye line snackbar ko thoda upar laayegi
+            )
+        },
 
     ) { paddingValues ->
+
+        val context = LocalContext.current
+        val clipboardManager = LocalClipboardManager.current
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -356,7 +391,35 @@ fun GettingStartedScreen(
                             } catch (e: Exception) {
                                 Log.e("GettingStartedScreen", "Error validating inputs", e)
                                 isValidChatId = false
-                            } finally {
+
+                                val errorMessage = e.localizedMessage ?: e.message ?: "Unknown error"
+//                                val clipboardManager = LocalClipboardManager.current
+//                                val context = LocalContext.current
+
+                                // ⚡ Copy error to clipboard
+                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(errorMessage))
+
+                                // ⚡ Show toast popup
+                                Toast.makeText(
+                                    context,
+                                    "Error copied to clipboard:\n$errorMessage",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                // 🔥 Still show snackbar (optional)
+                                scope.launch {
+                                    withContext(Dispatchers.Main) {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Telegram Error: $errorMessage\n(Tap to copy)",
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Long
+                                        )
+                                    }
+                                }
+
+
+
+                        } finally {
                                 isLoading = false
                             }
                         }
@@ -392,8 +455,15 @@ fun GettingStartedScreen(
                 }
             }
         }
+
     }
+
+
+
+
 }
+
+
 
 @Composable
 private fun SetupStep(

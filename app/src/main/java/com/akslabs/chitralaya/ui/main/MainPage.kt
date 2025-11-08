@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
@@ -221,7 +222,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                         Box {
                                             IconButton(onClick = { showGridOptionsDropdown = true }) {
                                                 Icon(
-                                                    imageVector = Icons.Default.GridView,
+                                                    imageVector = Icons.Default.Dashboard,
                                                     contentDescription = "Grid options",
                                                     tint = MaterialTheme.colorScheme.onSurface
                                                 )

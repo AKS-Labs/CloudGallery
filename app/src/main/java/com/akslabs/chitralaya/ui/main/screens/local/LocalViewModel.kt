@@ -118,7 +118,7 @@ class LocalViewModel : ViewModel() {
 
     companion object {
         private const val TAG = "LocalViewModel"
-        const val PAGE_SIZE = 32
+        const val PAGE_SIZE = 60
         const val PREFETCH_DISTANCE = 2 * 32
         const val JUMP_THRESHOLD = 5 * 32
     }

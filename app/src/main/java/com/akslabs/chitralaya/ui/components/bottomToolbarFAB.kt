@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.FilledIconButton
@@ -23,6 +24,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+
+import androidx.compose.runtime.getValue
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+
 
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
@@ -56,6 +63,7 @@ fun BottomToolbarFAB(
 ) {
     var fabState by remember { mutableStateOf(FabState.Inactive) }
     var isUploading by remember { mutableStateOf(false) }
+
 
     val transition = rememberInfiniteTransition(label = "")
     val offsetY by transition.animateFloat(
@@ -113,28 +121,44 @@ fun BottomToolbarFAB(
 
 @Composable
 private fun LeadingContent(navController: NavHostController) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val isDarkTheme = isSystemInDarkTheme()
+    val isSelected = currentRoute == Screens.LocalPhotos.route
+
     IconButton(
         onClick = {
             navController.navigate(Screens.LocalPhotos.route) {
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
-
             }
         }
     ) {
-        Icon(Icons.Filled.PhoneAndroid, contentDescription = "Device Photos")
+        Icon(
+            imageVector = Icons.Filled.PhoneAndroid,
+            contentDescription = "Device Photos",
+            tint = when {
+                isSelected -> MaterialTheme.colorScheme.primary
+                isDarkTheme -> Color.White
+                else -> Color.Black
+            }
+        )
     }
 
-    Spacer(modifier = Modifier.size(18.dp)) // optional spacing between icons
-
-
+    Spacer(modifier = Modifier.size(18.dp))
 }
+
 
 @Composable
 private fun TrailingContent(navController: NavHostController) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
-    Spacer(modifier = Modifier.size(18.dp)) // optional
+    val isCloudSelected = currentRoute == Screens.RemotePhotos.route
+    val isDarkTheme = isSystemInDarkTheme()
+
+    Spacer(modifier = Modifier.size(18.dp))
 
     IconButton(
         onClick = {
@@ -145,6 +169,14 @@ private fun TrailingContent(navController: NavHostController) {
             }
         }
     ) {
-        Icon(Icons.Filled.Cloud, contentDescription = "Cloud Photos")
+        Icon(
+            imageVector = Icons.Filled.Cloud,
+            contentDescription = "Cloud Photos",
+            tint = when {
+                isCloudSelected -> MaterialTheme.colorScheme.primary
+                isDarkTheme -> Color.White
+                else -> Color.Black
+            }
+        )
     }
 }

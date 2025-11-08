@@ -473,7 +473,7 @@ fun CloudPhotoItem(
 
             val imageRequest = ImageRequest.Builder(context)
                 .data(remotePhoto)
-                .size(Size(150, 150)) // Even smaller for faster loading
+                .size(Size(15, 150)) // Even smaller for faster loading
                 .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
                 .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
                 .crossfade(100) // Faster transition
