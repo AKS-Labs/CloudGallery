@@ -1,6 +1,7 @@
 package com.akslabs.cloudgallery.ui.onboarding
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
@@ -32,8 +33,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -41,10 +45,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
-import com.akslabs.cloudgallery.api.TelegramRawApi
 import com.akslabs.cloudgallery.api.TelegramHttp
 import com.akslabs.cloudgallery.data.localdb.Preferences
-import com.github.kotlintelegrambot.entities.ChatId
 
 import kotlinx.coroutines.launch
 
@@ -59,10 +61,28 @@ fun UidComponent(
     var isValidInput by remember { mutableStateOf(true) }
     var showStepsDisclaimer by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
+    var validationError by remember { mutableStateOf<String?>(null) }
+    var showErrorDialog by remember { mutableStateOf(false) }
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+
     LaunchedEffect(key1 = Unit) {
         botApi.create()
         botApi.startPolling()
     }
+
+    if (showErrorDialog) {
+        ErrorDialog(
+            error = validationError ?: "Unknown error",
+            onDismiss = { showErrorDialog = false },
+            onCopy = {
+                clipboardManager.setText(AnnotatedString(validationError ?: "Unknown error"))
+                showErrorDialog = false
+                Toast.makeText(context, "Error copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = remember { DialogProperties(usePlatformDefaultWidth = false) }
@@ -110,7 +130,11 @@ fun UidComponent(
             ) {
                 TextField(
                     value = inputIdState,
-                    onValueChange = { inputIdState = it },
+                    onValueChange = {
+                        inputIdState = it
+                        isValidInput = true
+                        validationError = null
+                    },
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Number
                     ),
@@ -151,6 +175,11 @@ fun UidComponent(
                     modifier = Modifier
                         .width(300.dp)
                 )
+                AnimatedVisibility(visible = validationError != null) {
+                    TextButton(onClick = { showErrorDialog = true }) {
+                        Text("See/Copy Error")
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 Button(
                     modifier = Modifier
@@ -163,23 +192,10 @@ fun UidComponent(
                                 Log.i("UidComponent", "Attempting to validate chat ID: $inputIdState")
                                 val id = inputIdState.toLongOrNull()
                                 if (id != null) {
-                                    Log.i("UidComponent", "Parsed chat ID: $id (${if (id < 0) "group/channel" else "bot/user"})")
+                                    Log.i("UidComponent", "Parsed chat ID: $id")
 
-                                    // Check if bot can access the chat (works for both groups and direct chats)
-                                    Log.i("UidComponent", "Checking access to chat ID: $id")
-                                    val canAccess = try {
-                                        TelegramHttp.validateChat(id).takeIf { it } ?: run {
-                                            val api = TelegramRawApi.create()
-                                            val resp = api.getChat(id)
-                                            resp.ok && resp.result?.id == id
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.w("UidComponent", "Raw getChat failed, falling back to BotApi", e)
-                                        botApi.getChat(ChatId.fromId(id))
-                                    }
-                                    Log.i("UidComponent", "Access result: $canAccess")
-
-                                    if (canAccess) {
+                                    val validationResult = TelegramHttp.validateChat(id)
+                                    if (validationResult.first) {
                                         // verification successful
                                         Log.i("UidComponent", "Chat ID verification successful, saving to preferences")
                                         Preferences.editEncrypted { putLong(Preferences.channelId, id) }
@@ -188,16 +204,19 @@ fun UidComponent(
                                         // navigate to main screen
                                         onNavigate()
                                     } else {
-                                        Log.w("UidComponent", "Bot cannot access chat ID: $id")
+                                        Log.w("UidComponent", "Chat ID validation failed")
                                         isValidInput = false
+                                        validationError = validationResult.second ?: "Validation failed with no error message."
                                     }
                                 } else {
                                     Log.w("UidComponent", "Invalid chat ID format: $inputIdState")
                                     isValidInput = false
+                                    validationError = "Invalid chat ID format: $inputIdState"
                                 }
                             } catch (e: Exception) {
                                 Log.e("UidComponent", "Error validating chat ID: $inputIdState", e)
                                 isValidInput = false
+                                validationError = e.stackTraceToString()
                             }
                         }
                     }
