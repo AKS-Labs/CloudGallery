@@ -14,6 +14,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import android.graphics.Bitmap
 import coil.Coil
+import com.akslabs.cloudgallery.utils.NotificationHelper
 import java.io.File
 
 
@@ -47,6 +48,7 @@ class App : Application() {
             }
             .build()
         Coil.setImageLoader(imageLoader)
+        NotificationHelper.createNotificationChannels(this)
     }
 
     }

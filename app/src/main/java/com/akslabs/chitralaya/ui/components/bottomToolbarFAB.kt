@@ -2,6 +2,7 @@ package com.akslabs.chitralaya.ui.components
 
 import android.net.http.SslCertificate.restoreState
 import android.net.http.SslCertificate.saveState
+import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -33,11 +34,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.akslabs.cloudgallery.ui.main.nav.Screens
+import com.akslabs.cloudgallery.utils.NotificationHelper
+import com.akslabs.cloudgallery.workers.PeriodicPhotoBackupWorker
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -47,7 +55,13 @@ fun BottomToolbarFAB(
     navController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = LocalHapticFeedback.current
     var isUploading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val workManager = WorkManager.getInstance(context)
+    val backupWorkRequest = OneTimeWorkRequestBuilder<PeriodicPhotoBackupWorker>()
+        .addTag("manual_backup")
+        .build()
 
     val transition = rememberInfiniteTransition(label = "")
     val offsetY by transition.animateFloat(
@@ -81,7 +95,19 @@ fun BottomToolbarFAB(
         content = {
             FilledIconButton(
                 modifier = Modifier.width(66.dp),
-                onClick = { isUploading = !isUploading }
+                onClick = {
+                    isUploading = !isUploading
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (isUploading) {
+                        workManager.enqueue(backupWorkRequest)
+                        Toast.makeText(context, "Backup started", Toast.LENGTH_SHORT).show()
+                        NotificationHelper.showBackupStartedNotification(context)
+                    } else {
+                        workManager.cancelAllWorkByTag("manual_backup")
+                        Toast.makeText(context, "Backup stopped by user", Toast.LENGTH_SHORT).show()
+                        NotificationHelper.showBackupStoppedNotification(context)
+                    }
+                }
             ) {
                 if (isUploading) {
                     Icon(
