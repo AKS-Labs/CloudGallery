@@ -413,7 +413,7 @@ fun LocalPhotoItem(
     index: Int,
     getDateLabel: (String) -> String?,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier.background(MaterialTheme.colorScheme.background)
 ) {
     val context = LocalContext.current
 

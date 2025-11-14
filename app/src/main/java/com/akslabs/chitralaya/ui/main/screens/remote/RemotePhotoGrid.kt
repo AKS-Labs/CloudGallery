@@ -298,7 +298,7 @@ fun CloudPhotosGrid(
     onPhotoClick: (Int, RemotePhoto?) -> Unit,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.background)
 )
  {
     val lazyGridState = rememberLazyGridState()
@@ -445,7 +445,7 @@ fun CloudPhotoItem(
     remotePhoto: RemotePhoto?,
     index: Int,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier.background(MaterialTheme.colorScheme.background)
 ) {
     val context = LocalContext.current
 

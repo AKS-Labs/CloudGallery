@@ -186,4 +186,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.6.0")
     implementation("androidx.compose.foundation:foundation:1.6.8")
 
+    implementation("androidx.activity:activity-compose:1.10.0")      // predictive back APIs
+    implementation("androidx.navigation:navigation-compose:2.8.3")   // predictive back animation built-in
+    implementation("androidx.compose.material3:material3:1.3.1")     // UI
+
+
 }

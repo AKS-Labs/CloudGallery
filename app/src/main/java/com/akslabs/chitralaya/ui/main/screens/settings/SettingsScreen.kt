@@ -89,10 +89,12 @@ import com.akslabs.cloudgallery.utils.Constants
 import com.akslabs.cloudgallery.utils.MetadataConfig
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.Balance
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ThumbUp
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import com.akslabs.cloudgallery.workers.WorkModule
 import kotlinx.coroutines.Dispatchers
@@ -285,7 +287,7 @@ private fun SettingsItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier) {
+fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.background)) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
