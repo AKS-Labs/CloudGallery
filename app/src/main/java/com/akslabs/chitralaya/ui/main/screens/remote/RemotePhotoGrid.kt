@@ -1,5 +1,6 @@
-package com.akslabs.cloudgallery.ui.main.screens.remote
-
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -185,6 +186,8 @@ fun RemotePhotosGrid(
  {
     Log.e(TAG, "🎯 === REMOTE PHOTO GRID COMPOSING ===")
     val context = LocalContext.current
+    val activity = context.findActivity()
+    val window = activity?.window
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<RemotePhoto?>(null) }
 
@@ -275,13 +278,16 @@ fun RemotePhotosGrid(
                 // Ensure target index is within bounds
                 val safeIndex = targetIndex.coerceIn(0, loadedPhotos.size - 1)
 
-                PhotoPageView(
-                    initialPage = safeIndex,
-                    onlyRemotePhotos = true,
-                    photos = loadedPhotos
-                ) {
-                    selectedIndex = null
-                    selectedPhoto = null
+                if (window != null) {
+                    PhotoPageView(
+                        initialPage = safeIndex,
+                        onlyRemotePhotos = true,
+                        photos = loadedPhotos,
+                        window = window
+                    ) {
+                        selectedIndex = null
+                        selectedPhoto = null
+                    }
                 }
             } else {
                 selectedIndex = null
@@ -534,3 +540,13 @@ fun CloudPhotoItem(
 }
 
 private const val TAG = "RemotePhotoGrid"
+
+// Helper function to find the current activity from the context
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
+}

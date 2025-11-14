@@ -1,5 +1,6 @@
 package com.akslabs.cloudgallery.ui.components
 
+import android.view.Window
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -16,6 +17,7 @@ fun PhotoPageView(
     initialPage: Int,
     photos: List<Photo>,
     onlyRemotePhotos: Boolean,
+    window: Window,
     onDismissRequest: () -> Unit,
 ) {
     val showUiState = remember { mutableStateOf(true) }
@@ -27,13 +29,14 @@ fun PhotoPageView(
     }
     Dialog(
         onDismissRequest = onDismissRequest,
-        properties = remember { DialogProperties(usePlatformDefaultWidth = false) }
+        properties = remember { DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false) }
     ) {
         HorizontalPager(modifier = Modifier.fillMaxSize(), state = pagerState) {
             PhotoView(
                 photo = photos[it],
                 isOnlyRemote = onlyRemotePhotos,
-                showUiState = { showUiState }
+                showUiState = { showUiState },
+                window = window
             )
         }
     }

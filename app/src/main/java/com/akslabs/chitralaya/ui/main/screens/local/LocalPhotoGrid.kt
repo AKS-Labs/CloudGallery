@@ -2,6 +2,7 @@ package com.akslabs.cloudgallery.ui.main.screens.local
 
 import android.content.ContentUris
 import android.provider.MediaStore
+import android.app.Activity
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -207,6 +208,7 @@ private fun createLayoutCache(
     return LayoutCache(normalGridItems, dateGroupedItems, localPhotos.itemCount, System.currentTimeMillis())
 }
 
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LocalPhotoGrid(
@@ -220,6 +222,7 @@ fun LocalPhotoGrid(
     val context = LocalContext.current
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<LocalUiPhoto?>(null) }
+    val window = (context as Activity).window
 
     // Preserve scroll
     val lazyGridState = rememberLazyGridState()
@@ -326,7 +329,6 @@ fun LocalPhotoGrid(
                             LocalPhotoItem(
                                 photo = p,
                                 index = index,
-                                getDateLabel = ::getDateLabel,
                                 onClick = {
                                     selectedIndex = index
                                     selectedPhoto = p
@@ -347,7 +349,6 @@ fun LocalPhotoGrid(
                         LocalPhotoItem(
                             photo = p,
                             index = i,
-                            getDateLabel = ::getDateLabel,
                             onClick = {
                                 selectedIndex = i
                                 selectedPhoto = p
@@ -394,7 +395,8 @@ fun LocalPhotoGrid(
                 PhotoPageView(
                     initialPage = safeIndex,
                     onlyRemotePhotos = false,
-                    photos = loadedPhotos
+                    photos = loadedPhotos,
+                    window = window
                 ) {
                     selectedIndex = null
                     selectedPhoto = null
@@ -411,7 +413,6 @@ fun LocalPhotoGrid(
 fun LocalPhotoItem(
     photo: LocalUiPhoto?,
     index: Int,
-    getDateLabel: (String) -> String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier.background(MaterialTheme.colorScheme.background)
 ) {

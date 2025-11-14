@@ -23,7 +23,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,9 +40,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.work.WorkInfo
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
@@ -55,12 +61,21 @@ import com.akslabs.cloudgallery.utils.toastFromMainThread
 import com.akslabs.cloudgallery.workers.WorkModule
 import com.akslabs.cloudgallery.workers.WorkModule.UPLOADING_ID
 import com.akslabs.cloudgallery.workers.WorkModule.DOWNLOADING_ID
-
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+
+import android.view.Window
 
 @Composable
-fun PhotoView(photo: Photo, isOnlyRemote: Boolean, showUiState: () -> MutableState<Boolean>) {
+fun PhotoView(
+    photo: Photo,
+    isOnlyRemote: Boolean,
+    showUiState: () -> MutableState<Boolean>,
+    window: Window
+) {
     val context = LocalContext.current
     var showUi by showUiState()
     val scope = rememberCoroutineScope()
@@ -82,6 +97,21 @@ fun PhotoView(photo: Photo, isOnlyRemote: Boolean, showUiState: () -> MutableSta
     // Dialog state for download confirmation when photo exists
     var showDownloadDialog by rememberSaveable { mutableStateOf(false) }
     var existingPhotoPath by rememberSaveable { mutableStateOf("") }
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        DisposableEffect(Unit) {
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = false
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            onDispose {
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+                insetsController.isAppearanceLightStatusBars = true
+            }
+        }
+    }
     
     // Helper function to check if photo exists and handle download
     suspend fun handleDownloadClick(remoteId: String, forceDownload: Boolean = false) {

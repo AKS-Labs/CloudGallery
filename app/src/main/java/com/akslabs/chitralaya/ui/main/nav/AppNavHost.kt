@@ -1,5 +1,6 @@
 package com.akslabs.cloudgallery.ui.main.nav
 
+import RemotePhotosGrid
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -22,9 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.akslabs.cloudgallery.ui.main.screens.local.LocalPhotoGrid
 import com.akslabs.cloudgallery.ui.main.screens.local.LocalViewModel
-//import com.akslabs.cloudgallery.ui.main.screens.remote.CloudPhotosGrid
-import com.akslabs.cloudgallery.ui.main.screens.remote.RemotePhotosGrid
-//import com.akslabs.cloudgallery.ui.main.screens.remote.RemotePhotoGrid
+
 import com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel
 import com.akslabs.cloudgallery.ui.main.screens.settings.SettingsScreen
 
