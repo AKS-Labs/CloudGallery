@@ -51,6 +51,7 @@ import androidx.paging.compose.LazyPagingItems
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
+import com.akslabs.chitralaya.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import com.akslabs.cloudgallery.data.localdb.Preferences
@@ -367,6 +368,10 @@ fun CloudPhotosGrid(
                 }
             }
             else -> {
+                ExpressiveScrollbar(
+                    lazyGridState = lazyGridState,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                )
                 LazyVerticalGrid(
                     state = lazyGridState,
                     modifier = Modifier

@@ -68,6 +68,7 @@ import kotlinx.coroutines.withContext
 import coil.request.ImageRequest
 import coil.size.Size
 //import com.akslabs.chitralaya.ui.components.GridVerticalScrollbar
+import com.akslabs.chitralaya.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.data.localdb.Preferences
@@ -270,12 +271,10 @@ fun LocalPhotoGrid(
             LoadAnimation(modifier = Modifier.align(Alignment.Center))
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
-//                GridVerticalScrollbar(
-//                    lazyGridState = lazyGridState,
-//                    modifier = Modifier
-//                        .align(Alignment.CenterEnd)
-//                        .padding(end = 4.dp)
-//                )
+                ExpressiveScrollbar(
+                    lazyGridState = lazyGridState,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                )
                 // the grid (unchanged except keep the same lazyGridState variable)
                 LazyVerticalGrid(
                     state = lazyGridState,

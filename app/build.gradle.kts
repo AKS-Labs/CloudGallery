@@ -122,6 +122,7 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.runtime.saveable)
+    implementation(libs.androidx.compose.foundation)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

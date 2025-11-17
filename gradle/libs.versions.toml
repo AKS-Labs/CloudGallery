@@ -30,6 +30,7 @@ workRuntime = "2.9.0"
 securityCrypto = "1.0.0"
 foundationLayout = "1.9.4"
 runtimeSaveable = "1.9.4"
+foundation = "1.9.4"
 
 
 [libraries]
@@ -75,6 +76,7 @@ telegram = { module = "io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegra
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 androidx-compose-runtime-saveable = { group = "androidx.compose.runtime", name = "runtime-saveable", version.ref = "runtimeSaveable" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 
 
 [plugins]
