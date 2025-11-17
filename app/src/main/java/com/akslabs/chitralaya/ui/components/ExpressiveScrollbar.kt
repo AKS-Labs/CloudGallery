@@ -1,6 +1,7 @@
 package com.akslabs.chitralaya.ui.components
 
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
@@ -68,15 +69,17 @@ fun ExpressiveScrollbar(
     modifier: Modifier = Modifier,
     indicatorColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-    thumbWidth: Dp = 6.dp,
+    thumbWidth: Dp = 8.dp,
     thumbHeightMin: Dp = 24.dp,
-    thumbCornerRadius: Dp = 3.dp,
+    thumbCornerRadius: Dp = 6.dp,
     paddingEnd: Dp = 4.dp,
     gridContentPadding: PaddingValues = PaddingValues(0.dp) // Default to no padding
 ) {
     val coroutineScope = rememberCoroutineScope()
     val isScrolling by remember { derivedStateOf { lazyGridState.isScrollInProgress } }
     var isDragging by remember { mutableStateOf(false) } // State for elevation and visibility
+
+    val draggableAreaWidth = thumbWidth + 8.dp // Total width of the scrollbar area including extra padding for draggable target
 
     val showScrollbar = remember { MutableTransitionState(ScrollbarVisibilityState.Hidden) }
     val transition = updateTransition(showScrollbar, label = "ScrollbarVisibility")
@@ -110,7 +113,7 @@ fun ExpressiveScrollbar(
         modifier = modifier // This `modifier` is from the function parameter
             .fillMaxHeight()
             .padding(end = paddingEnd + gridContentPadding.calculateEndPadding(LocalLayoutDirection.current))
-            .width(thumbWidth + 8.dp) // Total width of the scrollbar area including extra padding for draggable target
+            .width(draggableAreaWidth) // Total width of the scrollbar area including extra padding for draggable target
             .zIndex(10f) // Ensure the entire scrollbar component is above the grid
             .alpha(alpha), // Overall fading
         contentAlignment = Alignment.TopEnd // Align content (the thumb) to top-end within this BoxWithConstraints
@@ -118,6 +121,12 @@ fun ExpressiveScrollbar(
         val density = LocalDensity.current
         val thumbWidthPx = with(density) { thumbWidth.toPx() }
         val thumbHeightMinPx = with(density) { thumbHeightMin.toPx() }
+
+        val animatedThumbWidth by animateDpAsState(
+            targetValue = if (isDragging) thumbWidth * 2 else thumbWidth,
+            animationSpec = tween(durationMillis = 150), label = "animatedThumbWidth"
+        )
+        val currentThumbWidthPx = with(density) { animatedThumbWidth.toPx() }
 
         val totalItemsCount by remember { derivedStateOf { lazyGridState.layoutInfo.totalItemsCount } }
         val viewportHeight by remember { derivedStateOf { lazyGridState.layoutInfo.viewportSize.height.toFloat() } }
@@ -155,11 +164,7 @@ fun ExpressiveScrollbar(
         val scrollbarTrackHeight = constraints.maxHeight.toFloat()
         val thumbHeightPx by remember {
             derivedStateOf {
-                if (totalItemsCount == 0 || viewportHeight == 0f || totalContentHeightPx <= viewportHeight) thumbHeightMinPx
-                else {
-                    val ratio = viewportHeight / totalContentHeightPx
-                    (scrollbarTrackHeight * ratio).coerceAtLeast(thumbHeightMinPx)
-                }
+                thumbHeightMinPx
             }
         }
 
@@ -181,8 +186,8 @@ fun ExpressiveScrollbar(
         Box(
             modifier = Modifier
                 .fillMaxHeight()
-                .width(thumbWidth + 8.dp) // Draggable area is wider than visual thumb
-                .pointerInput(lazyGridState, totalContentHeightPx, viewportHeight, scrollbarTrackHeight, thumbHeightPx) {
+                .width(draggableAreaWidth) // Draggable area is wider than visual thumb
+                .pointerInput(lazyGridState) {
                     detectVerticalDragGestures(
                         onDragStart = {
                             isDragging = true
@@ -232,14 +237,14 @@ fun ExpressiveScrollbar(
             Canvas(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(thumbWidth) // The actual visual thumb width
+                    .width(animatedThumbWidth) // The actual visual thumb width
                     .align(Alignment.CenterEnd) // Align the visual thumb to the end of its draggable parent
             ) {
                 // Draw thumb
                 drawRoundRect(
                     color = indicatorColor,
-                    topLeft = Offset(x = (size.width - thumbWidthPx) / 2f, y = 0f), // Center the visual thumb
-                    size = Size(thumbWidthPx, thumbHeightPx),
+                    topLeft = Offset(x = (size.width - currentThumbWidthPx) / 2f, y = 0f), // Center the visual thumb
+                    size = Size(currentThumbWidthPx, thumbHeightPx),
                     cornerRadius = CornerRadius(with(density) { thumbCornerRadius.toPx() })
                 )
             }
