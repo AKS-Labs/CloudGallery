@@ -67,7 +67,7 @@ private enum class ScrollbarVisibilityState { Hidden, Visible }
 fun ExpressiveScrollbar(
     lazyGridState: LazyGridState,
     modifier: Modifier = Modifier,
-    indicatorColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+    indicatorColor: Color = MaterialTheme.colorScheme.primary,
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
     thumbWidth: Dp = 8.dp,
     thumbHeightMin: Dp = 24.dp,
@@ -78,6 +78,9 @@ fun ExpressiveScrollbar(
     val coroutineScope = rememberCoroutineScope()
     val isScrolling by remember { derivedStateOf { lazyGridState.isScrollInProgress } }
     var isDragging by remember { mutableStateOf(false) } // State for elevation and visibility
+    var dragStartY by remember { mutableStateOf(0f) }
+    var dragStartThumbOffset by remember { mutableStateOf(0f) }
+    var currentDragThumbOffset by remember { mutableStateOf(0f) }
 
     val draggableAreaWidth = thumbWidth + 8.dp // Total width of the scrollbar area including extra padding for draggable target
 
@@ -189,9 +192,12 @@ fun ExpressiveScrollbar(
                 .width(draggableAreaWidth) // Draggable area is wider than visual thumb
                 .pointerInput(lazyGridState) {
                     detectVerticalDragGestures(
-                        onDragStart = {
+                        onDragStart = { offset ->
                             isDragging = true
                             showScrollbar.targetState = ScrollbarVisibilityState.Visible
+                            dragStartY = offset.y
+                            dragStartThumbOffset = thumbOffsetPx
+                            currentDragThumbOffset = thumbOffsetPx
                         },
                         onDragEnd = {
                             isDragging = false
@@ -207,25 +213,40 @@ fun ExpressiveScrollbar(
                                 showScrollbar.targetState = ScrollbarVisibilityState.Hidden
                             }
                         },
-                        onVerticalDrag = { change, dragAmount ->
+                        onVerticalDrag = { change, _ ->
                             change.consume()
-                            val thumbScrollableRange = scrollbarTrackHeight - thumbHeightPx
-                            val contentScrollableRange = totalContentHeightPx - viewportHeight
 
-                            if (thumbScrollableRange <= 0f || contentScrollableRange <= 0f) {
-                                return@detectVerticalDragGestures
-                            }
+                            val newThumbOffsetY = dragStartThumbOffset + (change.position.y - dragStartY)
+                            val clampedThumbOffsetY = newThumbOffsetY.coerceIn(0f, scrollbarTrackHeight - thumbHeightPx)
+                            currentDragThumbOffset = clampedThumbOffsetY
 
-                            val scrollDelta = dragAmount * (contentScrollableRange / thumbScrollableRange)
+                            val scrollRatio = clampedThumbOffsetY / (scrollbarTrackHeight - thumbHeightPx)
+                            val targetScrollPx = scrollRatio * (totalContentHeightPx - viewportHeight)
+
+                            val layoutInfo = lazyGridState.layoutInfo
+                            val spanCount = layoutInfo.visibleItemsInfo.maxOfOrNull { it.column }?.plus(1) ?: 1
+                            if (spanCount == 0) return@detectVerticalDragGestures
+
+                            val averageRowHeight = singleItemHeight + mainAxisSpacing
+                            if (averageRowHeight <= 0f) return@detectVerticalDragGestures
+
+                            val targetRow = (targetScrollPx / averageRowHeight).toInt()
+                            val targetRowOffset = (targetScrollPx % averageRowHeight).toInt()
+
+                            val targetItemIndex = targetRow * spanCount
 
                             coroutineScope.launch {
-                                lazyGridState.scrollBy(scrollDelta)
+                                lazyGridState.scrollToItem(targetItemIndex, targetRowOffset)
                             }
                         }
                     )
                 }
                 .graphicsLayer {
-                    translationY = thumbOffsetPx.coerceIn(0f, (scrollbarTrackHeight - thumbHeightPx).coerceAtLeast(0f))
+                    translationY = if (isDragging) {
+                        currentDragThumbOffset
+                    } else {
+                        thumbOffsetPx
+                    }.coerceIn(0f, (scrollbarTrackHeight - thumbHeightPx).coerceAtLeast(0f))
                 }
                 .shadow(
                     elevation = if (isDragging) 8.dp else 0.dp, // Elevation while dragging
