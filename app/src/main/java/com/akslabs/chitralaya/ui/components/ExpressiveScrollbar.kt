@@ -70,8 +70,8 @@ fun ExpressiveScrollbar(
     indicatorColor: Color = MaterialTheme.colorScheme.primary,
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
     thumbWidth: Dp = 8.dp,
-    thumbHeightMin: Dp = 24.dp,
-    thumbCornerRadius: Dp = 6.dp,
+    thumbHeightMin: Dp = 34.dp,
+    thumbCornerRadius: Dp = 10.dp,
     paddingEnd: Dp = 4.dp,
     gridContentPadding: PaddingValues = PaddingValues(0.dp) // Default to no padding
 ) {
@@ -126,7 +126,7 @@ fun ExpressiveScrollbar(
         val thumbHeightMinPx = with(density) { thumbHeightMin.toPx() }
 
         val animatedThumbWidth by animateDpAsState(
-            targetValue = if (isDragging) thumbWidth * 2 else thumbWidth,
+            targetValue = if (isDragging) thumbWidth + 3.dp else thumbWidth,
             animationSpec = tween(durationMillis = 150), label = "animatedThumbWidth"
         )
         val currentThumbWidthPx = with(density) { animatedThumbWidth.toPx() }
