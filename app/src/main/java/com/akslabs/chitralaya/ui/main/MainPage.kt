@@ -133,11 +133,20 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         selectionMode = false
     }
 
-    fun selectAll() {
-        selectedPhotos = if (selectedTab == 0) {
-            (0 until localPhotos.itemCount).mapNotNull { localPhotos.peek(it)?.localId }.toSet()
+    val areAllSelected = remember(selectedPhotos, selectedTab, localPhotos.itemCount, allCloudPhotos.itemCount) {
+        val totalCount = if (selectedTab == 0) localPhotos.itemCount else allCloudPhotos.itemCount
+        totalCount > 0 && selectedPhotos.size == totalCount
+    }
+
+    fun toggleSelectAll() {
+        if (areAllSelected) {
+            clearSelection()
         } else {
-            (0 until allCloudPhotos.itemCount).mapNotNull { allCloudPhotos.peek(it)?.remoteId }.toSet()
+            selectedPhotos = if (selectedTab == 0) {
+                (0 until localPhotos.itemCount).mapNotNull { localPhotos.peek(it)?.localId }.toSet()
+            } else {
+                (0 until allCloudPhotos.itemCount).mapNotNull { allCloudPhotos.peek(it)?.remoteId }.toSet()
+            }
         }
     }
 
@@ -236,7 +245,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                 SelectionTopAppBar(
                                     selectedCount = selectedPhotos.size,
                                     onClearSelection = { clearSelection() },
-                                    onSelectAll = { selectAll() }
+                                    onToggleSelectAll = { toggleSelectAll() },
+                                    areAllSelected = areAllSelected
                                 )
                             } else {
                                 Column(
@@ -441,7 +451,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 fun SelectionTopAppBar(
     selectedCount: Int,
     onClearSelection: () -> Unit,
-    onSelectAll: () -> Unit
+    onToggleSelectAll: () -> Unit,
+    areAllSelected: Boolean
 ) {
     TopAppBar(
         title = { Text(text = "$selectedCount selected") },
@@ -451,15 +462,16 @@ fun SelectionTopAppBar(
             }
         },
         actions = {
-            IconButton(onClick = onSelectAll) {
-                Icon(Icons.Default.SelectAll, contentDescription = "Select All")
-            }
-            IconButton(onClick = onClearSelection) {
-                Icon(Icons.Default.Clear, contentDescription = "Deselect All")
+            IconButton(onClick = onToggleSelectAll) {
+                Icon(
+                    imageVector = Icons.Default.SelectAll,
+                    contentDescription = if (areAllSelected) "Deselect All" else "Select All",
+                    tint = if (areAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         )
     )
 }
