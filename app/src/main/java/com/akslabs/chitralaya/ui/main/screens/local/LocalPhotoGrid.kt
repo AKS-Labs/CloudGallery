@@ -1,26 +1,15 @@
 package com.akslabs.cloudgallery.ui.main.screens.local
 
-import android.content.ContentUris
-import android.provider.MediaStore
 import android.app.Activity
+import android.provider.MediaStore
 import android.util.Log
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.unit.dp
-
-import coil.request.CachePolicy
-import android.graphics.Bitmap
-
-import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
-
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,25 +18,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.BrokenImage
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,27 +39,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
-import com.akslabs.cloudgallery.BuildConfig
 import androidx.paging.compose.LazyPagingItems
 import coil.compose.SubcomposeAsyncImage
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Size
-//import com.akslabs.chitralaya.ui.components.GridVerticalScrollbar
 import com.akslabs.chitralaya.ui.components.ExpressiveScrollbar
+import com.akslabs.cloudgallery.BuildConfig
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
-import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
-import com.akslabs.cloudgallery.ui.components.itemsPaging
 import com.akslabs.cloudgallery.ui.main.rememberGridState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // Sealed class for grid items to support date grouping
 sealed class LocalGridItem {
@@ -210,7 +194,7 @@ private fun createLayoutCache(
 }
 
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun LocalPhotoGrid(
     localPhotos: LazyPagingItems<LocalUiPhoto>,
@@ -223,7 +207,20 @@ fun LocalPhotoGrid(
     val context = LocalContext.current
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<LocalUiPhoto?>(null) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedPhotos by remember { mutableStateOf<Set<String>>(emptySet()) }
     val window = (context as Activity).window
+
+    fun toggleSelection(photoId: String) {
+        selectedPhotos = if (selectedPhotos.contains(photoId)) {
+            selectedPhotos - photoId
+        } else {
+            selectedPhotos + photoId
+        }
+        if (selectedPhotos.isEmpty()) {
+            selectionMode = false
+        }
+    }
 
     // Preserve scroll
     val lazyGridState = rememberLazyGridState()
@@ -294,189 +291,240 @@ fun LocalPhotoGrid(
                     ),
                     verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                     horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
-                )
-                {
-                if (isDateGroupedLayout) {
-                    // Stream grouped headers/items inline to match normal grid count
-                    for (index in 0 until localPhotos.itemCount) {
-                        val current = localPhotos.peek(index)
-                        val prev = if (index > 0) localPhotos.peek(index - 1) else null
-                        val currentLabel = current?.let {
-                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
-                            formatPhotoDate(ts)
-                        }
-                        val prevLabel = prev?.let {
-                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
-                            formatPhotoDate(ts)
-                        }
-                        if (currentLabel != null && currentLabel != prevLabel) {
-                            item(key = "header_${index}_$currentLabel", span = { GridItemSpan(maxLineSpan) }) {
-                                Text(
-                                    text = currentLabel,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp, bottom = 4.dp)
                                 )
-                            }
-                        }
-                        val key = current?.localId ?: "placeholder"
-                        item(key = "photo_${index}_$key") {
-                            val p = localPhotos[index]
-                            LocalPhotoItem(
-                                photo = p,
-                                index = index,
-                                onClick = {
-                                    selectedIndex = index
-                                    selectedPhoto = p
+                                {
+                                if (isDateGroupedLayout) {
+                                    // Stream grouped headers/items inline to match normal grid count
+                                    for (index in 0 until localPhotos.itemCount) {
+                                        val current = localPhotos.peek(index)
+                                        val prev = if (index > 0) localPhotos.peek(index - 1) else null
+                                        val currentLabel = current?.let {
+                                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
+                                            formatPhotoDate(ts)
+                                        }
+                                        val prevLabel = prev?.let {
+                                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
+                                            formatPhotoDate(ts)
+                                        }
+                                        if (currentLabel != null && currentLabel != prevLabel) {
+                                            item(key = "header_${index}_$currentLabel", span = { GridItemSpan(maxLineSpan) }) {
+                                                Text(
+                                                    text = currentLabel,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(top = 8.dp, bottom = 4.dp)
+                                                )
+                                            }
+                                        }
+                                        val key = current?.localId ?: "placeholder"
+                                        item(key = "photo_${index}_$key") {
+                                            val p = localPhotos[index]
+                                            if (p != null) {
+                                                val isSelected = selectedPhotos.contains(p.localId)
+                                                LocalPhotoItem(
+                                                    photo = p,
+                                                    index = index,
+                                                    isSelected = isSelected,
+                                                    modifier = Modifier.combinedClickable(
+                                                        onClick = {
+                                                            if (selectionMode) {
+                                                                toggleSelection(p.localId)
+                                                            } else {
+                                                                selectedIndex = index
+                                                                selectedPhoto = p
+                                                            }
+                                                        },
+                                                        onLongClick = {
+                                                            if (!selectionMode) {
+                                                                selectionMode = true
+                                                            }
+                                                            toggleSelection(p.localId)
+                                                        }
+                                                    )
+                                                )
+                                            } else {
+                                                LocalPhotoItem(photo = null, index = index, isSelected = false)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // Normal grid with stable unique keys per index to avoid duplicate key crashes
+                                    items(
+                                        count = localPhotos.itemCount,
+                                        key = { i ->
+                                            val p = localPhotos.peek(i)
+                                            if (p != null) "photo_${i}_${p.localId}" else "photo_placeholder_${i}"
+                                        }
+                                    ) { i ->
+                                        val p = localPhotos[i]
+                                        if (p != null) {
+                                            val isSelected = selectedPhotos.contains(p.localId)
+                                            LocalPhotoItem(
+                                                photo = p,
+                                                index = i,
+                                                isSelected = isSelected,
+                                                modifier = Modifier.combinedClickable(
+                                                    onClick = {
+                                                        if (selectionMode) {
+                                                            toggleSelection(p.localId)
+                                                        } else {
+                                                            selectedIndex = i
+                                                            selectedPhoto = p
+                                                        }
+                                                    },
+                                                    onLongClick = {
+                                                        if (!selectionMode) {
+                                                            selectionMode = true
+                                                        }
+                                                        toggleSelection(p.localId)
+                                                    }
+                                                )
+                                            )
+                                        } else {
+                                            LocalPhotoItem(photo = null, index = i, isSelected = false)
+                                        }
+                                    }
+                
                                 }
-                            )
-                        }
-                    }
-                } else {
-                    // Normal grid with stable unique keys per index to avoid duplicate key crashes
-                    items(
-                        count = localPhotos.itemCount,
-                        key = { i ->
-                            val p = localPhotos.peek(i)
-                            if (p != null) "photo_${i}_${p.localId}" else "photo_placeholder_${i}"
-                        }
-                    ) { i ->
-                        val p = localPhotos[i]
-                        LocalPhotoItem(
-                            photo = p,
-                            index = i,
-                            onClick = {
-                                selectedIndex = i
-                                selectedPhoto = p
+                
+                                }
                             }
-                        )
+                        }
+                        // Photo viewer overlay
+                        selectedIndex?.let { index ->
+                            // Build photo list from loaded items only
+                            val loadedPhotos = mutableListOf<com.akslabs.cloudgallery.data.localdb.entities.Photo>()
+                            var targetIndex = 0
+                
+                            // Collect all loaded photos and find the target index
+                            for (i in 0 until localPhotos.itemCount) {
+                                val photo = localPhotos.peek(i) // Use peek to get already loaded items
+                                if (photo != null) {
+                                    if (i == index) {
+                                        targetIndex = loadedPhotos.size // Current position in loaded list
+                                    }
+                                    // Map UI photo to entity for viewer compatibility
+                                    loadedPhotos.add(
+                                        com.akslabs.cloudgallery.data.localdb.entities.Photo(
+                                            localId = photo.localId,
+                                            remoteId = null,
+                                            photoType = photo.mimeType.substringAfter('/').ifEmpty { "jpg" },
+                                            pathUri = photo.pathUri
+                                        )
+                                    )
+                                }
+                            }
+                
+                            if (loadedPhotos.isNotEmpty()) {
+                                // Ensure target index is within bounds
+                                val safeIndex = targetIndex.coerceIn(0, loadedPhotos.size - 1)
+                
+                                Log.d(TAG, "Opening photo viewer: originalIndex=$index, mappedIndex=$safeIndex, totalLoaded=${loadedPhotos.size}")
+                
+                                PhotoPageView(
+                                    initialPage = safeIndex,
+                                    onlyRemotePhotos = false,
+                                    photos = loadedPhotos,
+                                    window = window
+                                ) {
+                                    selectedIndex = null
+                                    selectedPhoto = null
+                                }
+                            } else {
+                                selectedIndex = null
+                                selectedPhoto = null
+                            }
+                        }
                     }
-
                 }
-
-                }
-            }
-        }
-        // Photo viewer overlay
-        selectedIndex?.let { index ->
-            // Build photo list from loaded items only
-            val loadedPhotos = mutableListOf<com.akslabs.cloudgallery.data.localdb.entities.Photo>()
-            var targetIndex = 0
-
-            // Collect all loaded photos and find the target index
-            for (i in 0 until localPhotos.itemCount) {
-                val photo = localPhotos.peek(i) // Use peek to get already loaded items
-                if (photo != null) {
-                    if (i == index) {
-                        targetIndex = loadedPhotos.size // Current position in loaded list
-                    }
-                    // Map UI photo to entity for viewer compatibility
-                    loadedPhotos.add(
-                        com.akslabs.cloudgallery.data.localdb.entities.Photo(
-                            localId = photo.localId,
-                            remoteId = null,
-                            photoType = photo.mimeType.substringAfter('/').ifEmpty { "jpg" },
-                            pathUri = photo.pathUri
-                        )
-                    )
-                }
-            }
-
-            if (loadedPhotos.isNotEmpty()) {
-                // Ensure target index is within bounds
-                val safeIndex = targetIndex.coerceIn(0, loadedPhotos.size - 1)
-
-                Log.d(TAG, "Opening photo viewer: originalIndex=$index, mappedIndex=$safeIndex, totalLoaded=${loadedPhotos.size}")
-
-                PhotoPageView(
-                    initialPage = safeIndex,
-                    onlyRemotePhotos = false,
-                    photos = loadedPhotos,
-                    window = window
+                
+                @Composable
+                fun LocalPhotoItem(
+                    photo: LocalUiPhoto?,
+                    index: Int,
+                    isSelected: Boolean,
+                    modifier: Modifier = Modifier
                 ) {
-                    selectedIndex = null
-                    selectedPhoto = null
-                }
-            } else {
-                selectedIndex = null
-                selectedPhoto = null
-            }
-        }
-    }
-}
-
-@Composable
-fun LocalPhotoItem(
-    photo: LocalUiPhoto?,
-    index: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier.background(MaterialTheme.colorScheme.background)
-) {
-    val context = LocalContext.current
-
-    // Per-item logging removed to avoid main-thread overhead during fast scroll
-
-    Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        if (photo != null) {
-            val request = ImageRequest.Builder(context)
-                .data(photo.pathUri)
-                .size(Size(110, 110))
-                .crossfade(false)
-                .allowHardware(false)
-//                .allowRgb565(true)
-                .memoryCachePolicy(CachePolicy.ENABLED)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .build()
-
-
-            SubcomposeAsyncImage(
-                model = request,
-                contentDescription = stringResource(id = R.string.photo),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                loading = {
+                    val context = LocalContext.current
+                
+                    // Per-item logging removed to avoid main-thread overhead during fast scroll
+                
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                },
-                error = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
+                        modifier = modifier
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            imageVector = Icons.Rounded.BrokenImage,
-                            contentDescription = stringResource(id = R.string.load_error),
-                            modifier = Modifier.size(16.dp)
-                        )
+                        if (photo != null) {
+                            val request = ImageRequest.Builder(context)
+                                .data(photo.pathUri)
+                                .size(Size(110, 110))
+                                .crossfade(false)
+                                .allowHardware(false)
+                //                .allowRgb565(true)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .build()
+                
+                
+                            SubcomposeAsyncImage(
+                                model = request,
+                                contentDescription = stringResource(id = R.string.photo),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                                loading = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    )
+                                },
+                                error = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                            imageVector = Icons.Rounded.BrokenImage,
+                                            contentDescription = stringResource(id = R.string.load_error),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            )
+                        } else {
+                            Log.w(TAG, "Item[$index] Showing PLACEHOLDER - photo is null")
+                            // Simplified placeholder for null items during loading - just background color
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                        }
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                            )
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = "Selected",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                            )
+                        }
                     }
                 }
-            )
-        } else {
-            Log.w(TAG, "Item[$index] Showing PLACEHOLDER - photo is null")
-            // Simplified placeholder for null items during loading - just background color
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
-        }
-    }
-}
-
-private const val TAG = "LocalPhotoGrid"
+                
+                private const val TAG = "LocalPhotoGrid"
+                

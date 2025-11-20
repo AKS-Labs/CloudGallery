@@ -2,13 +2,15 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.util.Log
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+
+import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
+
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,16 +19,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,11 +41,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
@@ -53,8 +54,10 @@ import coil.size.Size
 import com.akslabs.chitralaya.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
+import com.akslabs.cloudgallery.ui.components.itemsPaging
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 
@@ -188,19 +191,6 @@ fun RemotePhotosGrid(
     val window = activity?.window
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<RemotePhoto?>(null) }
-    var selectionMode by remember { mutableStateOf(false) }
-    var selectedPhotos by remember { mutableStateOf<Set<String>>(emptySet()) }
-
-    fun toggleSelection(photoId: String) {
-        selectedPhotos = if (selectedPhotos.contains(photoId)) {
-            selectedPhotos - photoId
-        } else {
-            selectedPhotos + photoId
-        }
-        if (selectedPhotos.isEmpty()) {
-            selectionMode = false
-        }
-    }
 
     // Comprehensive debug logging for cloud photos data
     LaunchedEffect(cloudPhotos.loadState, cloudPhotos.itemCount) {
@@ -259,17 +249,9 @@ fun RemotePhotosGrid(
         // Unified cloud photos grid
         CloudPhotosGrid(
             cloudPhotos = cloudPhotos,
-            selectionMode = selectionMode,
-            selectedPhotos = selectedPhotos,
             onPhotoClick = { index, photo ->
                 selectedIndex = index
                 selectedPhoto = photo
-            },
-            onToggleSelection = { photoId ->
-                toggleSelection(photoId)
-            },
-            onSelectionModeChange = { mode ->
-                selectionMode = mode
             },
             expanded = expanded,
             onExpandedChange = onExpandedChange
@@ -316,15 +298,11 @@ fun RemotePhotosGrid(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CloudPhotosGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
-    selectionMode: Boolean,
-    selectedPhotos: Set<String>,
     onPhotoClick: (Int, RemotePhoto?) -> Unit,
-    onToggleSelection: (String) -> Unit,
-    onSelectionModeChange: (Boolean) -> Unit,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.background)
@@ -449,7 +427,6 @@ fun CloudPhotosGrid(
                                 }
                             }
                             is RemoteGridItem.PhotoItem -> {
-                                val isSelected = selectedPhotos.contains(item.photo.remoteId)
                                 // Photo item with smooth animation
                                 androidx.compose.animation.AnimatedVisibility(
                                     visible = true,
@@ -459,23 +436,10 @@ fun CloudPhotosGrid(
                                     CloudPhotoItem(
                                         remotePhoto = item.photo,
                                         index = item.originalIndex,
-                                        isSelected = isSelected,
-                                        modifier = Modifier.combinedClickable(
-                                            onClick = {
-                                                if (selectionMode) {
-                                                    onToggleSelection(item.photo.remoteId)
-                                                } else {
-                                                    Log.d(TAG, "Photo clicked at index: ${item.originalIndex}, remoteId: ${item.photo.remoteId}")
-                                                    onPhotoClick(item.originalIndex, item.photo)
-                                                }
-                                            },
-                                            onLongClick = {
-                                                if (!selectionMode) {
-                                                    onSelectionModeChange(true)
-                                                }
-                                                onToggleSelection(item.photo.remoteId)
-                                            }
-                                        )
+                                        onClick = {
+                                            Log.d(TAG, "Photo clicked at index: ${item.originalIndex}, remoteId: ${item.photo.remoteId}")
+                                            onPhotoClick(item.originalIndex, item.photo)
+                                        }
                                     )
                                 }
                             }
@@ -491,8 +455,8 @@ fun CloudPhotosGrid(
 fun CloudPhotoItem(
     remotePhoto: RemotePhoto?,
     index: Int,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier.background(MaterialTheme.colorScheme.background)
 ) {
     val context = LocalContext.current
 
@@ -511,7 +475,8 @@ fun CloudPhotoItem(
         modifier = modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         if (remotePhoto != null) {
@@ -574,21 +539,6 @@ fun CloudPhotoItem(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
-        }
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-            )
-            Icon(
-                imageVector = Icons.Filled.CheckCircle,
-                contentDescription = "Selected",
-                tint = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
             )
         }
     }
