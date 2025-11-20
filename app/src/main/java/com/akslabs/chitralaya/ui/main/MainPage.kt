@@ -1,7 +1,13 @@
 package com.akslabs.cloudgallery.ui.main
 
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,9 +26,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material3.BottomAppBar
@@ -65,6 +74,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.work.WorkInfo
 import com.akslabs.chitralaya.ui.components.BottomToolbarFAB
 import com.akslabs.chitralaya.ui.components.FabState
@@ -110,6 +120,32 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         .collectAsStateWithLifecycle(initialValue = 0)
 
     val photoCounts = listOf(localPhotosCount, cloudPhotosCount)
+
+    // Selection state
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedPhotos by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    val localPhotos = viewModel.localPhotosFlow.collectAsLazyPagingItems()
+    val allCloudPhotos = viewModel.allCloudPhotosFlow.collectAsLazyPagingItems()
+
+    fun clearSelection() {
+        selectedPhotos = emptySet()
+        selectionMode = false
+    }
+
+    fun selectAll() {
+        selectedPhotos = if (selectedTab == 0) {
+            (0 until localPhotos.itemCount).mapNotNull { localPhotos.peek(it)?.localId }.toSet()
+        } else {
+            (0 until allCloudPhotos.itemCount).mapNotNull { allCloudPhotos.peek(it)?.remoteId }.toSet()
+        }
+    }
+
+    // Back press handler to exit selection mode
+    BackHandler(enabled = selectionMode) {
+        clearSelection()
+    }
+
 
     // Improved scrollable TopAppBar behavior - shows on scroll up, hides on scroll down
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -190,127 +226,142 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 modifier = if (!isSettingsScreen) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else Modifier,
                 topBar = {
                     if (!isSettingsScreen) {
-                        Column(
+                        AnimatedContent(
+                            targetState = selectionMode,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                            }
+                        ) { mode ->
+                            if (mode) {
+                                SelectionTopAppBar(
+                                    selectedCount = selectedPhotos.size,
+                                    onClearSelection = { clearSelection() },
+                                    onSelectAll = { selectAll() }
+                                )
+                            } else {
+                                Column(
 //                        modifier = Modifier.statusBarsPadding()
 //                        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
-                        ) {
+                                ) {
 
-                            TopAppBar(
+                                    TopAppBar(
 
-                                title = {
+                                        title = {
 //                                Column {
 //
 //                                    Spacer(modifier = Modifier.height(35.dp))
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        contentAlignment = Alignment.CenterStart
-                                    ) {
+                                            Box(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                contentAlignment = Alignment.CenterStart
+                                            ) {
 
-                                        Text(
-                                            text = "${tabs[selectedTab].first} ${photoCounts[selectedTab]}",
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.padding(top = 30.dp)
+                                                Text(
+                                                    text = "${tabs[selectedTab].first} ${photoCounts[selectedTab]}",
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.padding(top = 30.dp)
 
-                                        )
-                                    }
-                                }, expandedHeight = 90.dp,
-                                actions = {
-                                    Row(
-                                        modifier = Modifier.padding(top = 30.dp)// यहां भी पैडिंग जोड़ें
-                                    ) {
-                                        // Grid options menu button
-                                        Box {
-                                            IconButton(onClick = { showGridOptionsDropdown = true }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Dashboard,
-                                                    contentDescription = "Grid options",
-                                                    tint = MaterialTheme.colorScheme.onSurface
                                                 )
                                             }
-
-                                            DropdownMenu(
-                                                expanded = showGridOptionsDropdown,
-                                                onDismissRequest = { showGridOptionsDropdown = false }
+                                        },
+                                        actions = {
+                                            Row(
+                                                modifier = Modifier.padding(top = 30.dp)// यहां भी पैडिंग जोड़ें
                                             ) {
-                                                Text(
-                                                    text = "Layout",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                                )
+                                                // Grid options menu button
+                                                Box {
+                                                    IconButton(onClick = { showGridOptionsDropdown = true }) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Dashboard,
+                                                            contentDescription = "Grid options",
+                                                            tint = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    }
 
-                                                DropdownMenuItem(
-                                                    text = {
+                                                    DropdownMenu(
+                                                        expanded = showGridOptionsDropdown,
+                                                        onDismissRequest = { showGridOptionsDropdown = false }
+                                                    ) {
                                                         Text(
-                                                            text = "Grid View",
-                                                            color = if (!gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                            text = "Layout",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                                         )
-                                                    },
-                                                    onClick = {
-                                                        gridState.updateDateGroupedLayout(false)
-                                                        showGridOptionsDropdown = false
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = {
+
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(
+                                                                    text = "Grid View",
+                                                                    color = if (!gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                gridState.updateDateGroupedLayout(false)
+                                                                showGridOptionsDropdown = false
+                                                            }
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(
+                                                                    text = "Date Grouped",
+                                                                    color = if (gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                gridState.updateDateGroupedLayout(true)
+                                                                showGridOptionsDropdown = false
+                                                            }
+                                                        )
+                                                        androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                                                         Text(
-                                                            text = "Date Grouped",
-                                                            color = if (gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                            text = "Columns",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                                         )
-                                                    },
-                                                    onClick = {
-                                                        gridState.updateDateGroupedLayout(true)
-                                                        showGridOptionsDropdown = false
-                                                    }
-                                                )
-                                                androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                                                Text(
-                                                    text = "Columns",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                                )
-                                                listOf(3, 4, 5, 6).forEach { columnCount ->
-                                                    DropdownMenuItem(
-                                                        text = {
-                                                            Text(
-                                                                text = "$columnCount columns",
-                                                                color = if (columnCount == gridState.columnCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                        listOf(3, 4, 5, 6).forEach { columnCount ->
+                                                            DropdownMenuItem(
+                                                                text = {
+                                                                    Text(
+                                                                        text = "$columnCount columns",
+                                                                        color = if (columnCount == gridState.columnCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                                    )
+                                                                },
+                                                                onClick = {
+                                                                    gridState.updateColumnCount(columnCount)
+                                                                    showGridOptionsDropdown = false
+                                                                }
                                                             )
-                                                        },
-                                                        onClick = {
-                                                            gridState.updateColumnCount(columnCount)
-                                                            showGridOptionsDropdown = false
                                                         }
+                                                    }
+                                                }
+
+                                                // Settings button
+                                                IconButton(onClick = {
+//                                            isNavigatingToSettings = true
+                                                    // Stop any scroll animation immediately
+                                                    scrollBehavior.state.heightOffset = 0f
+                                                    scrollBehavior.state.heightOffsetLimit = 0f
+
+                                                    // Navigate instantly without waiting
+                                                    navController.navigate(Screens.Settings.route)
+//                                    navController.navigate(Screens.Settings.route)
+                                                }) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Settings,
+                                                        contentDescription = "Settings",
+                                                        tint = MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
                                             }
-                                        }
-
-                                        // Settings button
-                                        IconButton(onClick = {
-//                                            isNavigatingToSettings = true
-                                            // Stop any scroll animation immediately
-                                            scrollBehavior.state.heightOffset = 0f
-                                            scrollBehavior.state.heightOffsetLimit = 0f
-
-                                            // Navigate instantly without waiting
-                                            navController.navigate(Screens.Settings.route)
-//                                    navController.navigate(Screens.Settings.route)
-                                        }) {
-                                            Icon(
-                                                imageVector = Icons.Default.Settings,
-                                                contentDescription = "Settings",
-                                                tint = MaterialTheme.colorScheme.onSurface
-                                            )
-                                        }
-                                    }
-                                },
-                                windowInsets = WindowInsets(0, 0, 0, 0),
-                                scrollBehavior = scrollBehavior,
-                                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
-                            )
-                            ConnectivityStatusPopup()
+                                        },
+                                        windowInsets = WindowInsets(0, 0, 0, 0),
+                                        scrollBehavior = scrollBehavior,
+                                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                                    )
+                                    ConnectivityStatusPopup()
+                                }
+                            }
                         }
                     }
                 },
@@ -323,12 +374,12 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                             .fillMaxSize(),
                         navController = navController,
                         expanded = expanded,
-                        onExpandedChange = { expanded = it }
+                        onExpandedChange = { expanded = it },
+                        selectionMode = selectionMode,
+                        selectedPhotos = selectedPhotos,
+                        onSelectionModeChange = { selectionMode = it },
+                        onSelectedPhotosChange = { selectedPhotos = it }
                     )
-
-
-
-
                 }
             }
         } else {
@@ -342,12 +393,12 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                         .fillMaxSize(),
                     navController = navController,
                     expanded = expanded,
-                    onExpandedChange = { expanded = it }
+                    onExpandedChange = { expanded = it },
+                    selectionMode = selectionMode,
+                    selectedPhotos = selectedPhotos,
+                    onSelectionModeChange = { selectionMode = it },
+                    onSelectedPhotosChange = { selectedPhotos = it }
                 )
-
-
-
-
             }
         }
 //        var fabState by remember { mutableStateOf(FabState.Inactive) }
@@ -361,82 +412,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                     navController = navController,
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
-
-
-//                var fabState by remember { mutableStateOf(FabState.Inactive) }
-////
-//                TriStateFab(
-//                    modifier = Modifier
-//                        .align(Alignment.BottomCenter)
-//                        .offset(y = (-24).dp)
-//                        .zIndex(2f),
-//                    state = fabState,
-//                    onClick = {
-//                        fabState = when (fabState) {
-//                            FabState.Inactive -> FabState.Loading
-//                            FabState.Loading -> FabState.Active
-//                            FabState.Active -> FabState.Inactive
-//                        }
-//                    }
-//                )
             }
         }
-
-//        if (!isSettingsScreen) {
-//            Box(
-//                modifier = Modifier
-//                    .fillMaxSize()
-//                    .padding(bottom = 16.dp),
-//                contentAlignment = Alignment.BottomCenter
-//            ) {
-//                BottomAppBar(
-//                    modifier = Modifier
-//                        .width(300.dp)
-//                        .clip(RoundedCornerShape(37.dp)),
-//                    containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.9f),
-//                    tonalElevation = 12.dp
-//                )
-//                {
-//                    tabs.forEachIndexed { index, (title, icon, route) ->
-//                        NavigationBarItem(
-//                            selected = selectedTab == index,
-//                            onClick = {
-//                                selectedTab = index
-//                                navController.navigate(route) {
-//                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-//                                    launchSingleTop = true
-//                                    restoreState = true
-//                                }
-//                            },
-//                            icon = { Icon(imageVector = icon, contentDescription = title) },
-//                            label = { Text(text = title, style = MaterialTheme.typography.labelSmall) }
-//                        )
-//                        if (index == 0) Spacer(Modifier.width(34.dp))
-//                    }
-//                }
-//
-//
-//                var fabState by remember { mutableStateOf(FabState.Inactive) }
-//
-//                TriStateFab(
-//                    modifier = Modifier
-//                        .align(Alignment.BottomCenter)
-//                        .offset(y = (-24).dp),
-//                    state = fabState,
-//                    onClick = {
-//                        fabState = when (fabState) {
-//                            FabState.Inactive -> FabState.Loading
-//                            FabState.Loading -> FabState.Active
-//                            FabState.Active -> FabState.Inactive
-//                        }
-//                    }
-//                )
-//
-//
-//            }
-//        }
-
-
 
         // Only show syncing animation on cloud photos screen, not device screen
         AnimatedVisibility(visible = syncState == SyncState.SYNCING && selectedTab == 1) {
@@ -457,4 +434,32 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SelectionTopAppBar(
+    selectedCount: Int,
+    onClearSelection: () -> Unit,
+    onSelectAll: () -> Unit
+) {
+    TopAppBar(
+        title = { Text(text = "$selectedCount selected") },
+        navigationIcon = {
+            IconButton(onClick = onClearSelection) {
+                Icon(Icons.Default.Close, contentDescription = "Close selection mode")
+            }
+        },
+        actions = {
+            IconButton(onClick = onSelectAll) {
+                Icon(Icons.Default.SelectAll, contentDescription = "Select All")
+            }
+            IconButton(onClick = onClearSelection) {
+                Icon(Icons.Default.Clear, contentDescription = "Deselect All")
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    )
 }

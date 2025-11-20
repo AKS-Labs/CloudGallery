@@ -179,7 +179,11 @@ fun RemotePhotosGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
     onPhotoClick: (Int, RemotePhoto?) -> Unit,
     expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit
+    onExpandedChange: (Boolean) -> Unit,
+    selectionMode: Boolean,
+    selectedPhotos: Set<String>,
+    onSelectionModeChange: (Boolean) -> Unit,
+    onSelectedPhotosChange: (Set<String>) -> Unit,
 )
  {
     Log.e(TAG, "🎯 === REMOTE PHOTO GRID COMPOSING ===")
@@ -188,17 +192,16 @@ fun RemotePhotosGrid(
     val window = activity?.window
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<RemotePhoto?>(null) }
-    var selectionMode by remember { mutableStateOf(false) }
-    var selectedPhotos by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     fun toggleSelection(photoId: String) {
-        selectedPhotos = if (selectedPhotos.contains(photoId)) {
+        val newSelectedPhotos = if (selectedPhotos.contains(photoId)) {
             selectedPhotos - photoId
         } else {
             selectedPhotos + photoId
         }
-        if (selectedPhotos.isEmpty()) {
-            selectionMode = false
+        onSelectedPhotosChange(newSelectedPhotos)
+        if (newSelectedPhotos.isEmpty()) {
+            onSelectionModeChange(false)
         }
     }
 
@@ -269,7 +272,7 @@ fun RemotePhotosGrid(
                 toggleSelection(photoId)
             },
             onSelectionModeChange = { mode ->
-                selectionMode = mode
+                onSelectionModeChange(mode)
             },
             expanded = expanded,
             onExpandedChange = onExpandedChange

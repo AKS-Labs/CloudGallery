@@ -200,25 +200,28 @@ fun LocalPhotoGrid(
     localPhotos: LazyPagingItems<LocalUiPhoto>,
     totalCount: Int,
     expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit
+    onExpandedChange: (Boolean) -> Unit,
+    selectionMode: Boolean,
+    selectedPhotos: Set<String>,
+    onSelectionModeChange: (Boolean) -> Unit,
+    onSelectedPhotosChange: (Set<String>) -> Unit,
 ) {
 
     if (BuildConfig.DEBUG) Log.d(TAG, "🎯 LocalPhotoGrid composing")
     val context = LocalContext.current
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<LocalUiPhoto?>(null) }
-    var selectionMode by remember { mutableStateOf(false) }
-    var selectedPhotos by remember { mutableStateOf<Set<String>>(emptySet()) }
     val window = (context as Activity).window
 
     fun toggleSelection(photoId: String) {
-        selectedPhotos = if (selectedPhotos.contains(photoId)) {
+        val newSelectedPhotos = if (selectedPhotos.contains(photoId)) {
             selectedPhotos - photoId
         } else {
             selectedPhotos + photoId
         }
-        if (selectedPhotos.isEmpty()) {
-            selectionMode = false
+        onSelectedPhotosChange(newSelectedPhotos)
+        if (newSelectedPhotos.isEmpty()) {
+            onSelectionModeChange(false)
         }
     }
 
@@ -291,109 +294,108 @@ fun LocalPhotoGrid(
                     ),
                     verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                     horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
+                )
+                {
+                if (isDateGroupedLayout) {
+                    // Stream grouped headers/items inline to match normal grid count
+                    for (index in 0 until localPhotos.itemCount) {
+                        val current = localPhotos.peek(index)
+                        val prev = if (index > 0) localPhotos.peek(index - 1) else null
+                        val currentLabel = current?.let {
+                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
+                            formatPhotoDate(ts)
+                        }
+                        val prevLabel = prev?.let {
+                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
+                            formatPhotoDate(ts)
+                        }
+                        if (currentLabel != null && currentLabel != prevLabel) {
+                            item(key = "header_${index}_$currentLabel", span = { GridItemSpan(maxLineSpan) }) {
+                                Text(
+                                    text = currentLabel,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp, bottom = 4.dp)
                                 )
-                                {
-                                if (isDateGroupedLayout) {
-                                    // Stream grouped headers/items inline to match normal grid count
-                                    for (index in 0 until localPhotos.itemCount) {
-                                        val current = localPhotos.peek(index)
-                                        val prev = if (index > 0) localPhotos.peek(index - 1) else null
-                                        val currentLabel = current?.let {
-                                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
-                                            formatPhotoDate(ts)
-                                        }
-                                        val prevLabel = prev?.let {
-                                            val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
-                                            formatPhotoDate(ts)
-                                        }
-                                        if (currentLabel != null && currentLabel != prevLabel) {
-                                            item(key = "header_${index}_$currentLabel", span = { GridItemSpan(maxLineSpan) }) {
-                                                Text(
-                                                    text = currentLabel,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(top = 8.dp, bottom = 4.dp)
-                                                )
-                                            }
-                                        }
-                                        val key = current?.localId ?: "placeholder"
-                                        item(key = "photo_${index}_$key") {
-                                            val p = localPhotos[index]
-                                            if (p != null) {
-                                                val isSelected = selectedPhotos.contains(p.localId)
-                                                LocalPhotoItem(
-                                                    photo = p,
-                                                    index = index,
-                                                    isSelected = isSelected,
-                                                    modifier = Modifier.combinedClickable(
-                                                        onClick = {
-                                                            if (selectionMode) {
-                                                                toggleSelection(p.localId)
-                                                            } else {
-                                                                selectedIndex = index
-                                                                selectedPhoto = p
-                                                            }
-                                                        },
-                                                        onLongClick = {
-                                                            if (!selectionMode) {
-                                                                selectionMode = true
-                                                            }
-                                                            toggleSelection(p.localId)
-                                                        }
-                                                    )
-                                                )
-                                            } else {
-                                                LocalPhotoItem(photo = null, index = index, isSelected = false)
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    // Normal grid with stable unique keys per index to avoid duplicate key crashes
-                                    items(
-                                        count = localPhotos.itemCount,
-                                        key = { i ->
-                                            val p = localPhotos.peek(i)
-                                            if (p != null) "photo_${i}_${p.localId}" else "photo_placeholder_${i}"
-                                        }
-                                    ) { i ->
-                                        val p = localPhotos[i]
-                                        if (p != null) {
-                                            val isSelected = selectedPhotos.contains(p.localId)
-                                            LocalPhotoItem(
-                                                photo = p,
-                                                index = i,
-                                                isSelected = isSelected,
-                                                modifier = Modifier.combinedClickable(
-                                                    onClick = {
-                                                        if (selectionMode) {
-                                                            toggleSelection(p.localId)
-                                                        } else {
-                                                            selectedIndex = i
-                                                            selectedPhoto = p
-                                                        }
-                                                    },
-                                                    onLongClick = {
-                                                        if (!selectionMode) {
-                                                            selectionMode = true
-                                                        }
-                                                        toggleSelection(p.localId)
-                                                    }
-                                                )
-                                            )
-                                        } else {
-                                            LocalPhotoItem(photo = null, index = i, isSelected = false)
-                                        }
-                                    }
-                
-                                }
-                
-                                }
                             }
                         }
-                        // Photo viewer overlay
+                        val key = current?.localId ?: "placeholder"
+                        item(key = "photo_${index}_$key") {
+                            val p = localPhotos[index]
+                            if (p != null) {
+                                val isSelected = selectedPhotos.contains(p.localId)
+                                LocalPhotoItem(
+                                    photo = p,
+                                    index = index,
+                                    isSelected = isSelected,
+                                    modifier = Modifier.combinedClickable(
+                                        onClick = {
+                                            if (selectionMode) {
+                                                toggleSelection(p.localId)
+                                            } else {
+                                                selectedIndex = index
+                                                selectedPhoto = p
+                                            }
+                                        },
+                                        onLongClick = {
+                                            if (!selectionMode) {
+                                                onSelectionModeChange(true)
+                                            }
+                                            toggleSelection(p.localId)
+                                        }
+                                    )
+                                )
+                            } else {
+                                LocalPhotoItem(photo = null, index = index, isSelected = false)
+                            }
+                        }
+                    }
+                } else {
+                    // Normal grid with stable unique keys per index to avoid duplicate key crashes
+                    items(
+                        count = localPhotos.itemCount,
+                        key = { i ->
+                            val p = localPhotos.peek(i)
+                            if (p != null) "photo_${i}_${p.localId}" else "photo_placeholder_${i}"
+                        }
+                    ) { i ->
+                        val p = localPhotos[i]
+                        if (p != null) {
+                            val isSelected = selectedPhotos.contains(p.localId)
+                            LocalPhotoItem(
+                                photo = p,
+                                index = i,
+                                isSelected = isSelected,
+                                modifier = Modifier.combinedClickable(
+                                    onClick = {
+                                        if (selectionMode) {
+                                            toggleSelection(p.localId)
+                                        } else {
+                                            selectedIndex = i
+                                            selectedPhoto = p
+                                        }
+                                    },
+                                    onLongClick = {
+                                        if (!selectionMode) {
+                                            onSelectionModeChange(true)
+                                        }
+                                        toggleSelection(p.localId)
+                                    }
+                                )
+                            )
+                        } else {
+                            LocalPhotoItem(photo = null, index = i, isSelected = false)
+                        }
+                    }
+
+                }
+
+                }
+            }
+        }                        // Photo viewer overlay
                         selectedIndex?.let { index ->
                             // Build photo list from loaded items only
                             val loadedPhotos = mutableListOf<com.akslabs.cloudgallery.data.localdb.entities.Photo>()

@@ -21,10 +21,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.akslabs.cloudgallery.ui.main.MainViewModel
 import com.akslabs.cloudgallery.ui.main.screens.local.LocalPhotoGrid
-import com.akslabs.cloudgallery.ui.main.screens.local.LocalViewModel
-
-import com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel
 import com.akslabs.cloudgallery.ui.main.screens.settings.SettingsScreen
 
 @Composable
@@ -32,7 +30,11 @@ fun AppNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController,
     expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit
+    onExpandedChange: (Boolean) -> Unit,
+    selectionMode: Boolean,
+    selectedPhotos: Set<String>,
+    onSelectionModeChange: (Boolean) -> Unit,
+    onSelectedPhotosChange: (Set<String>) -> Unit,
 ) {
     NavHost(
         modifier = modifier,
@@ -48,7 +50,7 @@ fun AppNavHost(
         },
             ) {
         composable(route = Screens.LocalPhotos.route) {
-            val viewModel: LocalViewModel = screenScopedViewModel()
+            val viewModel: MainViewModel = screenScopedViewModel()
             val localPhotos = viewModel.localPhotosFlow.collectAsLazyPagingItems()
             val localPhotosCount by viewModel.localPhotosCount.collectAsStateWithLifecycle()
 
@@ -56,12 +58,16 @@ fun AppNavHost(
                 localPhotos = localPhotos,
                 totalCount = localPhotosCount,
                 expanded = expanded,
-                onExpandedChange = onExpandedChange
+                onExpandedChange = onExpandedChange,
+                selectionMode = selectionMode,
+                selectedPhotos = selectedPhotos,
+                onSelectionModeChange = onSelectionModeChange,
+                onSelectedPhotosChange = onSelectedPhotosChange
             )
         }
 
         composable(route = Screens.RemotePhotos.route) {
-            val viewModel: RemoteViewModel = screenScopedViewModel()
+            val viewModel: MainViewModel = screenScopedViewModel()
             val allCloudPhotos = viewModel.allCloudPhotosFlow.collectAsLazyPagingItems()
             val totalCloudPhotosCount by viewModel.totalCloudPhotosCount.collectAsStateWithLifecycle()
 
@@ -69,7 +75,11 @@ fun AppNavHost(
                 cloudPhotos = allCloudPhotos,
                 onPhotoClick = { _, _ -> },
                 expanded = expanded,
-                onExpandedChange = onExpandedChange
+                onExpandedChange = onExpandedChange,
+                selectionMode = selectionMode,
+                selectedPhotos = selectedPhotos,
+                onSelectionModeChange = onSelectionModeChange,
+                onSelectedPhotosChange = onSelectedPhotosChange
             )
 
         }
