@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
@@ -40,6 +41,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.SplitButtonDefaults
+import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -446,7 +449,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SelectionTopAppBar(
     selectedCount: Int,
@@ -454,14 +457,35 @@ fun SelectionTopAppBar(
     onToggleSelectAll: () -> Unit,
     areAllSelected: Boolean
 ) {
+    var showExtraActions by remember { mutableStateOf(false) }
+
     TopAppBar(
-        title = { Text(text = "$selectedCount selected") },
-        navigationIcon = {
-            IconButton(onClick = onClearSelection) {
-                Icon(Icons.Default.Close, contentDescription = "Close selection mode")
-            }
+        title = {
+            SplitButtonLayout(
+                leadingButton = {
+                    SplitButtonDefaults.LeadingButton(onClick = onClearSelection) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Close selection mode"
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text("$selectedCount selected")
+                        }
+                    }
+                },
+                trailingButton = {
+                    SplitButtonDefaults.TrailingButton(
+                        checked = showExtraActions,
+                        onCheckedChange = { showExtraActions = it }
+                    ) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More actions")
+                    }
+                }
+            )
         },
         actions = {
+            // Select All button
             IconButton(onClick = onToggleSelectAll) {
                 Icon(
                     imageVector = Icons.Default.SelectAll,
@@ -469,7 +493,28 @@ fun SelectionTopAppBar(
                     tint = if (areAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
             }
+            // The dropdown menu for the trailing button
+            DropdownMenu(
+                expanded = showExtraActions,
+                onDismissRequest = { showExtraActions = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    onClick = {
+                        // TODO: Handle delete
+                        showExtraActions = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Share") },
+                    onClick = {
+                        // TODO: Handle share
+                        showExtraActions = false
+                    }
+                )
+            }
         },
+        navigationIcon = {},
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         )
