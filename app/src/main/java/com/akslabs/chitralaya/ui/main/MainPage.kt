@@ -8,7 +8,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChecklistRtl
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
@@ -70,6 +73,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
@@ -278,7 +282,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                         },
                                         actions = {
                                             Row(
-                                                modifier = Modifier.padding(top = 30.dp)// यहां भी पैडिंग जोड़ें
+                                                modifier = Modifier.padding(top = 30.dp)
                                             ) {
                                                 // Grid options menu button
                                                 Box {
@@ -464,22 +468,26 @@ fun SelectionTopAppBar(
             SplitButtonLayout(
                 leadingButton = {
                     SplitButtonDefaults.LeadingButton(onClick = onClearSelection) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Close selection mode"
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text("$selectedCount selected")
-                        }
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Close selection mode"
+                        )
                     }
                 },
                 trailingButton = {
-                    SplitButtonDefaults.TrailingButton(
-                        checked = showExtraActions,
-                        onCheckedChange = { showExtraActions = it }
+                    val endShape = RoundedCornerShape(topStartPercent = 0, bottomStartPercent = 0, topEndPercent = 50, bottomEndPercent = 50)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainer,
+                                shape = endShape
+                            )
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More actions")
+                        Text("$selectedCount Selected  ",
+                        fontWeight = FontWeight.Bold)
                     }
                 }
             )
@@ -488,35 +496,40 @@ fun SelectionTopAppBar(
             // Select All button
             IconButton(onClick = onToggleSelectAll) {
                 Icon(
-                    imageVector = Icons.Default.SelectAll,
+                    imageVector = Icons.Default.ChecklistRtl,
                     contentDescription = if (areAllSelected) "Deselect All" else "Select All",
                     tint = if (areAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
             }
-            // The dropdown menu for the trailing button
-            DropdownMenu(
-                expanded = showExtraActions,
-                onDismissRequest = { showExtraActions = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Delete") },
-                    onClick = {
-                        // TODO: Handle delete
-                        showExtraActions = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Share") },
-                    onClick = {
-                        // TODO: Handle share
-                        showExtraActions = false
-                    }
-                )
+            // The more actions button and its dropdown menu
+            Box {
+                IconButton(onClick = { showExtraActions = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More actions")
+                }
+                DropdownMenu(
+                    expanded = showExtraActions,
+                    onDismissRequest = { showExtraActions = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = {
+                            // TODO: Handle delete
+                            showExtraActions = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Share") },
+                        onClick = {
+                            // TODO: Handle share
+                            showExtraActions = false
+                        }
+                    )
+                }
             }
         },
         navigationIcon = {},
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.background
         )
     )
 }
