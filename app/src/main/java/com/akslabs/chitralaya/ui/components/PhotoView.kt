@@ -130,12 +130,19 @@ fun PhotoView(
         }
     }
 
+    // Helper function to handle upload
+    fun handleUploadClick() {
+        android.util.Log.d("PhotoView", "Starting upload for photo: ${photo.localId}")
+        WorkModule.InstantUpload(photo.pathUri.toUri()).enqueue()
+        photoUploadState = UploadState.ENQUEUED
+    }
+
     // Observe download worker
     androidx.compose.runtime.LaunchedEffect(photo.remoteId) {
         photo.remoteId?.let { remoteId ->
             WorkModule.observeWorkerByName("${WorkModule.DOWNLOADING_ID}:$remoteId").collectLatest { workInfoList ->
                 workInfoList.firstOrNull()?.let { workInfo ->
-                    android.util.Log.d("PhotoView", "Worker state changed: ${workInfo.state}")
+                    android.util.Log.d("PhotoView", "Download worker state changed: ${workInfo.state}")
                     photoDownloadState = when (workInfo.state) {
                         WorkInfo.State.ENQUEUED -> DownloadState.ENQUEUED
                         WorkInfo.State.RUNNING -> DownloadState.DOWNLOADING
@@ -143,6 +150,26 @@ fun PhotoView(
                         WorkInfo.State.FAILED -> DownloadState.FAILED
                         WorkInfo.State.BLOCKED -> DownloadState.BLOCKED
                         WorkInfo.State.CANCELLED -> DownloadState.FAILED
+                    }
+                }
+            }
+        }
+    }
+
+    // Observe upload worker
+    androidx.compose.runtime.LaunchedEffect(photo.pathUri) {
+        if (isOnlyOnDevice) {
+            val uniqueWorkName = "${WorkModule.UPLOADING_ID}:${photo.pathUri.toUri().lastPathSegment}"
+            WorkModule.observeWorkerByName(uniqueWorkName).collectLatest { workInfoList ->
+                workInfoList.firstOrNull()?.let { workInfo ->
+                    android.util.Log.d("PhotoView", "Upload worker state changed: ${workInfo.state}")
+                    photoUploadState = when (workInfo.state) {
+                        WorkInfo.State.ENQUEUED -> UploadState.ENQUEUED
+                        WorkInfo.State.RUNNING -> UploadState.UPLOADING
+                        WorkInfo.State.SUCCEEDED -> UploadState.UPLOADED
+                        WorkInfo.State.FAILED -> UploadState.FAILED
+                        WorkInfo.State.BLOCKED -> UploadState.BLOCKED
+                        WorkInfo.State.CANCELLED -> UploadState.FAILED
                     }
                 }
             }
@@ -190,6 +217,25 @@ fun PhotoView(
                             handleDownloadClick(remoteId)
                         }
                     } ?: android.util.Log.e("PhotoView", "No remoteId found for photo!")
+                }
+            )
+        }
+
+        // Upload button for local photos
+        AnimatedVisibility(
+            visible = !isOnlyRemote && showUi,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp)
+        ) {
+            FloatingBottomBar(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                uploadState = photoUploadState,
+                onClickUpload = {
+                    handleUploadClick()
                 }
             )
         }
