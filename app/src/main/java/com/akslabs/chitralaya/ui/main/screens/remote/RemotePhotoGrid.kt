@@ -1,9 +1,10 @@
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.util.Log
+import android.util.Log 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,8 +21,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudOff
@@ -513,86 +516,97 @@ fun CloudPhotoItem(
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .clip(RoundedCornerShape(16.dp)) // Clip the whole item to rounded shape
+            .background(MaterialTheme.colorScheme.surfaceVariant) // Base background
+            .then(if (isSelected) Modifier.border(8.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else Modifier), // Thicker border
         contentAlignment = Alignment.Center
     ) {
-        if (remotePhoto != null) {
-            Log.d(TAG, "Item[$index] Creating ImageRequest for remoteId=${remotePhoto.remoteId}")
+        // Content Wrapper for padding
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (isSelected) Modifier.padding(4.dp) else Modifier) // Padding for the content
+        ) {
+            if (remotePhoto != null) {
+                Log.d(TAG, "Item[$index] Creating ImageRequest for remoteId=${remotePhoto.remoteId}")
 
-            val imageRequest = ImageRequest.Builder(context)
-                .data(remotePhoto)
-                .size(Size(15, 150)) // Even smaller for faster loading
-                .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
-                .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
-                .crossfade(100) // Faster transition
-                .allowHardware(true) // Use hardware acceleration
-                .allowRgb565(true) // Use less memory
-                .listener(
-                    onStart = {
-                        Log.i(TAG, "Item[$index] Image loading STARTED for remoteId=${remotePhoto.remoteId}")
+                val imageRequest = ImageRequest.Builder(context)
+                    .data(remotePhoto)
+                    .size(Size(15, 150)) // Even smaller for faster loading
+                    .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
+                    .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
+                    .crossfade(100) // Faster transition
+                    .allowHardware(true) // Use hardware acceleration
+                    .allowRgb565(true) // Use less memory
+                    .listener(
+                        onStart = {
+                            Log.i(TAG, "Item[$index] Image loading STARTED for remoteId=${remotePhoto.remoteId}")
+                        },
+                        onSuccess = { _, result ->
+                            Log.i(TAG, "Item[$index] Image loading SUCCESS for remoteId=${remotePhoto.remoteId}, dataSource=${result.dataSource}")
+                        },
+                        onError = { _, error ->
+                            Log.e(TAG, "Item[$index] Image loading ERROR for remoteId=${remotePhoto.remoteId}: ${error.throwable?.message}")
+                        }
+                    )
+                    .build()
+
+                Log.d(TAG, "Item[$index] ImageRequest created, starting SubcomposeAsyncImage")
+
+                SubcomposeAsyncImage(
+                    imageLoader = ImageLoaderModule.thumbnailImageLoader,
+                    model = imageRequest,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    contentDescription = stringResource(id = R.string.photo),
+                    loading = {
+                        // Use the same loading animation as full-screen image loader
+                        LoadAnimation()
                     },
-                    onSuccess = { _, result ->
-                        Log.i(TAG, "Item[$index] Image loading SUCCESS for remoteId=${remotePhoto.remoteId}, dataSource=${result.dataSource}")
-                    },
-                    onError = { _, error ->
-                        Log.e(TAG, "Item[$index] Image loading ERROR for remoteId=${remotePhoto.remoteId}: ${error.throwable?.message}")
+                    error = { error ->
+                        Log.e(TAG, "Item[$index] Showing ERROR state for remoteId=${remotePhoto.remoteId}: ${error.result.throwable?.message}")
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                imageVector = Icons.Rounded.CloudOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 )
-                .build()
-
-            Log.d(TAG, "Item[$index] ImageRequest created, starting SubcomposeAsyncImage")
-
-            SubcomposeAsyncImage(
-                imageLoader = ImageLoaderModule.thumbnailImageLoader,
-                model = imageRequest,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                contentDescription = stringResource(id = R.string.photo),
-                loading = {
-                    // Use the same loading animation as full-screen image loader
-                    LoadAnimation()
-                },
-                error = { error ->
-                    Log.e(TAG, "Item[$index] Showing ERROR state for remoteId=${remotePhoto.remoteId}: ${error.result.throwable?.message}")
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            imageVector = Icons.Rounded.CloudOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            )
-        } else {
-            Log.w(TAG, "Item[$index] Showing PLACEHOLDER - remotePhoto is null")
-            // Simplified placeholder for null items during loading - just background color
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
+            } else {
+                Log.w(TAG, "Item[$index] Showing PLACEHOLDER - remotePhoto is null")
+                // Simplified placeholder for null items during loading - just background color
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            }
         }
         if (isSelected) {
+            // Solid checkmark icon
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-            )
-            Icon(
-                imageVector = Icons.Filled.CheckCircle,
-                contentDescription = "Selected",
-                tint = Color.White,
-                modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
-            )
+                    .padding(7.dp) // Padding from the edge of the photo item
+                    .background(MaterialTheme.colorScheme.primary, CircleShape) // Solid primary circle background
+                    .size(24.dp), // Size of the icon container
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle, // Just the checkmark
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.onPrimary, // Contrasting checkmark color
+                    modifier = Modifier.size(20.dp) // Checkmark size
+                )
+            }
         }
     }
 }

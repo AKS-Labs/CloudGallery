@@ -5,6 +5,7 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,8 +22,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.BrokenImage
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -454,79 +457,171 @@ fun LocalPhotoGrid(
                 
                     // Per-item logging removed to avoid main-thread overhead during fast scroll
                 
-                    Box(
-                        modifier = modifier
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (photo != null) {
-                            val request = ImageRequest.Builder(context)
-                                .data(photo.pathUri)
-                                .size(Size(110, 110))
-                                .crossfade(false)
-                                .allowHardware(false)
-                //                .allowRgb565(true)
-                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                .diskCachePolicy(CachePolicy.ENABLED)
-                                .build()
+                                                                        Box(
                 
+                                                                            modifier = modifier
                 
-                            SubcomposeAsyncImage(
-                                model = request,
-                                contentDescription = stringResource(id = R.string.photo),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                                loading = {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    )
-                                },
-                                error = {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                            imageVector = Icons.Rounded.BrokenImage,
-                                            contentDescription = stringResource(id = R.string.load_error),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            )
-                        } else {
-                            Log.w(TAG, "Item[$index] Showing PLACEHOLDER - photo is null")
-                            // Simplified placeholder for null items during loading - just background color
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                            )
-                        }
-                        if (isSelected) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                            )
-                            Icon(
-                                imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = "Selected",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                            )
-                        }
-                    }
-                }
+                                                                                .aspectRatio(1f)
+                
+                                                                                .clip(RoundedCornerShape(16.dp)) // Clip the whole item to rounded shape
+                
+                                                                                .background(MaterialTheme.colorScheme.surfaceVariant) // Base background
+                
+                                                                                .then(if (isSelected) Modifier.border(8.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else Modifier), // Thicker border
+                
+                                                                            contentAlignment = Alignment.Center
+                
+                                                                        ) {
+                
+                                                                            // Content Wrapper for padding
+                
+                                                                            Box(
+                
+                                                                                modifier = Modifier
+                
+                                                                                    .fillMaxSize()
+                
+                                                                                    .then(if (isSelected) Modifier.padding(4.dp) else Modifier) // Padding for the content
+                
+                                                                            ) {
+                
+                                                                                if (photo != null) {
+                
+                                                                                    val request = ImageRequest.Builder(context)
+                
+                                                                                        .data(photo.pathUri)
+                
+                                                                                        .size(Size(110, 110))
+                
+                                                                                        .crossfade(false)
+                
+                                                                                        .allowHardware(false)
+                
+                                                                        //                .allowRgb565(true)
+                
+                                                                                        .memoryCachePolicy(CachePolicy.ENABLED)
+                
+                                                                                        .diskCachePolicy(CachePolicy.ENABLED)
+                
+                                                                                        .build()
+                
+                                    
+                
+                                    
+                
+                                                                                    SubcomposeAsyncImage(
+                
+                                                                                        model = request,
+                
+                                                                                        contentDescription = stringResource(id = R.string.photo),
+                
+                                                                                        contentScale = ContentScale.Crop,
+                
+                                                                                        modifier = Modifier.fillMaxSize(),
+                
+                                                                                        loading = {
+                
+                                                                                            Box(
+                
+                                                                                                modifier = Modifier
+                
+                                                                                                    .fillMaxSize()
+                
+                                                                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                
+                                                                                            )
+                
+                                                                                        },
+                
+                                                                                        error = {
+                
+                                                                                            Box(
+                
+                                                                                                modifier = Modifier
+                
+                                                                                                    .fillMaxSize()
+                
+                                                                                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                
+                                                                                                contentAlignment = Alignment.Center
+                
+                                                                                            ) {
+                
+                                                                                                Icon(
+                
+                                                                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                
+                                                                                                    imageVector = Icons.Rounded.BrokenImage,
+                
+                                                                                                    contentDescription = stringResource(id = R.string.load_error), // Fixed R.R.string to R.string
+                
+                                                                                                    modifier = Modifier.size(16.dp)
+                
+                                                                                                )
+                
+                                                                                            }
+                
+                                                                                        }
+                
+                                                                                    )
+                
+                                                                                } else {
+                
+                                                                                    Log.w(TAG, "Item[$index] Showing PLACEHOLDER - photo is null")
+                
+                                                                                    // Simplified placeholder for null items during loading - just background color
+                
+                                                                                    Box(
+                
+                                                                                        modifier = Modifier
+                
+                                                                                            .fillMaxSize()
+                
+                                                                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                
+                                                                                    )
+                
+                                                                                }
+                
+                                                                            }
+                
+                                                                            if (isSelected) {
+                
+                                                                                // Solid checkmark icon
+                
+                                                                                Box(
+                
+                                                                                    modifier = Modifier
+                
+                                                                                        .align(Alignment.TopEnd)
+                
+                                                                                        .padding(7.dp) // Padding from the edge of the photo item
+                
+                                                                                        .background(MaterialTheme.colorScheme.primary, CircleShape) // Solid primary circle background
+                
+                                                                                        .size(24.dp), // Size of the icon container
+                
+                                                                                    contentAlignment = Alignment.Center
+                
+                                                                                ) {
+                
+                                                                                    Icon(
+                
+                                                                                        imageVector = Icons.Default.CheckCircle, // Just the checkmark
+                
+                                                                                        contentDescription = "Selected",
+                
+                                                                                        tint = MaterialTheme.colorScheme.onPrimary, // Contrasting checkmark color
+                
+                                                                                        modifier = Modifier.size(20.dp) // Checkmark size
+                
+                                                                                    )
+                
+                                                                                }
+                
+                                                                            }
+                
+                                                                        }                }
                 
                 private const val TAG = "LocalPhotoGrid"
                 
