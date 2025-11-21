@@ -45,7 +45,8 @@ fun DragSelectableLazyVerticalGrid(
     contentPadding: PaddingValues,
     verticalArrangement: Arrangement.Vertical,
     horizontalArrangement: Arrangement.Horizontal,
-    onToggleItemSelection: (Int) -> Unit, // Changed: callback for single item toggle
+    onItemSelectionChange: (Any?, Boolean) -> Unit, // Changed: key, isSelected
+    isItemSelected: (Any?) -> Boolean, // New: check if item is selected
     onDragSelectionEnd: () -> Unit,
     content: LazyGridScope.() -> Unit
 ) {
@@ -53,13 +54,14 @@ fun DragSelectableLazyVerticalGrid(
     var dragStartOffset by remember { mutableStateOf<Offset?>(null) }
     var dragCurrentOffset by remember { mutableStateOf<Offset?>(null) }
     var gridSize by remember { mutableStateOf(IntSize.Zero) }
-    var lastGlidedItemIndex by remember { mutableStateOf<Int?>(null) } // Track last glided item
+    var lastGlidedItemKey by remember { mutableStateOf<Any?>(null) } // Track last glided item key
+    var dragSelectionMode by remember { mutableStateOf(true) } // true = select, false = deselect
 
     val density = LocalDensity.current
     val scrollThresholdPx = with(density) { SCROLL_THRESHOLD_DP.dp.toPx() }
     val scrollSpeedPx = with(density) { SCROLL_SPEED_DP.dp.toPx() }
     val coroutineScope = rememberCoroutineScope()
-    val layoutDirection = LocalLayoutDirection.current // Get current layout direction
+    val layoutDirection = LocalLayoutDirection.current
 
     LaunchedEffect(isDragging, dragCurrentOffset) {
         if (isDragging && dragCurrentOffset != null) {
@@ -76,9 +78,9 @@ fun DragSelectableLazyVerticalGrid(
                         adjustedDragY < itemInfo.offset.y + itemInfo.size.height
                     }
 
-                    if (currentItem != null && currentItem.index != lastGlidedItemIndex) {
-                        onToggleItemSelection(currentItem.index)
-                        lastGlidedItemIndex = currentItem.index
+                    if (currentItem != null && currentItem.key != lastGlidedItemKey) {
+                        onItemSelectionChange(currentItem.key, dragSelectionMode)
+                        lastGlidedItemKey = currentItem.key
                     }
                 }
                 delay(10) // Control frequency of checks
@@ -134,7 +136,7 @@ fun DragSelectableLazyVerticalGrid(
                         isDragging = true
                         dragStartOffset = offset
                         dragCurrentOffset = offset
-                        lastGlidedItemIndex = null // Reset on new drag
+                        lastGlidedItemKey = null // Reset on new drag
 
                         val adjustedStartX = offset.x - with(density) { contentPadding.calculateLeftPadding(layoutDirection).toPx() }
                         val adjustedStartY = offset.y - with(density) { contentPadding.calculateTopPadding().toPx() }
@@ -146,23 +148,31 @@ fun DragSelectableLazyVerticalGrid(
                             adjustedStartY >= itemInfo.offset.y &&
                             adjustedStartY < itemInfo.offset.y + itemInfo.size.height
                         }
+
                         if (initialItem != null) {
-                            onToggleItemSelection(initialItem.index)
-                            lastGlidedItemIndex = initialItem.index
+                            // Determine mode based on initial item state
+                            val isCurrentlySelected = isItemSelected(initialItem.key)
+                            dragSelectionMode = !isCurrentlySelected // If selected, mode is deselect. If not, mode is select.
+
+                            onItemSelectionChange(initialItem.key, dragSelectionMode)
+                            lastGlidedItemKey = initialItem.key
+                        } else {
+                            // Default to select mode if started on empty space (though less likely to trigger action immediately)
+                            dragSelectionMode = true
                         }
                     },
                     onDragEnd = {
                         isDragging = false
                         dragStartOffset = null
                         dragCurrentOffset = null
-                        lastGlidedItemIndex = null
+                        lastGlidedItemKey = null
                         onDragSelectionEnd()
                     },
                     onDragCancel = {
                         isDragging = false
                         dragStartOffset = null
                         dragCurrentOffset = null
-                        lastGlidedItemIndex = null
+                        lastGlidedItemKey = null
                         onDragSelectionEnd()
                     },
                     onDrag = { change: PointerInputChange, _: Offset ->

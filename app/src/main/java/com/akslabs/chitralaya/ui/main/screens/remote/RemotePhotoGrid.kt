@@ -408,14 +408,22 @@ fun CloudPhotosGrid(
                 DragSelectableLazyVerticalGrid(
                     lazyGridState = lazyGridState,
                     selectionEnabled = selectionMode,
-                    onToggleItemSelection = { index -> // Changed callback name
-                        if (!selectionMode) {
-                            onSelectionModeChange(true)
+                    onItemSelectionChange = { key, isSelected ->
+                        if (key is String && !key.startsWith("header_")) {
+                            val photoId = key
+                            val currentlySelected = selectedPhotos.contains(photoId)
+                            if (isSelected != currentlySelected) {
+                                onToggleSelection(photoId)
+                            }
+                            if (!selectionMode && isSelected) {
+                                onSelectionModeChange(true)
+                            }
                         }
-                        val item = currentLayoutItems.getOrNull(index)
-                        if (item is RemoteGridItem.PhotoItem) {
-                            onToggleSelection(item.photo.remoteId)
-                        }
+                    },
+                    isItemSelected = { key ->
+                        if (key is String && !key.startsWith("header_")) {
+                            selectedPhotos.contains(key)
+                        } else false
                     },
                     onDragSelectionEnd = {
                         if (selectedPhotos.isEmpty()) {
