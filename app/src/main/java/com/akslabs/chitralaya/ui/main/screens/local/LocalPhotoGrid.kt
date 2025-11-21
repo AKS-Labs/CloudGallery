@@ -54,6 +54,7 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Size
+import com.akslabs.chitralaya.ui.components.DragSelectableLazyVerticalGrid // Import the new component
 import com.akslabs.chitralaya.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.BuildConfig
 import com.akslabs.cloudgallery.R
@@ -279,8 +280,25 @@ fun LocalPhotoGrid(
                     modifier = Modifier.align(Alignment.CenterEnd)
                 )
                 // the grid (unchanged except keep the same lazyGridState variable)
-                LazyVerticalGrid(
-                    state = lazyGridState,
+                DragSelectableLazyVerticalGrid(
+                    lazyGridState = lazyGridState,
+                    selectionEnabled = selectionMode,
+                    onToggleItemSelection = { index -> // Changed callback name
+                        if (!selectionMode) {
+                            onSelectionModeChange(true)
+                        }
+                        val photo = localPhotos.peek(index)
+                        if (photo != null) {
+                            toggleSelection(photo.localId)
+                        }
+                    },
+                    onDragSelectionEnd = {
+                        // This callback is triggered when drag selection ends.
+                        // If no photos are selected after a drag, we might want to exit selection mode.
+                        if (selectedPhotos.isEmpty()) {
+                            onSelectionModeChange(false)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .floatingToolbarVerticalNestedScroll(
@@ -296,10 +314,9 @@ fun LocalPhotoGrid(
                         bottom = 96.dp
                     ),
                     verticalArrangement = Arrangement.spacedBy(verticalSpacing),
-                    horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
-                )
-                {
-                if (isDateGroupedLayout) {
+                    horizontalArrangement = Arrangement.spacedBy(horizontalSpacing),
+                    content = { // Use 'content' as a LazyGridScope extension
+                        if (isDateGroupedLayout) {
                     // Stream grouped headers/items inline to match normal grid count
                     for (index in 0 until localPhotos.itemCount) {
                         val current = localPhotos.peek(index)
@@ -396,7 +413,7 @@ fun LocalPhotoGrid(
 
                 }
 
-                }
+                })
             }
         }                        // Photo viewer overlay
                         selectedIndex?.let { index ->

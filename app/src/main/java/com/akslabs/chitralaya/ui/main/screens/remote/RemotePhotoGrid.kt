@@ -53,6 +53,7 @@ import androidx.paging.compose.LazyPagingItems
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
+import com.akslabs.chitralaya.ui.components.DragSelectableLazyVerticalGrid
 import com.akslabs.chitralaya.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
@@ -277,6 +278,9 @@ fun RemotePhotosGrid(
             onSelectionModeChange = { mode ->
                 onSelectionModeChange(mode)
             },
+            onSelectedPhotosChange = { photos -> // Add this line
+                onSelectedPhotosChange(photos)
+            },
             expanded = expanded,
             onExpandedChange = onExpandedChange
         )
@@ -331,6 +335,7 @@ fun CloudPhotosGrid(
     onPhotoClick: (Int, RemotePhoto?) -> Unit,
     onToggleSelection: (String) -> Unit,
     onSelectionModeChange: (Boolean) -> Unit,
+    onSelectedPhotosChange: (Set<String>) -> Unit, // Added this line
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.background)
@@ -400,8 +405,23 @@ fun CloudPhotosGrid(
                     lazyGridState = lazyGridState,
                     modifier = Modifier.align(Alignment.CenterEnd)
                 )
-                LazyVerticalGrid(
-                    state = lazyGridState,
+                DragSelectableLazyVerticalGrid(
+                    lazyGridState = lazyGridState,
+                    selectionEnabled = selectionMode,
+                    onToggleItemSelection = { index -> // Changed callback name
+                        if (!selectionMode) {
+                            onSelectionModeChange(true)
+                        }
+                        val item = currentLayoutItems.getOrNull(index)
+                        if (item is RemoteGridItem.PhotoItem) {
+                            onToggleSelection(item.photo.remoteId)
+                        }
+                    },
+                    onDragSelectionEnd = {
+                        if (selectedPhotos.isEmpty()) {
+                            onSelectionModeChange(false)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .floatingToolbarVerticalNestedScroll(
@@ -409,7 +429,6 @@ fun CloudPhotosGrid(
                             onExpand = { onExpandedChange(true) },
                             onCollapse = { onExpandedChange(false) },
                         ),
-
                     columns = GridCells.Fixed(columns),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(verticalSpacing),
