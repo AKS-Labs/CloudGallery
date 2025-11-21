@@ -179,11 +179,6 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     LaunchedEffect(viewModel) {
         // Always open on Device screen on app start
         selectedTab = 0
-        navController.navigate(Screens.LocalPhotos.route) {
-            popUpTo(0) { inclusive = false }
-            launchSingleTop = true
-            restoreState = true
-        }
     }
 
     LaunchedEffect(viewModel) {

@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -50,6 +51,10 @@ fun DragSelectableLazyVerticalGrid(
     onDragSelectionEnd: () -> Unit,
     content: LazyGridScope.() -> Unit
 ) {
+    val currentOnItemSelectionChange by rememberUpdatedState(onItemSelectionChange)
+    val currentIsItemSelected by rememberUpdatedState(isItemSelected)
+    val currentOnDragSelectionEnd by rememberUpdatedState(onDragSelectionEnd)
+
     var isDragging by remember { mutableStateOf(false) }
     var dragStartOffset by remember { mutableStateOf<Offset?>(null) }
     var dragCurrentOffset by remember { mutableStateOf<Offset?>(null) }
@@ -79,7 +84,7 @@ fun DragSelectableLazyVerticalGrid(
                     }
 
                     if (currentItem != null && currentItem.key != lastGlidedItemKey) {
-                        onItemSelectionChange(currentItem.key, dragSelectionMode)
+                        currentOnItemSelectionChange(currentItem.key, dragSelectionMode)
                         lastGlidedItemKey = currentItem.key
                     }
                 }
@@ -151,10 +156,10 @@ fun DragSelectableLazyVerticalGrid(
 
                         if (initialItem != null) {
                             // Determine mode based on initial item state
-                            val isCurrentlySelected = isItemSelected(initialItem.key)
+                            val isCurrentlySelected = currentIsItemSelected(initialItem.key)
                             dragSelectionMode = !isCurrentlySelected // If selected, mode is deselect. If not, mode is select.
 
-                            onItemSelectionChange(initialItem.key, dragSelectionMode)
+                            currentOnItemSelectionChange(initialItem.key, dragSelectionMode)
                             lastGlidedItemKey = initialItem.key
                         } else {
                             // Default to select mode if started on empty space (though less likely to trigger action immediately)
@@ -166,14 +171,14 @@ fun DragSelectableLazyVerticalGrid(
                         dragStartOffset = null
                         dragCurrentOffset = null
                         lastGlidedItemKey = null
-                        onDragSelectionEnd()
+                        currentOnDragSelectionEnd()
                     },
                     onDragCancel = {
                         isDragging = false
                         dragStartOffset = null
                         dragCurrentOffset = null
                         lastGlidedItemKey = null
-                        onDragSelectionEnd()
+                        currentOnDragSelectionEnd()
                     },
                     onDrag = { change: PointerInputChange, _: Offset ->
                         dragCurrentOffset = change.position

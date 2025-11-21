@@ -98,6 +98,7 @@ fun PhotoView(
     var showDownloadDialog by rememberSaveable { mutableStateOf(false) }
     var existingPhotoPath by rememberSaveable { mutableStateOf("") }
 
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         DisposableEffect(Unit) {
@@ -123,191 +124,74 @@ fun PhotoView(
             existingPhotoPath = existingPhoto.pathUri
             showDownloadDialog = true
         } else {
-            android.util.Log.d("PhotoView", "Photo doesn't exist or forcing download, starting download")
+            android.util.Log.d("PhotoView", "Starting download for remoteId: $remoteId")
             WorkModule.InstantDownload(remoteId, forceDownload).enqueue()
-            android.util.Log.d("PhotoView", "Download worker enqueued, starting observation")
-            WorkModule.observeWorkerByName("$DOWNLOADING_ID:$remoteId")
-                .collectLatest {
-                    it.first().let { workInfo ->
-                        android.util.Log.d("PhotoView", "Worker state changed: ${workInfo.state}")
-                        photoDownloadState = when (workInfo.state) {
-                            WorkInfo.State.ENQUEUED -> DownloadState.ENQUEUED
-                            WorkInfo.State.RUNNING -> DownloadState.DOWNLOADING
-                            WorkInfo.State.SUCCEEDED -> DownloadState.DOWNLOADED
-                            WorkInfo.State.FAILED -> DownloadState.FAILED
-                            WorkInfo.State.BLOCKED -> DownloadState.BLOCKED
-                            WorkInfo.State.CANCELLED -> DownloadState.FAILED
-                        }
+            photoDownloadState = DownloadState.ENQUEUED
+        }
+    }
+
+    // Observe download worker
+    androidx.compose.runtime.LaunchedEffect(photo.remoteId) {
+        photo.remoteId?.let { remoteId ->
+            WorkModule.observeWorkerByName("${WorkModule.DOWNLOADING_ID}:$remoteId").collectLatest { workInfoList ->
+                workInfoList.firstOrNull()?.let { workInfo ->
+                    android.util.Log.d("PhotoView", "Worker state changed: ${workInfo.state}")
+                    photoDownloadState = when (workInfo.state) {
+                        WorkInfo.State.ENQUEUED -> DownloadState.ENQUEUED
+                        WorkInfo.State.RUNNING -> DownloadState.DOWNLOADING
+                        WorkInfo.State.SUCCEEDED -> DownloadState.DOWNLOADED
+                        WorkInfo.State.FAILED -> DownloadState.FAILED
+                        WorkInfo.State.BLOCKED -> DownloadState.BLOCKED
+                        WorkInfo.State.CANCELLED -> DownloadState.FAILED
                     }
                 }
+            }
         }
     }
 
     Box(
-        Modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(Unit) {
-                detectTapGestures {
-                    showUi = !showUi
-                }
-            },
-        contentAlignment = Alignment.Center
     ) {
-        val zoomState = rememberZoomState()
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(if (isOnlyRemote) photo.toRemotePhoto() else photo.pathUri)
+                .crossfade(true)
+                .build(),
+            contentDescription = "Photo",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { showUi = !showUi }
+                    )
+                }
+        )
 
-        val alpha by animateFloatAsState(
-            targetValue = if (showUi) 0.5f else 0f,
-            label = stringResource(R.string.backgroundalpha),
-            animationSpec = tween(500)
-        )
-        AsyncImage(
-            imageLoader = ImageLoaderModule.defaultImageLoader,
-            model = photo.pathUri,
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
+        // Download button for cloud photos
+        AnimatedVisibility(
+            visible = isOnlyRemote && showUi,
             modifier = Modifier
-                .fillMaxSize()
-                .blur(50.dp)
-                .alpha(alpha)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .zoomArea(zoomState),
-            contentAlignment = Alignment.Center
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp)
         ) {
-            if (!isOnlyRemote) {
-                SubcomposeAsyncImage(
-                    model = photo.pathUri,
-                    contentDescription = stringResource(R.string.photo),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .zoomImage(zoomState),
-                    contentScale = ContentScale.Fit,
-                    error = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .aspectRatio(1f)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                imageVector = Icons.Rounded.Error,
-                                contentDescription = stringResource(R.string.error),
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .padding(16.dp)
-                            )
+            FloatingDownloadBar(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                downloadState = photoDownloadState,
+                onClickDownload = {
+                    android.util.Log.d("PhotoView", "Download button clicked!")
+                    photo.remoteId?.let { remoteId ->
+                        scope.launch {
+                            handleDownloadClick(remoteId)
                         }
-                    }
-                )
-            } else {
-                SubcomposeAsyncImage(
-                    imageLoader = ImageLoaderModule.remoteImageLoader,
-                    model = ImageRequest.Builder(context)
-                        .data(photo.toRemotePhoto())
-                        .placeholderMemoryCacheKey(photo.remoteId)
-                        .memoryCacheKey(photo.remoteId)
-                        .build(),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .zoomImage(zoomState),
-                    contentDescription = stringResource(id = R.string.photo),
-                    loading = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .aspectRatio(1f)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            LoadAnimation()
-                        }
-                    },
-                    error = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .aspectRatio(1f)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                imageVector = Icons.Rounded.CloudOff,
-                                contentDescription = stringResource(id = R.string.error),
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .padding(16.dp)
-                            )
-                        }
-                    }
-                )
-            }
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Upload button for device photos
-                AnimatedVisibility(
-                    visible = !isOnlyRemote && showUi
-                ) {
-                    FloatingBottomBar(
-                        modifier = Modifier
-                            .padding(bottom = 80.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        uploadState = photoUploadState,
-                        onClickUpload = {
-                            WorkModule.InstantUpload(photo.pathUri.toUri()).enqueue()
-                            scope.launch {
-                                WorkModule.observeWorkerByName("$UPLOADING_ID:${photo.localId}")
-                                    .collectLatest {
-                                        it.first().let { workInfo ->
-                                            photoUploadState = when (workInfo.state) {
-                                                WorkInfo.State.ENQUEUED -> UploadState.ENQUEUED
-                                                WorkInfo.State.RUNNING -> UploadState.UPLOADING
-                                                WorkInfo.State.SUCCEEDED -> UploadState.UPLOADED
-                                                WorkInfo.State.FAILED -> UploadState.FAILED
-                                                WorkInfo.State.BLOCKED -> UploadState.BLOCKED
-                                                WorkInfo.State.CANCELLED -> UploadState.FAILED
-                                            }
-                                        }
-                                    }
-                            }
-                        }
-                    )
+                    } ?: android.util.Log.e("PhotoView", "No remoteId found for photo!")
                 }
-                
-                // Download button for cloud photos
-                AnimatedVisibility(
-                    visible = isOnlyRemote && showUi
-                ) {
-                    FloatingDownloadBar(
-                        modifier = Modifier
-                            .padding(bottom = 80.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        downloadState = photoDownloadState,
-                        onClickDownload = {
-                            android.util.Log.d("PhotoView", "Download button clicked!")
-                            photo.remoteId?.let { remoteId ->
-                                scope.launch {
-                                    handleDownloadClick(remoteId)
-                                }
-                            } ?: android.util.Log.e("PhotoView", "No remoteId found for photo!")
-                        }
-                    )
-                }
-            }
+            )
         }
     }
     

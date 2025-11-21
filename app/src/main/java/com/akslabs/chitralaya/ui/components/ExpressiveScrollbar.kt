@@ -7,12 +7,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -34,14 +34,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlin.math.ceil
@@ -221,32 +220,32 @@ fun ExpressiveScrollbar(
                             currentDragThumbOffset = clampedThumbOffsetY
 
                             val scrollRatio = clampedThumbOffsetY / (scrollbarTrackHeight - thumbHeightPx)
-                            val targetScrollPx = scrollRatio * (totalContentHeightPx - viewportHeight)
+                            val targetScrollPx = scrollRatio * (totalContentHeightPx - viewportHeight).coerceAtLeast(0f)
 
                             val layoutInfo = lazyGridState.layoutInfo
                             val spanCount = layoutInfo.visibleItemsInfo.maxOfOrNull { it.column }?.plus(1) ?: 1
-                            if (spanCount == 0) return@detectVerticalDragGestures
+                            if (spanCount > 0) {
+                                val averageRowHeight = singleItemHeight + mainAxisSpacing
+                                if (averageRowHeight > 0f) {
+                                    val targetRow = (targetScrollPx / averageRowHeight).toInt()
+                                    val targetRowOffset = (targetScrollPx % averageRowHeight).toInt()
+                                    val targetItemIndex = (targetRow * spanCount).coerceIn(0, totalItemsCount - 1)
 
-                            val averageRowHeight = singleItemHeight + mainAxisSpacing
-                            if (averageRowHeight <= 0f) return@detectVerticalDragGestures
-
-                            val targetRow = (targetScrollPx / averageRowHeight).toInt()
-                            val targetRowOffset = (targetScrollPx % averageRowHeight).toInt()
-
-                            val targetItemIndex = targetRow * spanCount
-
-                            coroutineScope.launch {
-                                lazyGridState.scrollToItem(targetItemIndex, targetRowOffset)
+                                    coroutineScope.launch {
+                                        lazyGridState.scrollToItem(targetItemIndex, targetRowOffset)
+                                    }
+                                }
                             }
                         }
                     )
                 }
-                .graphicsLayer {
-                    translationY = if (isDragging) {
+                .offset {
+                    val yOffset = if (isDragging) {
                         currentDragThumbOffset
                     } else {
                         thumbOffsetPx
                     }.coerceIn(0f, (scrollbarTrackHeight - thumbHeightPx).coerceAtLeast(0f))
+                    IntOffset(0, yOffset.toInt())
                 }
                 .shadow(
                     elevation = if (isDragging) 8.dp else 0.dp, // Elevation while dragging

@@ -39,6 +39,8 @@ abstract class WhDatabase : RoomDatabase() {
                     DATABASE_NAME
                 )
                 .addMigrations(*migrations())
+                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
         }
     }
