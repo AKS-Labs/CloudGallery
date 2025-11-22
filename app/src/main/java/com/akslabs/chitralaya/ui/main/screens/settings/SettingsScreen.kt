@@ -745,6 +745,27 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
 //            }
 //        )
 
+        // LOOK & FEEL SECTION
+        SettingsSection(title = "Look & Feel")
+
+        var currentGlideBehavior by remember {
+            mutableStateOf(Preferences.getString(Preferences.glideSelectionBehaviorKey, "Toggle"))
+        }
+
+        SettingsDialogItem(
+            icon = Icons.Rounded.Palette,
+            title = "Glide Selection Behavior",
+            subtitle = "Choose how glide selection works",
+            currentValue = currentGlideBehavior,
+            options = listOf("Toggle" to "Toggle", "Fixed" to "Fixed"),
+            onValueChange = { value ->
+                Preferences.edit {
+                    putString(Preferences.glideSelectionBehaviorKey, value)
+                }
+                currentGlideBehavior = value
+            }
+        )
+
         // ABOUT SECTION
         SettingsSection(title = "About")
 

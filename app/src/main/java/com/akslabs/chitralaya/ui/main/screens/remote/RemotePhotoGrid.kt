@@ -61,6 +61,7 @@ import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
+import com.akslabs.cloudgallery.data.localdb.Preferences
 
 // Sealed class for remote grid items to support date grouping
 sealed class RemoteGridItem {
@@ -352,6 +353,10 @@ fun CloudPhotosGrid(
     // Layout mode configuration
     val isDateGroupedLayout = gridState.isDateGroupedLayout
 
+    val glideSelectionBehavior = remember {
+        Preferences.getString(Preferences.glideSelectionBehaviorKey, "Toggle")
+    }
+
     fun getDateLabel(uploadedAt: Long): String? {
         return try {
             java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(uploadedAt))
@@ -408,6 +413,7 @@ fun CloudPhotosGrid(
                 DragSelectableLazyVerticalGrid(
                     lazyGridState = lazyGridState,
                     selectionEnabled = selectionMode,
+                    glideSelectionBehavior = glideSelectionBehavior,
                     onItemSelectionChange = { key, isSelected ->
                         if (key is String && !key.startsWith("header_")) {
                             val photoId = key

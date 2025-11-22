@@ -49,6 +49,7 @@ fun DragSelectableLazyVerticalGrid(
     onItemSelectionChange: (Any?, Boolean) -> Unit, // Changed: key, isSelected
     isItemSelected: (Any?) -> Boolean, // New: check if item is selected
     onDragSelectionEnd: () -> Unit,
+    glideSelectionBehavior: String = "Toggle", // "Toggle" or "Fixed"
     content: LazyGridScope.() -> Unit
 ) {
     val currentOnItemSelectionChange by rememberUpdatedState(onItemSelectionChange)
@@ -60,7 +61,7 @@ fun DragSelectableLazyVerticalGrid(
     var dragCurrentOffset by remember { mutableStateOf<Offset?>(null) }
     var gridSize by remember { mutableStateOf(IntSize.Zero) }
     var lastGlidedItemKey by remember { mutableStateOf<Any?>(null) } // Track last glided item key
-    var dragSelectionMode by remember { mutableStateOf(true) } // true = select, false = deselect
+    var dragSelectionMode by remember { mutableStateOf(true) } // Used for "Fixed" behavior
 
     val density = LocalDensity.current
     val scrollThresholdPx = with(density) { SCROLL_THRESHOLD_DP.dp.toPx() }
@@ -84,7 +85,12 @@ fun DragSelectableLazyVerticalGrid(
                     }
 
                     if (currentItem != null && currentItem.key != lastGlidedItemKey) {
-                        currentOnItemSelectionChange(currentItem.key, dragSelectionMode)
+                        if (glideSelectionBehavior == "Fixed") {
+                            currentOnItemSelectionChange(currentItem.key, dragSelectionMode)
+                        } else {
+                            val isSelected = currentIsItemSelected(currentItem.key)
+                            currentOnItemSelectionChange(currentItem.key, !isSelected)
+                        }
                         lastGlidedItemKey = currentItem.key
                     }
                 }
@@ -155,15 +161,16 @@ fun DragSelectableLazyVerticalGrid(
                         }
 
                         if (initialItem != null) {
-                            // Determine mode based on initial item state
                             val isCurrentlySelected = currentIsItemSelected(initialItem.key)
-                            dragSelectionMode = !isCurrentlySelected // If selected, mode is deselect. If not, mode is select.
-
-                            currentOnItemSelectionChange(initialItem.key, dragSelectionMode)
+                            
+                            if (glideSelectionBehavior == "Fixed") {
+                                dragSelectionMode = !isCurrentlySelected
+                                currentOnItemSelectionChange(initialItem.key, dragSelectionMode)
+                            } else {
+                                // Toggle
+                                currentOnItemSelectionChange(initialItem.key, !isCurrentlySelected)
+                            }
                             lastGlidedItemKey = initialItem.key
-                        } else {
-                            // Default to select mode if started on empty space (though less likely to trigger action immediately)
-                            dragSelectionMode = true
                         }
                     },
                     onDragEnd = {

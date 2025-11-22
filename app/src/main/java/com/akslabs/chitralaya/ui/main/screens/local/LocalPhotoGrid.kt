@@ -64,6 +64,7 @@ import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.akslabs.cloudgallery.data.localdb.Preferences
 
 // Sealed class for grid items to support date grouping
 sealed class LocalGridItem {
@@ -217,6 +218,10 @@ fun LocalPhotoGrid(
     var selectedPhoto by remember { mutableStateOf<LocalUiPhoto?>(null) }
     val window = (context as Activity).window
 
+    val glideSelectionBehavior = remember {
+        Preferences.getString(Preferences.glideSelectionBehaviorKey, "Toggle")
+    }
+
     fun toggleSelection(photoId: String) {
         val newSelectedPhotos = if (selectedPhotos.contains(photoId)) {
             selectedPhotos - photoId
@@ -283,6 +288,7 @@ fun LocalPhotoGrid(
                 DragSelectableLazyVerticalGrid(
                     lazyGridState = lazyGridState,
                     selectionEnabled = selectionMode,
+                    glideSelectionBehavior = glideSelectionBehavior,
                     onItemSelectionChange = { key, isSelected ->
                         if (key is String && key.startsWith("photo_")) {
                             val parts = key.split("_", limit = 3)
