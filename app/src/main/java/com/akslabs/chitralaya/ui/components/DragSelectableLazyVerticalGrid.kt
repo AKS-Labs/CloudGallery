@@ -28,6 +28,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -64,6 +65,12 @@ fun DragSelectableLazyVerticalGrid(
     var gridSize by remember { mutableStateOf(IntSize.Zero) }
     var lastGlidedItemKey by remember { mutableStateOf<Any?>(null) }
     var dragSelectionMode by remember { mutableStateOf(true) }
+
+    // New state for touch slop
+    var initialDownPosition by remember { mutableStateOf<Offset?>(null) }
+    var hasMovedPastSlop by remember { mutableStateOf(false) }
+    val viewConfiguration = LocalViewConfiguration.current
+    val touchSlop = viewConfiguration.touchSlop
 
     val density = LocalDensity.current
     val scrollThresholdPx = with(density) { SCROLL_THRESHOLD_DP.dp.toPx() }
@@ -144,64 +151,73 @@ fun DragSelectableLazyVerticalGrid(
             }
             .pointerInput(selectionEnabled) {
                 if (selectionEnabled) {
-                    val onDragStart: (Offset) -> Unit = { offset ->
-                        isDragging = true
-                        dragStartOffset = offset
-                        dragCurrentOffset = offset
-                        lastGlidedItemKey = null // Reset on new drag
-
-                        // visibleItemsInfo offsets are relative to the grid viewport and INCLUDE content padding.
-                        val adjustedStartX = offset.x
-                        val adjustedStartY = offset.y
-
-                        // Immediately select the item under the drag start offset
-                        val initialItem = lazyGridState.layoutInfo.visibleItemsInfo.find { itemInfo ->
-                            adjustedStartX >= itemInfo.offset.x &&
-                                    adjustedStartX < itemInfo.offset.x + itemInfo.size.width &&
-                                    adjustedStartY >= itemInfo.offset.y &&
-                                    adjustedStartY < itemInfo.offset.y + itemInfo.size.height
-                        }
-
-                        if (initialItem != null) {
-                            val isCurrentlySelected = currentIsItemSelected(initialItem.key)
-
-                            if (glideSelectionBehavior == "Fixed") {
-                                dragSelectionMode = !isCurrentlySelected
-                                currentOnItemSelectionChange(initialItem.key, dragSelectionMode)
-                            } else {
-                                // Toggle
-                                currentOnItemSelectionChange(initialItem.key, !isCurrentlySelected)
-                            }
-                            lastGlidedItemKey = initialItem.key
-                        }
-                    }
-
-                    val onDragEnd: () -> Unit = {
-                        isDragging = false
-                        dragStartOffset = null
-                        dragCurrentOffset = null
-                        lastGlidedItemKey = null
-                        currentOnDragSelectionEnd()
-                    }
-
-                    val onDragCancel: () -> Unit = {
-                        isDragging = false
-                        dragStartOffset = null
-                        dragCurrentOffset = null
-                        lastGlidedItemKey = null
-                        currentOnDragSelectionEnd()
-                    }
-
-                    val onDrag: (PointerInputChange, Offset) -> Unit = { change, _ ->
-                        change.consume()
-                        dragCurrentOffset = change.position
-                    }
-
                     detectDragGestures(
-                        onDragStart = onDragStart,
-                        onDragEnd = onDragEnd,
-                        onDragCancel = onDragCancel,
-                        onDrag = onDrag
+                        onDragStart = { offset ->
+                            initialDownPosition = offset // Store the initial touch position
+                            dragStartOffset = offset
+                            dragCurrentOffset = offset
+                            lastGlidedItemKey = null
+                            hasMovedPastSlop = false // Reset slop flag
+                        },
+                        onDragEnd = {
+                            if (isDragging) { // Only call end actions if a drag was actually started
+                                isDragging = false
+                                dragStartOffset = null
+                                dragCurrentOffset = null
+                                lastGlidedItemKey = null
+                                currentOnDragSelectionEnd()
+                            }
+                        },
+                        onDragCancel = {
+                            if (isDragging) { // Only call cancel actions if a drag was actually started
+                                isDragging = false
+                                dragStartOffset = null
+                                dragCurrentOffset = null
+                                lastGlidedItemKey = null
+                                currentOnDragSelectionEnd()
+                            }
+                        },
+                        onDrag = { change, _ ->
+                            if (!isDragging) {
+                                // Check if we've moved beyond the touch slop
+                                initialDownPosition?.let { initial ->
+                                    if ((change.position - initial).getDistance() > touchSlop) {
+                                        hasMovedPastSlop = true
+
+                                        // If we have moved past slop, and we are in selection mode,
+                                        // then this is now considered a drag for selection.
+                                        isDragging = true
+
+                                        // Perform the initial item selection here as well
+                                        // This ensures the item under the *initial down position* is selected
+                                        val adjustedStartX = initial.x
+                                        val adjustedStartY = initial.y
+                                        val initialItem = lazyGridState.layoutInfo.visibleItemsInfo.find { itemInfo ->
+                                            adjustedStartX >= itemInfo.offset.x &&
+                                                    adjustedStartX < itemInfo.offset.x + itemInfo.size.width &&
+                                                    adjustedStartY >= itemInfo.offset.y &&
+                                                    adjustedStartY < itemInfo.offset.y + itemInfo.size.height
+                                        }
+
+                                        if (initialItem != null) {
+                                            val isCurrentlySelected = currentIsItemSelected(initialItem.key)
+                                            if (glideSelectionBehavior == "Fixed") {
+                                                dragSelectionMode = !isCurrentlySelected
+                                                currentOnItemSelectionChange(initialItem.key, dragSelectionMode)
+                                            } else {
+                                                currentOnItemSelectionChange(initialItem.key, !isCurrentlySelected)
+                                            }
+                                            lastGlidedItemKey = initialItem.key
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (isDragging) {
+                                change.consume()
+                                dragCurrentOffset = change.position
+                            }
+                        }
                     )
                 }
             }

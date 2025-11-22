@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.lifecycle.ViewModel
@@ -37,11 +38,15 @@ fun AppNavHost(
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
 ) {
+    val currentSelectionMode by rememberUpdatedState(selectionMode)
+    val currentOnSelectionModeChange by rememberUpdatedState(onSelectionModeChange)
+    val currentOnSelectedPhotosChange by rememberUpdatedState(onSelectedPhotosChange)
+
     LaunchedEffect(navController) {
         navController.addOnDestinationChangedListener { _, _, _ ->
-            if (selectionMode) {
-                onSelectionModeChange(false)
-                onSelectedPhotosChange(emptySet())
+            if (currentSelectionMode) {
+                currentOnSelectionModeChange(false)
+                currentOnSelectedPhotosChange(emptySet())
             }
         }
     }
