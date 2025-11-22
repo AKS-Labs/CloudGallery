@@ -383,17 +383,9 @@ fun LocalPhotoGrid(
                                                         selectedIndex = index
                                                         selectedPhoto = p
                                                     }
-                                                },
-                                                onLongClick = {
-                                                    if (!selectionMode) {
-                                                        onSelectionModeChange(true)
-                                                    }
-                                                    toggleSelection(p.localId)
                                                 }
                                             )
                                         )
-                                    } else {
-                                        LocalPhotoItem(photo = null, index = index, isSelected = false)
                                     }
                                 }
                             }
@@ -421,20 +413,11 @@ fun LocalPhotoGrid(
                                                     selectedIndex = i
                                                     selectedPhoto = p
                                                 }
-                                            },
-                                            onLongClick = {
-                                                if (!selectionMode) {
-                                                    onSelectionModeChange(true)
-                                                }
-                                                toggleSelection(p.localId)
                                             }
                                         )
                                     )
-                                } else {
-                                    LocalPhotoItem(photo = null, index = i, isSelected = false)
                                 }
                             }
-
                         }
                     }
                 )

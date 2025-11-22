@@ -507,16 +507,16 @@ fun SelectionTopAppBar(
                     onDismissRequest = { showExtraActions = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Delete") },
+                        text = { Text("Upload to Cloud") },
                         onClick = {
-                            // TODO: Handle delete
+                            // TODO: Upload Selected Images to Cloud
                             showExtraActions = false
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Share") },
+                        text = { Text("Move to Trash Bin") },
                         onClick = {
-                            // TODO: Handle share
+                            // TODO: Delete Selected Images from Cloud and Move it to Trash Bin
                             showExtraActions = false
                         }
                     )

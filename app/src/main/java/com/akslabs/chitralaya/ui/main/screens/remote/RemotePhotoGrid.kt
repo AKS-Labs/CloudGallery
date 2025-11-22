@@ -507,12 +507,6 @@ fun CloudPhotosGrid(
                                                     Log.d(TAG, "Photo clicked at index: ${item.originalIndex}, remoteId: ${item.photo.remoteId}")
                                                     onPhotoClick(item.originalIndex, item.photo)
                                                 }
-                                            },
-                                            onLongClick = {
-                                                if (!selectionMode) {
-                                                    onSelectionModeChange(true)
-                                                }
-                                                onToggleSelection(item.photo.remoteId)
                                             }
                                         )
                                     )
