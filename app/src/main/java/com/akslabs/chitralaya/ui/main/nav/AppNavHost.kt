@@ -9,6 +9,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.lifecycle.ViewModel
@@ -36,6 +37,15 @@ fun AppNavHost(
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
 ) {
+    LaunchedEffect(navController) {
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            if (selectionMode) {
+                onSelectionModeChange(false)
+                onSelectedPhotosChange(emptySet())
+            }
+        }
+    }
+
     NavHost(
         modifier = modifier,
         navController = navController,

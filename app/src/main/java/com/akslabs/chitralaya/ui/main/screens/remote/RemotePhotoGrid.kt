@@ -1,7 +1,8 @@
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.util.Log 
+import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -197,6 +198,13 @@ fun RemotePhotosGrid(
     val window = activity?.window
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<RemotePhoto?>(null) }
+
+    if (selectionMode) {
+        BackHandler(enabled = true) {
+            onSelectionModeChange(false)
+            onSelectedPhotosChange(emptySet())
+        }
+    }
 
     fun toggleSelection(photoId: String) {
         val newSelectedPhotos = if (selectedPhotos.contains(photoId)) {
@@ -507,6 +515,12 @@ fun CloudPhotosGrid(
                                                     Log.d(TAG, "Photo clicked at index: ${item.originalIndex}, remoteId: ${item.photo.remoteId}")
                                                     onPhotoClick(item.originalIndex, item.photo)
                                                 }
+                                            },
+                                            onLongClick = {
+                                                if (!selectionMode) {
+                                                    onSelectionModeChange(true)
+                                                }
+                                                onToggleSelection(item.photo.remoteId)
                                             }
                                         )
                                     )

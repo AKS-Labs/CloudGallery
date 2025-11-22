@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -222,6 +223,13 @@ fun LocalPhotoGrid(
         Preferences.getString(Preferences.glideSelectionBehaviorKey, "Toggle")
     }
 
+    if (selectionMode) {
+        BackHandler(enabled = true) {
+            onSelectionModeChange(false)
+            onSelectedPhotosChange(emptySet())
+        }
+    }
+
     fun toggleSelection(photoId: String) {
         val newSelectedPhotos = if (selectedPhotos.contains(photoId)) {
             selectedPhotos - photoId
@@ -383,6 +391,12 @@ fun LocalPhotoGrid(
                                                         selectedIndex = index
                                                         selectedPhoto = p
                                                     }
+                                                },
+                                                onLongClick = {
+                                                    if (!selectionMode) {
+                                                        onSelectionModeChange(true)
+                                                    }
+                                                    toggleSelection(p.localId)
                                                 }
                                             )
                                         )
@@ -413,6 +427,12 @@ fun LocalPhotoGrid(
                                                     selectedIndex = i
                                                     selectedPhoto = p
                                                 }
+                                            },
+                                            onLongClick = {
+                                                if (!selectionMode) {
+                                                    onSelectionModeChange(true)
+                                                }
+                                                toggleSelection(p.localId)
                                             }
                                         )
                                     )

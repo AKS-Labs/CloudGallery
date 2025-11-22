@@ -31,6 +31,7 @@ securityCrypto = "1.0.0"
 foundationLayout = "1.9.4"
 runtimeSaveable = "1.9.4"
 foundation = "1.9.4"
+foundationVersion = "1.9.5"
 
 
 [libraries]
@@ -77,6 +78,7 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 androidx-compose-runtime-saveable = { group = "androidx.compose.runtime", name = "runtime-saveable", version.ref = "runtimeSaveable" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundationVersion" }
 
 
 [plugins]

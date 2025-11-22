@@ -142,66 +142,68 @@ fun DragSelectableLazyVerticalGrid(
             .onGloballyPositioned {
                 gridSize = it.size
             }
-            .pointerInput(Unit) {
-                val onDragStart: (Offset) -> Unit = { offset ->
-                    isDragging = true
-                    dragStartOffset = offset
-                    dragCurrentOffset = offset
-                    lastGlidedItemKey = null // Reset on new drag
+            .pointerInput(selectionEnabled) {
+                if (selectionEnabled) {
+                    val onDragStart: (Offset) -> Unit = { offset ->
+                        isDragging = true
+                        dragStartOffset = offset
+                        dragCurrentOffset = offset
+                        lastGlidedItemKey = null // Reset on new drag
 
-                    // visibleItemsInfo offsets are relative to the grid viewport and INCLUDE content padding.
-                    val adjustedStartX = offset.x
-                    val adjustedStartY = offset.y
+                        // visibleItemsInfo offsets are relative to the grid viewport and INCLUDE content padding.
+                        val adjustedStartX = offset.x
+                        val adjustedStartY = offset.y
 
-                    // Immediately select the item under the drag start offset
-                    val initialItem = lazyGridState.layoutInfo.visibleItemsInfo.find { itemInfo ->
-                        adjustedStartX >= itemInfo.offset.x &&
-                        adjustedStartX < itemInfo.offset.x + itemInfo.size.width &&
-                        adjustedStartY >= itemInfo.offset.y &&
-                        adjustedStartY < itemInfo.offset.y + itemInfo.size.height
-                    }
-
-                    if (initialItem != null) {
-                        val isCurrentlySelected = currentIsItemSelected(initialItem.key)
-                        
-                        if (glideSelectionBehavior == "Fixed") {
-                            dragSelectionMode = !isCurrentlySelected
-                            currentOnItemSelectionChange(initialItem.key, dragSelectionMode)
-                        } else {
-                            // Toggle
-                            currentOnItemSelectionChange(initialItem.key, !isCurrentlySelected)
+                        // Immediately select the item under the drag start offset
+                        val initialItem = lazyGridState.layoutInfo.visibleItemsInfo.find { itemInfo ->
+                            adjustedStartX >= itemInfo.offset.x &&
+                                    adjustedStartX < itemInfo.offset.x + itemInfo.size.width &&
+                                    adjustedStartY >= itemInfo.offset.y &&
+                                    adjustedStartY < itemInfo.offset.y + itemInfo.size.height
                         }
-                        lastGlidedItemKey = initialItem.key
+
+                        if (initialItem != null) {
+                            val isCurrentlySelected = currentIsItemSelected(initialItem.key)
+
+                            if (glideSelectionBehavior == "Fixed") {
+                                dragSelectionMode = !isCurrentlySelected
+                                currentOnItemSelectionChange(initialItem.key, dragSelectionMode)
+                            } else {
+                                // Toggle
+                                currentOnItemSelectionChange(initialItem.key, !isCurrentlySelected)
+                            }
+                            lastGlidedItemKey = initialItem.key
+                        }
                     }
-                }
 
-                val onDragEnd: () -> Unit = {
-                    isDragging = false
-                    dragStartOffset = null
-                    dragCurrentOffset = null
-                    lastGlidedItemKey = null
-                    currentOnDragSelectionEnd()
-                }
+                    val onDragEnd: () -> Unit = {
+                        isDragging = false
+                        dragStartOffset = null
+                        dragCurrentOffset = null
+                        lastGlidedItemKey = null
+                        currentOnDragSelectionEnd()
+                    }
 
-                val onDragCancel: () -> Unit = {
-                    isDragging = false
-                    dragStartOffset = null
-                    dragCurrentOffset = null
-                    lastGlidedItemKey = null
-                    currentOnDragSelectionEnd()
-                }
+                    val onDragCancel: () -> Unit = {
+                        isDragging = false
+                        dragStartOffset = null
+                        dragCurrentOffset = null
+                        lastGlidedItemKey = null
+                        currentOnDragSelectionEnd()
+                    }
 
-                val onDrag: (PointerInputChange, Offset) -> Unit = { change, _ ->
-                    change.consume()
-                    dragCurrentOffset = change.position
-                }
+                    val onDrag: (PointerInputChange, Offset) -> Unit = { change, _ ->
+                        change.consume()
+                        dragCurrentOffset = change.position
+                    }
 
-                detectDragGesturesAfterLongPress(
-                    onDragStart = onDragStart,
-                    onDragEnd = onDragEnd,
-                    onDragCancel = onDragCancel,
-                    onDrag = onDrag
-                )
+                    detectDragGestures(
+                        onDragStart = onDragStart,
+                        onDragEnd = onDragEnd,
+                        onDragCancel = onDragCancel,
+                        onDrag = onDrag
+                    )
+                }
             }
     ) {
         LazyVerticalGrid(
