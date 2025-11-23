@@ -3,6 +3,11 @@ package com.akslabs.chitralaya.ui.components
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -58,6 +63,7 @@ fun DragSelectableLazyVerticalGrid(
     val currentOnItemSelectionChange by rememberUpdatedState(onItemSelectionChange)
     val currentIsItemSelected by rememberUpdatedState(isItemSelected)
     val currentOnDragSelectionEnd by rememberUpdatedState(onDragSelectionEnd)
+    val currentSelectionEnabled by rememberUpdatedState(selectionEnabled)
 
     var isDragging by remember { mutableStateOf(false) }
     var dragStartOffset by remember { mutableStateOf<Offset?>(null) }
@@ -149,76 +155,94 @@ fun DragSelectableLazyVerticalGrid(
             .onGloballyPositioned {
                 gridSize = it.size
             }
-            .pointerInput(selectionEnabled) {
-                if (selectionEnabled) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            initialDownPosition = offset // Store the initial touch position
-                            dragStartOffset = offset
-                            dragCurrentOffset = offset
-                            lastGlidedItemKey = null
-                            hasMovedPastSlop = false // Reset slop flag
-                        },
-                        onDragEnd = {
-                            if (isDragging) { // Only call end actions if a drag was actually started
-                                isDragging = false
-                                dragStartOffset = null
-                                dragCurrentOffset = null
-                                lastGlidedItemKey = null
-                                currentOnDragSelectionEnd()
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    
+                    var dragStarted = false
+                    var initialDragOffset: Offset? = null
+                    
+                    // Use the latest value of selectionEnabled
+                    if (currentSelectionEnabled) {
+                        // If selection is enabled, we need to distinguish between a TAP (toggle) and a DRAG (glide).
+                        // We wait for touch slop.
+                        val drag = awaitTouchSlopOrCancellation(down.id) { change, over ->
+                            change.consume()
+                        }
+                        
+                        if (drag != null) {
+                            // Slop exceeded, it's a drag
+                            dragStarted = true
+                            initialDragOffset = drag.position
+                            
+                            // Determine initial selection mode based on the item where drag started (original down position)
+                            // We use the down position because that's where the user intended to start
+                            val adjustedX = down.position.x
+                            val adjustedY = down.position.y
+                            val initialItem = lazyGridState.layoutInfo.visibleItemsInfo.find { itemInfo ->
+                                adjustedX >= itemInfo.offset.x &&
+                                adjustedX < itemInfo.offset.x + itemInfo.size.width &&
+                                adjustedY >= itemInfo.offset.y &&
+                                adjustedY < itemInfo.offset.y + itemInfo.size.height
                             }
-                        },
-                        onDragCancel = {
-                            if (isDragging) { // Only call cancel actions if a drag was actually started
-                                isDragging = false
-                                dragStartOffset = null
-                                dragCurrentOffset = null
-                                lastGlidedItemKey = null
-                                currentOnDragSelectionEnd()
-                            }
-                        },
-                        onDrag = { change, _ ->
-                            if (!isDragging) {
-                                // Check if we've moved beyond the touch slop
-                                initialDownPosition?.let { initial ->
-                                    if ((change.position - initial).getDistance() > touchSlop) {
-                                        hasMovedPastSlop = true
 
-                                        // If we have moved past slop, and we are in selection mode,
-                                        // then this is now considered a drag for selection.
-                                        isDragging = true
-
-                                        // Perform the initial item selection here as well
-                                        // This ensures the item under the *initial down position* is selected
-                                        val adjustedStartX = initial.x
-                                        val adjustedStartY = initial.y
-                                        val initialItem = lazyGridState.layoutInfo.visibleItemsInfo.find { itemInfo ->
-                                            adjustedStartX >= itemInfo.offset.x &&
-                                                    adjustedStartX < itemInfo.offset.x + itemInfo.size.width &&
-                                                    adjustedStartY >= itemInfo.offset.y &&
-                                                    adjustedStartY < itemInfo.offset.y + itemInfo.size.height
-                                        }
-
-                                        if (initialItem != null) {
-                                            val isCurrentlySelected = currentIsItemSelected(initialItem.key)
-                                            if (glideSelectionBehavior == "Fixed") {
-                                                dragSelectionMode = !isCurrentlySelected
-                                                currentOnItemSelectionChange(initialItem.key, dragSelectionMode)
-                                            } else {
-                                                currentOnItemSelectionChange(initialItem.key, !isCurrentlySelected)
-                                            }
-                                            lastGlidedItemKey = initialItem.key
-                                        }
-                                    }
+                            if (initialItem != null) {
+                                val isCurrentlySelected = currentIsItemSelected(initialItem.key)
+                                if (glideSelectionBehavior == "Fixed") {
+                                    dragSelectionMode = !isCurrentlySelected
+                                    currentOnItemSelectionChange(initialItem.key, dragSelectionMode)
+                                } else {
+                                    currentOnItemSelectionChange(initialItem.key, !isCurrentlySelected)
                                 }
-                            }
-
-                            if (isDragging) {
-                                change.consume()
-                                dragCurrentOffset = change.position
+                                lastGlidedItemKey = initialItem.key
                             }
                         }
-                    )
+                    } else {
+                        // If selection is NOT enabled, we wait for a long press
+                        val longPress = awaitLongPressOrCancellation(down.id)
+                        if (longPress != null) {
+                            dragStarted = true
+                            initialDragOffset = longPress.position
+                            
+                            // Trigger initial selection for the long-pressed item
+                            val adjustedX = longPress.position.x
+                            val adjustedY = longPress.position.y
+                            val initialItem = lazyGridState.layoutInfo.visibleItemsInfo.find { itemInfo ->
+                                adjustedX >= itemInfo.offset.x &&
+                                adjustedX < itemInfo.offset.x + itemInfo.size.width &&
+                                adjustedY >= itemInfo.offset.y &&
+                                adjustedY < itemInfo.offset.y + itemInfo.size.height
+                            }
+
+                            if (initialItem != null) {
+                                val isCurrentlySelected = currentIsItemSelected(initialItem.key)
+                                if (!isCurrentlySelected) {
+                                     currentOnItemSelectionChange(initialItem.key, true)
+                                }
+                                lastGlidedItemKey = initialItem.key
+                                dragSelectionMode = true
+                            }
+                        }
+                    }
+
+                    if (dragStarted && initialDragOffset != null) {
+                        isDragging = true
+                        dragStartOffset = initialDragOffset
+                        dragCurrentOffset = initialDragOffset
+                        
+                        try {
+                            drag(down.id) { change ->
+                                dragCurrentOffset = change.position
+                                change.consume()
+                            }
+                        } finally {
+                            isDragging = false
+                            dragStartOffset = null
+                            dragCurrentOffset = null
+                            lastGlidedItemKey = null
+                            currentOnDragSelectionEnd()
+                        }
+                    }
                 }
             }
     ) {
