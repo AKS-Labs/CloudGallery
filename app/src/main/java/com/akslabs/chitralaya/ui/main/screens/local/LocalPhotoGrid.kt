@@ -6,7 +6,7 @@ import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -347,7 +347,7 @@ fun LocalPhotoGrid(
                     ),
                     verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                     horizontalArrangement = Arrangement.spacedBy(horizontalSpacing),
-                    content = { // Use 'content' as a LazyGridScope extension
+                    content = {
                         if (isDateGroupedLayout) {
                             // Stream grouped headers/items inline to match normal grid count
                             for (index in 0 until localPhotos.itemCount) {
@@ -383,7 +383,7 @@ fun LocalPhotoGrid(
                                             photo = p,
                                             index = index,
                                             isSelected = isSelected,
-                                            modifier = Modifier.combinedClickable(
+                                            modifier = Modifier.clickable(
                                                 onClick = {
                                                     if (selectionMode) {
                                                         toggleSelection(p.localId)
@@ -391,12 +391,6 @@ fun LocalPhotoGrid(
                                                         selectedIndex = index
                                                         selectedPhoto = p
                                                     }
-                                                },
-                                                onLongClick = {
-                                                    if (!selectionMode) {
-                                                        onSelectionModeChange(true)
-                                                    }
-                                                    toggleSelection(p.localId)
                                                 }
                                             )
                                         )
@@ -419,7 +413,7 @@ fun LocalPhotoGrid(
                                         photo = p,
                                         index = i,
                                         isSelected = isSelected,
-                                        modifier = Modifier.combinedClickable(
+                                        modifier = Modifier.clickable(
                                             onClick = {
                                                 if (selectionMode) {
                                                     toggleSelection(p.localId)
@@ -427,12 +421,6 @@ fun LocalPhotoGrid(
                                                     selectedIndex = i
                                                     selectedPhoto = p
                                                 }
-                                            },
-                                            onLongClick = {
-                                                if (!selectionMode) {
-                                                    onSelectionModeChange(true)
-                                                }
-                                                toggleSelection(p.localId)
                                             }
                                         )
                                     )
