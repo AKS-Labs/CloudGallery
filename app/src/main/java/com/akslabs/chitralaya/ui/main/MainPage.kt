@@ -126,12 +126,25 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     val navController = rememberNavController()
     val syncState by viewModel.syncState.collectAsStateWithLifecycle()
 
-    // State for bottom navigation
-    var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf(
-        Triple("Device", Icons.Default.Smartphone, Screens.LocalPhotos.route),
-        Triple("Cloud", Icons.Default.Cloud, Screens.RemotePhotos.route)
-    )
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+
+    // Selection state (shared between screens)
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedPhotos by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    fun clearSelection() {
+        selectedPhotos = emptySet()
+        selectionMode = false
+    }
+
+    // This is a proactive fix to prevent confusion.
+    // When the user navigates between tabs, clear any active selection.
+    LaunchedEffect(currentRoute) {
+        if (selectionMode) {
+            clearSelection()
+        }
+    }
 
     // State for grid customization menu
     var showGridOptionsDropdown by remember { mutableStateOf(false) }
@@ -150,20 +163,11 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 
     val photoCounts = listOf(localPhotosCount, cloudPhotosCount)
 
-    // Selection state
-    var selectionMode by remember { mutableStateOf(false) }
-    var selectedPhotos by remember { mutableStateOf<Set<String>>(emptySet()) }
-
     val localPhotos = viewModel.localPhotosFlow.collectAsLazyPagingItems()
     val allCloudPhotos = viewModel.allCloudPhotosFlow.collectAsLazyPagingItems()
 
-    fun clearSelection() {
-        selectedPhotos = emptySet()
-        selectionMode = false
-    }
-
-    val areAllSelected = remember(selectedPhotos, selectedTab, localPhotos.itemCount, allCloudPhotos.itemCount) {
-        val totalCount = if (selectedTab == 0) localPhotos.itemCount else allCloudPhotos.itemCount
+    val areAllSelected = remember(selectedPhotos, currentRoute, localPhotos.itemCount, allCloudPhotos.itemCount) {
+        val totalCount = if (currentRoute == Screens.LocalPhotos.route) localPhotos.itemCount else allCloudPhotos.itemCount
         totalCount > 0 && selectedPhotos.size == totalCount
     }
 
@@ -171,7 +175,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         if (areAllSelected) {
             clearSelection()
         } else {
-            selectedPhotos = if (selectedTab == 0) {
+            selectedPhotos = if (currentRoute == Screens.LocalPhotos.route) {
                 (0 until localPhotos.itemCount).mapNotNull { localPhotos.peek(it)?.localId }.toSet()
             } else {
                 (0 until allCloudPhotos.itemCount).mapNotNull { allCloudPhotos.peek(it)?.remoteId }.toSet()
@@ -198,11 +202,6 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     }
 
     LaunchedEffect(viewModel) {
-        // Always open on Device screen on app start
-        selectedTab = 0
-    }
-
-    LaunchedEffect(viewModel) {
         WorkModule.SyncMediaStore.enqueueInstant()
         scope.launch {
             WorkModule.observeWorkerByName(SYNC_MEDIA_STORE_WORK)
@@ -225,16 +224,11 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
-        val backStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = backStackEntry?.destination?.route
         val isSettingsScreen = currentRoute == Screens.Settings.route || isNavigatingToSettings
         val showAppLayout = !isSettingsScreen
 
         LaunchedEffect(isNavigatingToSettings) {
             if (isNavigatingToSettings) {
-                // Wait 1 frame so UI update (AppBar hide) happens instantly
-//                kotlinx.coroutines.android.awaitFrame()
-
                 navController.navigate(Screens.Settings.route) {
                     launchSingleTop = true
                 }
@@ -255,7 +249,6 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 
 
             Scaffold(
-//            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 modifier = if (!isSettingsScreen) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else Modifier,
                 topBar = {
                     if (!isSettingsScreen) {
@@ -274,33 +267,30 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                     scope = scope,
                                     context = LocalContext.current,
                                     selectedPhotos = selectedPhotos,
-                                    selectedTab = selectedTab
+                                    currentRoute = currentRoute,
+                                    onDeletionComplete = { localPhotos.refresh() }
                                 )
                             } else {
-                                Column(
-//                        modifier = Modifier.statusBarsPadding()
-//                        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
-                                ) {
-
+                                Column {
                                     TopAppBar(
-
                                         title = {
-//                                Column {
-//
-//                                    Spacer(modifier = Modifier.height(35.dp))
                                             Box(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 contentAlignment = Alignment.CenterStart
                                             ) {
-
+                                                val titleText = when (currentRoute) {
+                                                    Screens.LocalPhotos.route -> "Device ${photoCounts[0]}"
+                                                    Screens.RemotePhotos.route -> "Cloud ${photoCounts[1]}"
+                                                    else -> ""
+                                                }
                                                 Text(
-                                                    text = "${tabs[selectedTab].first} ${photoCounts[selectedTab]}",
+                                                    text = titleText,
                                                     color = MaterialTheme.colorScheme.onSurface,
                                                     modifier = Modifier.padding(top = 30.dp)
 
                                                 )
                                             }
-                                        },expandedHeight = 90.dp,
+                                        },
                                         actions = {
                                             Row(
                                                 modifier = Modifier.padding(top = 30.dp)
@@ -350,7 +340,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                                 showGridOptionsDropdown = false
                                                             }
                                                         )
-                                                        androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                                                         Text(
                                                             text = "Columns",
                                                             style = MaterialTheme.typography.labelMedium,
@@ -376,14 +366,9 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 
                                                 // Settings button
                                                 IconButton(onClick = {
-//                                            isNavigatingToSettings = true
-                                                    // Stop any scroll animation immediately
                                                     scrollBehavior.state.heightOffset = 0f
                                                     scrollBehavior.state.heightOffsetLimit = 0f
-
-                                                    // Navigate instantly without waiting
                                                     navController.navigate(Screens.Settings.route)
-//                                    navController.navigate(Screens.Settings.route)
                                                 }) {
                                                     Icon(
                                                         imageVector = Icons.Default.Settings,
@@ -421,7 +406,6 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 }
             }
         } else {
-            // Ye Scaffold Settings screen ke liye (AppBar aur BottomBar hata do)
             Scaffold(
                 contentWindowInsets = WindowInsets.navigationBars
             ) { paddingValues ->
@@ -439,9 +423,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 )
             }
         }
-//        var fabState by remember { mutableStateOf(FabState.Inactive) }
 
-        // Truly floating bottom navigation
         if (!isSettingsScreen) {
             Box(modifier = Modifier.fillMaxSize()) {
                 BottomToolbarFAB(
@@ -453,8 +435,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             }
         }
 
-        // Only show syncing animation on cloud photos screen, not device screen
-        AnimatedVisibility(visible = syncState == SyncState.SYNCING && selectedTab == 1) {
+        AnimatedVisibility(visible = syncState == SyncState.SYNCING && currentRoute == Screens.RemotePhotos.route) {
             Dialog({}) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -486,7 +467,8 @@ fun SelectionTopAppBar(
     scope: CoroutineScope,
     context: Context,
     selectedPhotos: Set<String>,
-    selectedTab: Int
+    currentRoute: String?,
+    onDeletionComplete: () -> Unit
 ) {
     var showExtraActions by remember { mutableStateOf(false) }
 
@@ -497,6 +479,7 @@ fun SelectionTopAppBar(
             scope.launch {
                 context.toastFromMainThread("Photos deleted successfully.")
             }
+            onDeletionComplete()
         } else {
             scope.launch {
                 context.toastFromMainThread("Couldn't get permission to delete photos.")
@@ -535,7 +518,6 @@ fun SelectionTopAppBar(
             )
         },
         actions = {
-            // Select All button
             IconButton(onClick = onToggleSelectAll) {
                 Icon(
                     imageVector = Icons.Default.ChecklistRtl,
@@ -543,7 +525,6 @@ fun SelectionTopAppBar(
                     tint = if (areAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
             }
-            // The more actions button and its dropdown menu
             Box {
                 IconButton(onClick = { showExtraActions = true }) {
                     Icon(Icons.Default.MoreVert, contentDescription = "More actions")
@@ -552,7 +533,7 @@ fun SelectionTopAppBar(
                     expanded = showExtraActions,
                     onDismissRequest = { showExtraActions = false }
                 ) {
-                    if (selectedTab == 0) { // Device photos
+                    if (currentRoute == Screens.LocalPhotos.route) { // Device photos
                         DropdownMenuItem(
                             text = { Text("Upload to Cloud") },
                             onClick = {
@@ -619,6 +600,7 @@ fun SelectionTopAppBar(
                                             }
                                             withContext(Dispatchers.Main) {
                                                 context.toastFromMainThread("$deletedCount photos deleted.")
+                                                onDeletionComplete()
                                                 onClearSelection()
                                             }
                                         } catch (e: SecurityException) {
