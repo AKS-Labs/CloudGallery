@@ -28,7 +28,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -231,9 +234,29 @@ fun DragSelectableLazyVerticalGrid(
                         dragCurrentOffset = initialDragOffset
                         
                         try {
-                            drag(down.id) { change ->
-                                dragCurrentOffset = change.position
-                                change.consume()
+                            // Custom drag loop to explicitly consume the UP event.
+                            // This prevents the 'clickable' modifier on items from firing onClick
+                            // when the finger is lifted after a long press (which would deselect the item).
+                            while (true) {
+                                // We MUST check in the Initial pass to consume the UP event BEFORE the child 'clickable' sees it.
+                                // 'clickable' handles events in the Main pass. If we wait for Main, it's too late.
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                val change = event.changes.find { it.id == down.id }
+
+                                if (change == null) {
+                                    break // Pointer is gone
+                                }
+
+                                if (change.changedToUp()) {
+                                    // User lifted finger. Consume this UP event!
+                                    change.consume()
+                                    break
+                                }
+
+                                if (change.positionChange() != Offset.Zero) {
+                                    dragCurrentOffset = change.position
+                                    change.consume()
+                                }
                             }
                         } finally {
                             isDragging = false
