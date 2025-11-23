@@ -3,6 +3,10 @@ package com.akslabs.cloudgallery.data.localdb
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 
@@ -32,6 +36,9 @@ object Preferences {
     private lateinit var preferences: SharedPreferences
     private lateinit var encryptedPreferences: SharedPreferences
 
+    private val observableStringPreferences = mutableMapOf<String, MutableStateFlow<String>>()
+    // Add other types of observable preferences here if needed (e.g., for Boolean, Int, etc.)
+
     fun init(context: Context) {
         try {
             preferences = context.getSharedPreferences(prefFile, Context.MODE_PRIVATE)
@@ -45,6 +52,22 @@ object Preferences {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
             migrateToEncrypted(preferences.all.filterKeys { it == botToken || it == channelId })
+
+            // Initialize StateFlows with current values for observable keys
+            observableStringPreferences[glideSelectionBehaviorKey] = MutableStateFlow(getString(glideSelectionBehaviorKey, "Fixed"))
+
+            // Register a listener for SharedPreferences changes to update StateFlows
+            preferences.registerOnSharedPreferenceChangeListener { sharedPreferences, key ->
+                when (key) {
+                    glideSelectionBehaviorKey -> {
+                        // Use the correct default value when updating the flow
+                        val newValue = sharedPreferences.getString(key, "Fixed") ?: "Fixed"
+                        observableStringPreferences[key]?.update { newValue }
+                    }
+                    // Handle other observable keys here if needed
+                }
+            }
+
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -57,6 +80,15 @@ object Preferences {
     fun getInt(key: String, defValue: Int) = preferences.getInt(key, defValue)
     fun getStringSet(key: String, defValue: Set<String>) =
         preferences.getStringSet(key, defValue) ?: defValue
+
+    // New method to get an observable StateFlow for a string preference
+    fun getStringFlow(key: String, defValue: String): StateFlow<String> {
+        // Ensure the flow is initialized. If not, create it and populate with current value.
+        // This handles cases where a flow might be requested before init() or for a new key.
+        return observableStringPreferences.getOrPut(key) {
+            MutableStateFlow(getString(key, defValue))
+        }.asStateFlow()
+    }
 
     fun edit(action: SharedPreferences.Editor.() -> Unit) {
         preferences.edit().apply(action).apply()

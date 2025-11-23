@@ -60,6 +60,7 @@ import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.akslabs.cloudgallery.data.localdb.Preferences
 
 // Sealed class for remote grid items to support date grouping
@@ -357,9 +358,7 @@ fun CloudPhotosGrid(
     // Layout mode configuration
     val isDateGroupedLayout = gridState.isDateGroupedLayout
 
-    val glideSelectionBehavior = remember {
-        Preferences.getString(Preferences.glideSelectionBehaviorKey, "Toggle")
-    }
+    val glideSelectionBehavior by Preferences.getStringFlow(Preferences.glideSelectionBehaviorKey, "Fixed").collectAsStateWithLifecycle()
 
     fun getDateLabel(uploadedAt: Long): String? {
         return try {

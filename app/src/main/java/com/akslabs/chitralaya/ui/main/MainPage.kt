@@ -524,7 +524,7 @@ fun SelectionTopAppBar(
                     HorizontalDivider()
                     // Glide Selection Behavior
                     var currentGlideBehavior by remember {
-                        mutableStateOf(Preferences.getString(Preferences.glideSelectionBehaviorKey, "Toggle"))
+                        mutableStateOf(Preferences.getString(Preferences.glideSelectionBehaviorKey, "Fixed"))
                     }
                     val onGlideBehaviorChange: (String) -> Unit = { value ->
                         Preferences.edit {

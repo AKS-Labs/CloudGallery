@@ -65,6 +65,7 @@ import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.akslabs.cloudgallery.data.localdb.Preferences
 
 // Sealed class for grid items to support date grouping
@@ -219,9 +220,7 @@ fun LocalPhotoGrid(
     var selectedPhoto by remember { mutableStateOf<LocalUiPhoto?>(null) }
     val window = (context as Activity).window
 
-    val glideSelectionBehavior = remember {
-        Preferences.getString(Preferences.glideSelectionBehaviorKey, "Toggle")
-    }
+    val glideSelectionBehavior by Preferences.getStringFlow(Preferences.glideSelectionBehaviorKey, "Fixed").collectAsStateWithLifecycle()
 
     if (selectionMode) {
         BackHandler(enabled = true) {
