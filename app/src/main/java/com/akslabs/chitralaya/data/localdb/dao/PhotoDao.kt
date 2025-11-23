@@ -60,7 +60,6 @@ interface PhotoDao {
     @Query("SELECT COUNT(*) FROM photos WHERE remoteId IS NOT NULL")
     fun getAllUploadedCountFlow(): Flow<Int>
 
-    // NOT USED RIGHT NOW
-    @Query("SELECT * FROM photos WHERE remoteId IS NULL")
-    fun getAllNotUploadedPaging(): PagingSource<Int, Photo>
+    @Query("SELECT * FROM photos WHERE localId = :localId")
+    suspend fun getPhotoByLocalId(localId: String): Photo?
 }

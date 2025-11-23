@@ -1,6 +1,7 @@
 package com.akslabs.cloudgallery.ui.main
 
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -88,6 +89,15 @@ import com.akslabs.chitralaya.ui.components.BottomToolbarFAB
 import com.akslabs.chitralaya.ui.components.FabState
 import androidx.compose.material3.HorizontalDivider
 import com.akslabs.cloudgallery.data.localdb.Preferences
+import android.net.Uri
+import androidx.core.net.toUri
+import com.akslabs.cloudgallery.api.BotApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.akslabs.cloudgallery.utils.sendFileViaUri
+import com.akslabs.cloudgallery.utils.toastFromMainThread
+import android.util.Log
+import androidx.compose.ui.platform.LocalContext
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.ui.components.ConnectivityStatusPopup
@@ -96,6 +106,7 @@ import com.akslabs.cloudgallery.ui.main.nav.Screens
 import com.akslabs.cloudgallery.ui.main.nav.screenScopedViewModel
 import com.akslabs.cloudgallery.workers.WorkModule
 import com.akslabs.cloudgallery.workers.WorkModule.SYNC_MEDIA_STORE_WORK
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -250,7 +261,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                     selectedCount = selectedPhotos.size,
                                     onClearSelection = { clearSelection() },
                                     onToggleSelectAll = { toggleSelectAll() },
-                                    areAllSelected = areAllSelected
+                                    areAllSelected = areAllSelected,
+                                    scope = scope,
+                                    context = LocalContext.current,
+                                    selectedPhotos = selectedPhotos
                                 )
                             } else {
                                 Column(
@@ -456,7 +470,10 @@ fun SelectionTopAppBar(
     selectedCount: Int,
     onClearSelection: () -> Unit,
     onToggleSelectAll: () -> Unit,
-    areAllSelected: Boolean
+    areAllSelected: Boolean,
+    scope: CoroutineScope,
+    context: Context,
+    selectedPhotos: Set<String>
 ) {
     var showExtraActions by remember { mutableStateOf(false) }
 
@@ -510,14 +527,57 @@ fun SelectionTopAppBar(
                     DropdownMenuItem(
                         text = { Text("Upload to Cloud") },
                         onClick = {
-                            // TODO: Upload Selected Images to Cloud
                             showExtraActions = false
+                            scope.launch {
+                                context.toastFromMainThread("Uploading selected images...")
+                                val channelId = Preferences.getEncryptedLong(Preferences.channelId, 0L)
+                                if (channelId == 0L) {
+                                    context.toastFromMainThread("Please configure Telegram channel in settings first.")
+                                    return@launch
+                                }
+
+                                val successfulUploads = withContext(Dispatchers.IO) {
+                                    var count = 0
+                                    selectedPhotos.forEach { localId ->
+                                        val photo = DbHolder.database.photoDao().getPhotoByLocalId(localId)
+                                        if (photo?.pathUri != null) {
+                                            try {
+                                                sendFileViaUri(
+                                                    photo.pathUri.toUri(),
+                                                    context.contentResolver,
+                                                    channelId,
+                                                    BotApi,
+                                                    context
+                                                )
+                                                count++
+                                            } catch (e: Exception) {
+                                                Log.e("Upload", "Failed to upload photo $localId: ${e.message}")
+                                            }
+                                        }
+                                    }
+                                    count
+                                }
+
+                                if (successfulUploads > 0) {
+                                    context.toastFromMainThread("$successfulUploads images uploaded to Cloud.")
+                                } else {
+                                    context.toastFromMainThread("No images uploaded or failed to find selected images.")
+                                }
+                                onClearSelection()
+                            }
                         }
                     )
                     DropdownMenuItem(
                         text = { Text("Move to Trash Bin") },
                         onClick = {
                             // TODO: Delete Selected Images from Cloud and Move it to Trash Bin
+                            showExtraActions = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete From Device") },
+                        onClick = {
+                            // TODO: Delete Selected Images from Device
                             showExtraActions = false
                         }
                     )
