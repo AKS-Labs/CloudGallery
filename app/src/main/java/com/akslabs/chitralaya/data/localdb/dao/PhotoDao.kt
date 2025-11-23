@@ -62,4 +62,7 @@ interface PhotoDao {
 
     @Query("SELECT * FROM photos WHERE localId = :localId")
     suspend fun getPhotoByLocalId(localId: String): Photo?
+
+    @Query("UPDATE photos SET remoteId = :remoteId WHERE pathUri = :pathUri")
+    suspend fun updateRemoteIdForPath(pathUri: String, remoteId: String)
 }

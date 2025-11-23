@@ -152,21 +152,8 @@ suspend fun sendFileApi(
             else -> extension
         }
 
-        // Update or insert device Photo with remoteId for linkage
-        val existingPhotos = DbHolder.database.photoDao().getAll()
-        val existingPhoto = existingPhotos.find { photo -> photo.pathUri == pathUri.toString() }
-        if (existingPhoto != null) {
-            DbHolder.database.photoDao().updatePhotos(existingPhoto.copy(remoteId = fileId))
-        } else {
-            DbHolder.database.photoDao().insertPhotos(
-                Photo(
-                    localId = pathUri.lastPathSegment ?: fileId,
-                    remoteId = fileId,
-                    photoType = resolvedExt,
-                    pathUri = pathUri.toString()
-                )
-            )
-        }
+        // Atomically update the remoteId for the photo using its pathUri
+        DbHolder.database.photoDao().updateRemoteIdForPath(pathUri.toString(), fileId)
 
         // Insert/replace RemotePhoto so Cloud screen picks it up immediately
         DbHolder.database.remotePhotoDao().insertAll(
