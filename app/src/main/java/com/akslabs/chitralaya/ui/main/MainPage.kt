@@ -86,7 +86,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.work.WorkInfo
 import com.akslabs.chitralaya.ui.components.BottomToolbarFAB
 import com.akslabs.chitralaya.ui.components.FabState
-import com.akslabs.chitralaya.ui.components.TriStateFab
+import androidx.compose.material3.HorizontalDivider
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.ui.components.ConnectivityStatusPopup
@@ -517,6 +518,24 @@ fun SelectionTopAppBar(
                         text = { Text("Move to Trash Bin") },
                         onClick = {
                             // TODO: Delete Selected Images from Cloud and Move it to Trash Bin
+                            showExtraActions = false
+                        }
+                    )
+                    HorizontalDivider()
+                    // Glide Selection Behavior
+                    var currentGlideBehavior by remember {
+                        mutableStateOf(Preferences.getString(Preferences.glideSelectionBehaviorKey, "Toggle"))
+                    }
+                    val onGlideBehaviorChange: (String) -> Unit = { value ->
+                        Preferences.edit {
+                            putString(Preferences.glideSelectionBehaviorKey, value)
+                        }
+                        currentGlideBehavior = value
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Glide: ${if (currentGlideBehavior == "Toggle") "Toggle Selection" else "Select Only)"}") },
+                        onClick = {
+                            onGlideBehaviorChange(if (currentGlideBehavior == "Toggle") "Fixed" else "Toggle")
                             showExtraActions = false
                         }
                     )
