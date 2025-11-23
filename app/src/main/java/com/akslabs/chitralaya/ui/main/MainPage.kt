@@ -2,6 +2,11 @@ package com.akslabs.cloudgallery.ui.main
 
 
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import android.app.Activity
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -20,6 +25,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import android.content.ContentUris
+import android.provider.MediaStore
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -264,7 +273,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                     areAllSelected = areAllSelected,
                                     scope = scope,
                                     context = LocalContext.current,
-                                    selectedPhotos = selectedPhotos
+                                    selectedPhotos = selectedPhotos,
+                                    selectedTab = selectedTab
                                 )
                             } else {
                                 Column(
@@ -464,6 +474,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     }
 }
 
+
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SelectionTopAppBar(
@@ -473,9 +485,25 @@ fun SelectionTopAppBar(
     areAllSelected: Boolean,
     scope: CoroutineScope,
     context: Context,
-    selectedPhotos: Set<String>
+    selectedPhotos: Set<String>,
+    selectedTab: Int
 ) {
     var showExtraActions by remember { mutableStateOf(false) }
+
+    val deleteRequestLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            scope.launch {
+                context.toastFromMainThread("Photos deleted successfully.")
+            }
+        } else {
+            scope.launch {
+                context.toastFromMainThread("Couldn't get permission to delete photos.")
+            }
+        }
+        onClearSelection()
+    }
 
     TopAppBar(
         title = {
@@ -524,63 +552,99 @@ fun SelectionTopAppBar(
                     expanded = showExtraActions,
                     onDismissRequest = { showExtraActions = false }
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("Upload to Cloud") },
-                        onClick = {
-                            showExtraActions = false
-                            scope.launch {
-                                context.toastFromMainThread("Uploading selected images...")
-                                val channelId = Preferences.getEncryptedLong(Preferences.channelId, 0L)
-                                if (channelId == 0L) {
-                                    context.toastFromMainThread("Please configure Telegram channel in settings first.")
-                                    return@launch
-                                }
+                    if (selectedTab == 0) { // Device photos
+                        DropdownMenuItem(
+                            text = { Text("Upload to Cloud") },
+                            onClick = {
+                                showExtraActions = false
+                                scope.launch {
+                                    context.toastFromMainThread("Uploading selected images to Cloud...")
+                                    val channelId = Preferences.getEncryptedLong(Preferences.channelId, 0L)
+                                    if (channelId == 0L) {
+                                        context.toastFromMainThread("Please configure Telegram channel in settings first.")
+                                        return@launch
+                                    }
 
-                                val successfulUploads = withContext(Dispatchers.IO) {
-                                    var count = 0
-                                    selectedPhotos.forEach { localId ->
-                                        val photo = DbHolder.database.photoDao().getPhotoByLocalId(localId)
-                                        if (photo?.pathUri != null) {
-                                            try {
-                                                sendFileViaUri(
-                                                    photo.pathUri.toUri(),
-                                                    context.contentResolver,
-                                                    channelId,
-                                                    BotApi,
-                                                    context
-                                                )
-                                                count++
-                                            } catch (e: Exception) {
-                                                Log.e("Upload", "Failed to upload photo $localId: ${e.message}")
+                                    val successfulUploads = withContext(Dispatchers.IO) {
+                                        var count = 0
+                                        selectedPhotos.forEach { localId ->
+                                            val photo = DbHolder.database.photoDao().getPhotoByLocalId(localId)
+                                            if (photo?.pathUri != null) {
+                                                try {
+                                                    sendFileViaUri(
+                                                        photo.pathUri.toUri(),
+                                                        context.contentResolver,
+                                                        channelId,
+                                                        BotApi,
+                                                        context
+                                                    )
+                                                    count++
+                                                } catch (e: Exception) {
+                                                    Log.e("Upload", "Failed to upload photo $localId: ${e.message}")
+                                                }
                                             }
                                         }
+                                        count
                                     }
-                                    count
-                                }
 
-                                if (successfulUploads > 0) {
-                                    context.toastFromMainThread("$successfulUploads images uploaded to Cloud.")
-                                } else {
-                                    context.toastFromMainThread("No images uploaded or failed to find selected images.")
+                                    if (successfulUploads > 0) {
+                                        context.toastFromMainThread("$successfulUploads images uploaded to Cloud.")
+                                    } else {
+                                        context.toastFromMainThread("No images uploaded or failed to find selected images.")
+                                    }
+                                    onClearSelection()
                                 }
-                                onClearSelection()
                             }
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Move to Trash Bin") },
-                        onClick = {
-                            // TODO: Delete Selected Images from Cloud and Move it to Trash Bin
-                            showExtraActions = false
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete From Device") },
-                        onClick = {
-                            // TODO: Delete Selected Images from Device
-                            showExtraActions = false
-                        }
-                    )
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete From Device") },
+                            onClick = {
+                                showExtraActions = false
+                                scope.launch(Dispatchers.IO) {
+                                    val urisToDelete = selectedPhotos.map { id ->
+                                        ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toLong())
+                                    }
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) { // Android 11+
+                                        val pendingIntent = MediaStore.createDeleteRequest(context.contentResolver, urisToDelete)
+                                        val intentSenderRequest = IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+                                        deleteRequestLauncher.launch(intentSenderRequest)
+                                    } else {
+                                        // Fallback for older Android versions
+                                        try {
+                                            var deletedCount = 0
+                                            urisToDelete.forEach { uri ->
+                                                if (context.contentResolver.delete(uri, null, null) > 0) {
+                                                    deletedCount++
+                                                }
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                context.toastFromMainThread("$deletedCount photos deleted.")
+                                                onClearSelection()
+                                            }
+                                        } catch (e: SecurityException) {
+                                            withContext(Dispatchers.Main) {
+                                                context.toastFromMainThread("Permission denied. Could not delete photos.")
+                                            }
+                                            Log.e("Delete", "SecurityException while deleting photos.", e)
+                                        } catch (e: Exception) {
+                                             withContext(Dispatchers.Main) {
+                                                context.toastFromMainThread("Error deleting photos.")
+                                            }
+                                            Log.e("Delete", "Error while deleting photos.", e)
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    } else { // Cloud photos
+                        DropdownMenuItem(
+                            text = { Text("Move to Trash Bin") },
+                            onClick = {
+                                // TODO: Delete Selected Images from Cloud and Move it to Trash Bin
+                                showExtraActions = false
+                            }
+                        )
+                    }
                     HorizontalDivider()
                     // Glide Selection Behavior
                     var currentGlideBehavior by remember {
