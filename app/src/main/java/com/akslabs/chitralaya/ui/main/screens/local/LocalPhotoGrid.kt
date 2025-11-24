@@ -3,6 +3,9 @@ package com.akslabs.cloudgallery.ui.main.screens.local
 import android.app.Activity
 import android.provider.MediaStore
 import android.util.Log
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -196,10 +199,10 @@ private fun createLayoutCache(
             group.photos.forEach { (p, originalIndex) -> add(LocalGridItem.PhotoItem(p, originalIndex)) }
         }
     }
+
     Log.d(TAG, "Layout cache in ${System.currentTimeMillis() - start}ms; normal=${normalGridItems.size}, grouped=${dateGroupedItems.size}")
     return LayoutCache(normalGridItems, dateGroupedItems, localPhotos.itemCount, System.currentTimeMillis())
 }
-
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -212,6 +215,7 @@ fun LocalPhotoGrid(
     selectedPhotos: Set<String>,
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
+    deletedPhotoIds: List<String> = emptyList()
 ) {
 
     if (BuildConfig.DEBUG) Log.d(TAG, "🎯 LocalPhotoGrid composing")
@@ -378,10 +382,12 @@ fun LocalPhotoGrid(
                                     val p = localPhotos[index]
                                     if (p != null) {
                                         val isSelected = selectedPhotos.contains(p.localId)
+                                        val isDeleted = deletedPhotoIds.contains(p.localId)
                                         LocalPhotoItem(
                                             photo = p,
                                             index = index,
                                             isSelected = isSelected,
+                                            isDeleted = isDeleted,
                                             modifier = Modifier.clickable(
                                                 onClick = {
                                                     if (selectionMode) {
@@ -408,10 +414,12 @@ fun LocalPhotoGrid(
                                 val p = localPhotos[i]
                                 if (p != null) {
                                     val isSelected = selectedPhotos.contains(p.localId)
+                                    val isDeleted = deletedPhotoIds.contains(p.localId)
                                     LocalPhotoItem(
                                         photo = p,
                                         index = i,
                                         isSelected = isSelected,
+                                        isDeleted = isDeleted,
                                         modifier = Modifier.clickable(
                                             onClick = {
                                                 if (selectionMode) {
@@ -483,92 +491,108 @@ fun LocalPhotoItem(
     photo: LocalUiPhoto?,
     index: Int,
     isSelected: Boolean,
+    isDeleted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val scale by animateFloatAsState(
+        targetValue = if (isDeleted) 0f else 1f,
+        animationSpec = tween(durationMillis = 300),
+        label = "scale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (isDeleted) 0f else 1f,
+        animationSpec = tween(durationMillis = 300),
+        label = "alpha"
+    )
 
-    // Per-item logging removed to avoid main-thread overhead during fast scroll
-
-    Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp)) // Clip the whole item to rounded shape
-            .background(MaterialTheme.colorScheme.surfaceVariant) // Base background
-            .then(if (isSelected) Modifier.border(8.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else Modifier), // Thicker border
-        contentAlignment = Alignment.Center
-    ) {
-        // Content Wrapper for padding
+    if (scale > 0f) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (isSelected) Modifier.padding(4.dp) else Modifier) // Padding for the content
+            modifier = modifier
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                }
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(16.dp)) // Clip the whole item to rounded shape
+                .background(MaterialTheme.colorScheme.surfaceVariant) // Base background
+                .then(if (isSelected) Modifier.border(8.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else Modifier), // Thicker border
+            contentAlignment = Alignment.Center
         ) {
-            if (photo != null) {
-                val request = ImageRequest.Builder(context)
-                    .data(photo.pathUri)
-                    .size(Size(110, 110))
-                    .crossfade(false)
-                    .allowHardware(false)
-                    // .allowRgb565(true)
-                    .memoryCachePolicy(CachePolicy.ENABLED)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .build()
-
-                SubcomposeAsyncImage(
-                    model = request,
-                    contentDescription = stringResource(id = R.string.photo),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                    loading = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                        )
-                    },
-                    error = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                imageVector = Icons.Rounded.BrokenImage,
-                                contentDescription = stringResource(id = R.string.load_error), // Fixed R.R.string to R.string
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                )
-            } else {
-                Log.w(TAG, "Item[$index] Showing PLACEHOLDER - photo is null")
-                // Simplified placeholder for null items during loading - just background color
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
-            }
-        }
-
-        if (isSelected) {
-            // Solid checkmark icon
+            // Content Wrapper for padding
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(7.dp) // Padding from the edge of the photo item
-                    .background(MaterialTheme.colorScheme.primary, CircleShape) // Solid primary circle background
-                    .size(24.dp), // Size of the icon container
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .then(if (isSelected) Modifier.padding(4.dp) else Modifier) // Padding for the content
             ) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle, // Just the checkmark
-                    contentDescription = "Selected",
-                    tint = MaterialTheme.colorScheme.onPrimary, // Contrasting checkmark color
-                    modifier = Modifier.size(20.dp) // Checkmark size
-                )
+                if (photo != null) {
+                    val request = ImageRequest.Builder(context)
+                        .data(photo.pathUri)
+                        .size(Size(110, 110))
+                        .crossfade(false)
+                        .allowHardware(false)
+                        // .allowRgb565(true)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .build()
+
+                    SubcomposeAsyncImage(
+                        model = request,
+                        contentDescription = stringResource(id = R.string.photo),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        loading = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                        },
+                        error = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    imageVector = Icons.Rounded.BrokenImage,
+                                    contentDescription = stringResource(id = R.string.load_error),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    )
+                } else {
+                    Log.w(TAG, "Item[$index] Showing PLACEHOLDER - photo is null")
+                    // Simplified placeholder for null items during loading - just background color
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                }
+            }
+
+            if (isSelected) {
+                // Solid checkmark icon
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(7.dp) // Padding from the edge of the photo item
+                        .background(MaterialTheme.colorScheme.primary, CircleShape) // Solid primary circle background
+                        .size(24.dp), // Size of the icon container
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle, // Just the checkmark
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary, // Contrasting checkmark color
+                        modifier = Modifier.size(20.dp) // Checkmark size
+                    )
+                }
             }
         }
     }

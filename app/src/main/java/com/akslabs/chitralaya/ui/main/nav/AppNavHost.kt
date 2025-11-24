@@ -37,6 +37,7 @@ fun AppNavHost(
     selectedPhotos: Set<String>,
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
+    deletedPhotoIds: List<String> = emptyList()
 ) {
     val currentSelectionMode by rememberUpdatedState(selectionMode)
     val currentOnSelectionModeChange by rememberUpdatedState(onSelectionModeChange)
@@ -77,7 +78,8 @@ fun AppNavHost(
                 selectionMode = selectionMode,
                 selectedPhotos = selectedPhotos,
                 onSelectionModeChange = onSelectionModeChange,
-                onSelectedPhotosChange = onSelectedPhotosChange
+                onSelectedPhotosChange = onSelectedPhotosChange,
+                deletedPhotoIds = deletedPhotoIds
             )
         }
 

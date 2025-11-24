@@ -132,6 +132,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     // Selection state (shared between screens)
     var selectionMode by remember { mutableStateOf(false) }
     var selectedPhotos by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val deletedPhotoIds = remember { androidx.compose.runtime.mutableStateListOf<String>() }
 
     fun clearSelection() {
         selectedPhotos = emptySet()
@@ -268,7 +269,16 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                     context = LocalContext.current,
                                     selectedPhotos = selectedPhotos,
                                     currentRoute = currentRoute,
-                                    onDeletionComplete = { localPhotos.refresh() }
+                                    onDeletionComplete = {
+                                        val idsToDelete = selectedPhotos.toList()
+                                        deletedPhotoIds.addAll(idsToDelete)
+                                        scope.launch {
+                                            kotlinx.coroutines.delay(400)
+                                            localPhotos.refresh()
+                                            kotlinx.coroutines.delay(1000)
+                                            deletedPhotoIds.removeAll(idsToDelete)
+                                        }
+                                    }
                                 )
                             } else {
                                 Column {
@@ -401,7 +411,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                         selectionMode = selectionMode,
                         selectedPhotos = selectedPhotos,
                         onSelectionModeChange = { selectionMode = it },
-                        onSelectedPhotosChange = { selectedPhotos = it }
+                        onSelectedPhotosChange = { selectedPhotos = it },
+                        deletedPhotoIds = deletedPhotoIds
                     )
                 }
             }
@@ -419,7 +430,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                     selectionMode = selectionMode,
                     selectedPhotos = selectedPhotos,
                     onSelectionModeChange = { selectionMode = it },
-                    onSelectedPhotosChange = { selectedPhotos = it }
+                    onSelectedPhotosChange = { selectedPhotos = it },
+                    deletedPhotoIds = deletedPhotoIds
                 )
             }
         }
