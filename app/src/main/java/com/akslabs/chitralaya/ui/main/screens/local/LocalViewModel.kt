@@ -1,9 +1,10 @@
 package com.akslabs.cloudgallery.ui.main.screens.local
 
+import android.app.Application
 import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.util.fastForEach
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -20,7 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class LocalViewModel : ViewModel() {
+class LocalViewModel(application: Application) : AndroidViewModel(application) {
 
     val localPhotosFlow: Flow<PagingData<LocalUiPhoto>> by lazy {
         Pager(
@@ -33,7 +34,7 @@ class LocalViewModel : ViewModel() {
             pagingSourceFactory = {
                 Log.d(TAG, "=== CREATING NEW LOCAL PAGING SOURCE ===")
                 Log.d(TAG, "PageSize: $PAGE_SIZE, PrefetchDistance: $PREFETCH_DISTANCE, JumpThreshold: $JUMP_THRESHOLD")
-                LocalPhotoSource
+                LocalPhotoSource(getApplication())
             }
         ).flow.cachedIn(viewModelScope)
     }

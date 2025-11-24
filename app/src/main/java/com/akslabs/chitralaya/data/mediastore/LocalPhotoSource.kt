@@ -8,9 +8,9 @@ import androidx.paging.PagingState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-object LocalPhotoSource : PagingSource<Int, LocalUiPhoto>() {
+class LocalPhotoSource(context: Context) : PagingSource<Int, LocalUiPhoto>() {
 
-    private lateinit var contentResolver: ContentResolver
+    private val contentResolver: ContentResolver = context.contentResolver
     private val imageCollection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
 
     override val jumpingSupported: Boolean = true
@@ -80,9 +80,5 @@ object LocalPhotoSource : PagingSource<Int, LocalUiPhoto>() {
         val anchor = state.anchorPosition ?: return null
         val closest = state.closestPageToPosition(anchor)
         return closest?.prevKey?.plus(1) ?: closest?.nextKey?.minus(1)
-    }
-
-    fun create(applicationContext: Context) {
-        contentResolver = applicationContext.contentResolver
     }
 }

@@ -1,10 +1,11 @@
 package com.akslabs.cloudgallery.ui.main
 
+import android.app.Application
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -22,7 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 
-class MainViewModel : ViewModel() {
+class MainViewModel(application: Application) : AndroidViewModel(application) {
     var currentDestination by mutableStateOf<Screens>(Screens.LocalPhotos)
         private set
 
@@ -47,7 +48,7 @@ class MainViewModel : ViewModel() {
             ),
             pagingSourceFactory = {
                 Log.d("MainViewModel", "=== CREATING NEW LOCAL PAGING SOURCE ===")
-                LocalPhotoSource
+                LocalPhotoSource(getApplication())
             }
         ).flow.cachedIn(viewModelScope)
     }

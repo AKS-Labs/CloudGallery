@@ -25,7 +25,7 @@ class App : Application() {
 
         Preferences.init(applicationContext)
         DbHolder.create(applicationContext)
-        LocalPhotoSource.create(applicationContext)
+
         WorkModule.create(applicationContext)
         ImageLoaderModule.create(applicationContext)
         ConnectivityObserver.init(applicationContext)

@@ -290,7 +290,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 
                                                 )
                                             }
-                                        },
+                                        },expandedHeight = 90.dp,
                                         actions = {
                                             Row(
                                                 modifier = Modifier.padding(top = 30.dp)
