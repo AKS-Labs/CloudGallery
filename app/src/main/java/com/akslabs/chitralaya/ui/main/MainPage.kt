@@ -273,10 +273,21 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                         val idsToDelete = selectedPhotos.toList()
                                         deletedPhotoIds.addAll(idsToDelete)
                                         scope.launch {
-                                            kotlinx.coroutines.delay(400)
+                                            Log.d("MainPage", "🗑️ Deletion animation started for ${idsToDelete.size} items")
+                                            // Wait for animation (300ms) + buffer for MediaStore update
+                                            kotlinx.coroutines.delay(1000) 
+                                            // Remove from local database immediately
+                                            withContext(Dispatchers.IO) {
+                                                idsToDelete.forEach { localId ->
+                                                    DbHolder.database.photoDao().deleteById(localId)
+                                                }
+                                            }
+                                            Log.d("MainPage", "🔄 Refreshing local photos after deletion")
                                             localPhotos.refresh()
-                                            kotlinx.coroutines.delay(1000)
+                                            // Keep IDs in deleted list longer to ensure they don't flicker back if refresh is slow
+                                            kotlinx.coroutines.delay(2000)
                                             deletedPhotoIds.removeAll(idsToDelete)
+                                            Log.d("MainPage", "✨ Cleared deleted IDs")
                                         }
                                     }
                                 )
