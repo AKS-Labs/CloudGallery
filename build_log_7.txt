@@ -1,0 +1,131 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:kaptGenerateStubsDebugKotlin
+> Task :app:kaptDebugKotlin
+> Task :app:compileDebugKotlin
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:3:8 Unresolved reference: RemotePhotosGrid
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:16:15 Unresolved reference: Modifier
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:16:26 Unresolved reference: Modifier
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:17:20 Unresolved reference: NavHostController
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:26:33 Unresolved reference: rememberUpdatedState
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:27:41 Unresolved reference: rememberUpdatedState
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:28:42 Unresolved reference: rememberUpdatedState
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:31:57 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:31:60 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:31:63 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:39:5 Unresolved reference: NavHost
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:48:35 Unresolved reference: TransformOrigin
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:52:9 Unresolved reference: composable
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:53:28 Unresolved reference: MainViewModel
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:53:44 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:53:44 Not enough information to infer type variable T
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:57:13 Unresolved reference: LocalPhotoGrid
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:70:9 Unresolved reference: composable
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:71:28 Unresolved reference: MainViewModel
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:71:44 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:71:44 Not enough information to infer type variable T
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:75:13 Unresolved reference: RemotePhotosGrid
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:77:34 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:77:37 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:88:9 Unresolved reference: composable
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:89:13 Unresolved reference: SettingsScreen
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:92:9 Unresolved reference: composable
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:93:39 Unresolved reference: main
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:104:25 Unresolved reference: ViewModel
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:105:14 Unresolved reference: ViewModelProvider
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:107:31 Unresolved reference: LocalViewModelStoreOwner
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:110:9 Unresolved reference: ViewModelProvider
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:110:48 Unresolved reference: it
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:111:10 Unresolved reference: ViewModelProvider
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/Screens.kt:22:106 Unresolved reference: DeleteOutline
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:93:22 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:93:60 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:95:9 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:96:9 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:97:9 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:98:9 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:102:50 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:103:53 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:104:53 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:105:51 Unresolved reference: MediaStore
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:141:5 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:157:5 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:272:13 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:273:13 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:274:13 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:275:13 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:276:13 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:277:13 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:278:13 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:446:17 Unresolved reference: Log
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:478:18 Unresolved reference: animateFloatAsState
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:480:25 Unresolved reference: tween
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:488:18 Unresolved reference: graphicsLayer
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:489:21 Unresolved reference: scaleX
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:490:21 Unresolved reference: scaleY
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:491:21 Unresolved reference: alpha
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:584:13 Unresolved reference: Context
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:584:37 Unresolved reference: Activity
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:586:23 Unresolved reference: ContextWrapper
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:587:24 Unresolved reference: Activity
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemotePhotoGrid.kt:284:22 This material3 API is experimental and is likely to change or to be removed in the future.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/SyncRemoteSizesWorker.kt:47:33 Unresolved reference. None of the following candidates is applicable because of receiver type mismatch: 
+public inline fun kotlin.text.StringBuilder /* = java.lang.StringBuilder */.insert(index: Int, value: Byte): kotlin.text.StringBuilder /* = java.lang.StringBuilder */ defined in kotlin.text
+public inline fun kotlin.text.StringBuilder /* = java.lang.StringBuilder */.insert(index: Int, value: Short): kotlin.text.StringBuilder /* = java.lang.StringBuilder */ defined in kotlin.text
+
+> Task :app:compileDebugKotlin FAILED
+[Incubating] Problems report is available at: file:///C:/Users/ashin/StudioProjects/CloudGallery/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 54s
+32 actionable tasks: 4 executed, 28 up-to-date

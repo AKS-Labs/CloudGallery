@@ -1,37 +1,34 @@
 package com.akslabs.cloudgallery.ui.main.screens.local
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.provider.MediaStore
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 import androidx.compose.material3.Icon
@@ -47,29 +44,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import coil.compose.SubcomposeAsyncImage
-import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Size
-import com.akslabs.chitralaya.ui.components.DragSelectableLazyVerticalGrid // Import the new component
+import com.akslabs.chitralaya.ui.components.DragSelectableLazyVerticalGrid
 import com.akslabs.chitralaya.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.BuildConfig
 import com.akslabs.cloudgallery.R
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.akslabs.cloudgallery.data.localdb.Preferences
 
 // Sealed class for grid items to support date grouping
 sealed class LocalGridItem {
@@ -95,7 +92,7 @@ data class LayoutCache(
 // Avoid heavy per-item resolver calls in UI thread
 private fun safeTimestampFromLocalId(localId: String): Long = localId.toLongOrNull()?.times(1000L) ?: 0L
 
-private suspend fun buildPhotoDateMap(context: android.content.Context): Map<String, Long> = withContext(Dispatchers.IO) {
+private suspend fun buildPhotoDateMap(context: Context): Map<String, Long> = withContext(Dispatchers.IO) {
     val resolver = context.contentResolver
     val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
     val projection = arrayOf(
@@ -156,18 +153,12 @@ private fun groupPhotosByDateOptimized(
 
             photosByDate.getOrPut(dateLabel) { mutableListOf() }.add(photo to i)
             processedCount++
-
-            if (processedCount % 100 == 0) {
-                Log.d(TAG, "📊 Processed $processedCount photos so far...")
-            }
         } else {
             skippedCount++
-            Log.w(TAG, "⚠️ Skipped null photo at index $i")
         }
     }
 
     Log.d(TAG, "✅ Date grouping complete: $processedCount processed, $skippedCount skipped")
-    Log.d(TAG, "📅 Created ${photosByDate.size} date groups")
 
     // Convert to sorted list of DateGroups (most recent first)
     return photosByDate.map { (dateLabel, photos) ->
@@ -186,22 +177,37 @@ private fun createLayoutCache(
     dateMap: Map<String, Long>
 ): LayoutCache {
     val start = System.currentTimeMillis()
-    val normalGridItems = buildList {
-        for (i in 0 until localPhotos.itemCount) {
-            val p = localPhotos.peek(i) ?: continue
-            add(LocalGridItem.PhotoItem(p, i))
-        }
-    }
-    val dateGroups = groupPhotosByDateOptimized(localPhotos, dateMap)
-    val dateGroupedItems = buildList {
-        dateGroups.forEachIndexed { idx, group ->
-            add(LocalGridItem.HeaderItem(group.dateLabel, "header_${idx}_${group.dateLabel}"))
-            group.photos.forEach { (p, originalIndex) -> add(LocalGridItem.PhotoItem(p, originalIndex)) }
+
+    // Create normal grid items
+    val normalGridItems = (0 until localPhotos.itemCount).mapNotNull { index ->
+        localPhotos.peek(index)?.let { photo ->
+            LocalGridItem.PhotoItem(photo, index)
         }
     }
 
-    Log.d(TAG, "Layout cache in ${System.currentTimeMillis() - start}ms; normal=${normalGridItems.size}, grouped=${dateGroupedItems.size}")
-    return LayoutCache(normalGridItems, dateGroupedItems, localPhotos.itemCount, System.currentTimeMillis())
+    // Create date grouped items
+    val dateGroups = groupPhotosByDateOptimized(localPhotos, dateMap)
+    val dateGroupedItems = mutableListOf<LocalGridItem>()
+
+    dateGroups.forEachIndexed { groupIndex, dateGroup ->
+        // Add date header
+        dateGroupedItems.add(LocalGridItem.HeaderItem(
+            dateLabel = dateGroup.dateLabel,
+            id = "header_${groupIndex}_${dateGroup.dateLabel}"
+        ))
+
+        // Add all photos for this date
+        dateGroup.photos.forEach { (photo, originalIndex) ->
+            dateGroupedItems.add(LocalGridItem.PhotoItem(photo, originalIndex))
+        }
+    }
+
+    return LayoutCache(
+        normalGridItems = normalGridItems,
+        dateGroupedItems = dateGroupedItems,
+        totalPhotos = localPhotos.itemCount,
+        lastUpdateTime = System.currentTimeMillis()
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
@@ -215,14 +221,14 @@ fun LocalPhotoGrid(
     selectedPhotos: Set<String>,
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
-    deletedPhotoIds: List<String> = emptyList()
+    deletedPhotoIds: List<String>
 ) {
-
-    if (BuildConfig.DEBUG) Log.d(TAG, "🎯 LocalPhotoGrid composing")
     val context = LocalContext.current
+    val activity = context.findActivity()
+    val window = activity?.window
+
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<LocalUiPhoto?>(null) }
-    val window = (context as Activity).window
 
     val glideSelectionBehavior by Preferences.getStringFlow(Preferences.glideSelectionBehaviorKey, "Fixed").collectAsStateWithLifecycle()
 
@@ -277,7 +283,13 @@ fun LocalPhotoGrid(
         }
     }
 
-    // No heavy cache for grouped layout; we stream headers/items inline for parity with normal grid
+    // Create layout cache
+    val layoutCache = remember(localPhotos.itemCount, isDateGroupedLayout, dateMap) {
+        createLayoutCache(localPhotos, dateMap)
+    }
+
+    val currentLayoutItems = if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
+    val maxLineSpan = columns
 
     fun getDateLabel(localId: String): String? {
         val millis = dateMap[localId] ?: return null
@@ -351,73 +363,41 @@ fun LocalPhotoGrid(
                     verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                     horizontalArrangement = Arrangement.spacedBy(horizontalSpacing),
                     content = {
-                        if (isDateGroupedLayout) {
-                            // Stream grouped headers/items inline to match normal grid count
-                            for (index in 0 until localPhotos.itemCount) {
-                                val current = localPhotos.peek(index)
-                                val prev = if (index > 0) localPhotos.peek(index - 1) else null
-                                val currentLabel = current?.let {
-                                    val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
-                                    formatPhotoDate(ts)
+                        // Unified layout rendering
+                        items(
+                            count = currentLayoutItems.size,
+                            key = { index ->
+                                when (val item = currentLayoutItems[index]) {
+                                    is LocalGridItem.HeaderItem -> item.id
+                                    is LocalGridItem.PhotoItem -> "photo_${item.originalIndex}_${item.photo.localId}"
                                 }
-                                val prevLabel = prev?.let {
-                                    val ts = dateMap[it.localId] ?: safeTimestampFromLocalId(it.localId)
-                                    formatPhotoDate(ts)
-                                }
-                                if (currentLabel != null && currentLabel != prevLabel) {
-                                    item(key = "header_${index}_$currentLabel", span = { GridItemSpan(maxLineSpan) }) {
-                                        Text(
-                                            text = currentLabel,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 8.dp, bottom = 4.dp)
-                                        )
-                                    }
-                                }
-                                val key = current?.localId
-                                item(key = if (key != null) "photo_${index}_$key" else "placeholder_${index}") {
-                                    val p = localPhotos[index]
-                                    if (p != null) {
-                                        val isSelected = selectedPhotos.contains(p.localId)
-                                        val isDeleted = deletedPhotoIds.contains(p.localId)
-                                        LocalPhotoItem(
-                                            photo = p,
-                                            index = index,
-                                            isSelected = isSelected,
-                                            isDeleted = isDeleted,
-                                            modifier = Modifier.clickable(
-                                                onClick = {
-                                                    if (selectionMode) {
-                                                        toggleSelection(p.localId)
-                                                    } else {
-                                                        selectedIndex = index
-                                                        selectedPhoto = p
-                                                    }
-                                                }
-                                            )
-                                        )
-                                    }
+                            },
+                            span = { index ->
+                                when (currentLayoutItems[index]) {
+                                    is LocalGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
+                                    is LocalGridItem.PhotoItem -> GridItemSpan(1)
                                 }
                             }
-                        } else {
-                            // Normal grid with stable unique keys per index to avoid duplicate key crashes
-                            items(
-                                count = localPhotos.itemCount,
-                                key = { i ->
-                                    val p = localPhotos.peek(i)
-                                    if (p != null) "photo_${i}_${p.localId}" else "placeholder_${i}"
+                        ) { index ->
+                            when (val item = currentLayoutItems[index]) {
+                                is LocalGridItem.HeaderItem -> {
+                                    Text(
+                                        text = item.dateLabel,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp, bottom = 4.dp)
+                                    )
                                 }
-                            ) { i ->
-                                val p = localPhotos[i]
-                                if (p != null) {
+                                is LocalGridItem.PhotoItem -> {
+                                    val p = item.photo
                                     val isSelected = selectedPhotos.contains(p.localId)
                                     val isDeleted = deletedPhotoIds.contains(p.localId)
                                     LocalPhotoItem(
                                         photo = p,
-                                        index = i,
+                                        index = item.originalIndex,
                                         isSelected = isSelected,
                                         isDeleted = isDeleted,
                                         modifier = Modifier.clickable(
@@ -425,7 +405,7 @@ fun LocalPhotoGrid(
                                                 if (selectionMode) {
                                                     toggleSelection(p.localId)
                                                 } else {
-                                                    selectedIndex = i
+                                                    selectedIndex = item.originalIndex
                                                     selectedPhoto = p
                                                 }
                                             }
@@ -469,14 +449,16 @@ fun LocalPhotoGrid(
 
                 Log.d(TAG, "Opening photo viewer: originalIndex=$index, mappedIndex=$safeIndex, totalLoaded=${loadedPhotos.size}")
 
-                PhotoPageView(
-                    initialPage = safeIndex,
-                    onlyRemotePhotos = false,
-                    photos = loadedPhotos,
-                    window = window
-                ) {
-                    selectedIndex = null
-                    selectedPhoto = null
+                if (window != null) {
+                    PhotoPageView(
+                        initialPage = safeIndex,
+                        onlyRemotePhotos = false,
+                        photos = loadedPhotos,
+                        window = window
+                    ) {
+                        selectedIndex = null
+                        selectedPhoto = null
+                    }
                 }
             } else {
                 selectedIndex = null
@@ -488,33 +470,30 @@ fun LocalPhotoGrid(
 
 @Composable
 fun LocalPhotoItem(
-    photo: LocalUiPhoto?,
+    photo: LocalUiPhoto,
     index: Int,
     isSelected: Boolean,
-    isDeleted: Boolean = false,
+    isDeleted: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+
+    // Animate scale/alpha if deleted
     val scale by animateFloatAsState(
         targetValue = if (isDeleted) 0f else 1f,
-        animationSpec = tween(durationMillis = 300),
+        animationSpec = tween(300),
         label = "scale"
-    )
-    val alpha by animateFloatAsState(
-        targetValue = if (isDeleted) 0f else 1f,
-        animationSpec = tween(durationMillis = 300),
-        label = "alpha"
     )
 
     if (scale > 0f) {
         Box(
             modifier = modifier
+                .aspectRatio(1f)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
-                    this.alpha = alpha
+                    alpha = scale
                 }
-                .aspectRatio(1f)
                 .clip(RoundedCornerShape(16.dp)) // Clip the whole item to rounded shape
                 .background(MaterialTheme.colorScheme.surfaceVariant) // Base background
                 .then(if (isSelected) Modifier.border(8.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else Modifier), // Thicker border
@@ -526,71 +505,76 @@ fun LocalPhotoItem(
                     .fillMaxSize()
                     .then(if (isSelected) Modifier.padding(4.dp) else Modifier) // Padding for the content
             ) {
-                if (photo != null) {
-                    val request = ImageRequest.Builder(context)
+                SubcomposeAsyncImage(
+                    model = ImageRequest.Builder(context)
                         .data(photo.pathUri)
-                        .size(Size(110, 110))
-                        .crossfade(false)
-                        .allowHardware(false)
-                        // .allowRgb565(true)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .build()
-
-                    SubcomposeAsyncImage(
-                        model = request,
-                        contentDescription = stringResource(id = R.string.photo),
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                        loading = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                            )
-                        },
-                        error = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    imageVector = Icons.Rounded.BrokenImage,
-                                    contentDescription = stringResource(id = R.string.load_error),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+                        .size(Size(150, 150)) // Thumbnail size
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = stringResource(R.string.photo),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    loading = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Optional: small loading indicator or just color
                         }
-                    )
-                } else {
-                    Log.w(TAG, "Item[$index] Showing PLACEHOLDER - photo is null")
-                    // Simplified placeholder for null items during loading - just background color
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    },
+                    error = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.BrokenImage,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                )
+            }
+
+            // Selection Checkmark
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .size(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            if (isSelected) {
-                // Solid checkmark icon
+            // Cloud Icon (if backed up)
+            if (photo.remoteId != null) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(7.dp) // Padding from the edge of the photo item
-                        .background(MaterialTheme.colorScheme.primary, CircleShape) // Solid primary circle background
-                        .size(24.dp), // Size of the icon container
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f), CircleShape)
+                        .size(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.CheckCircle, // Just the checkmark
-                        contentDescription = "Selected",
-                        tint = MaterialTheme.colorScheme.onPrimary, // Contrasting checkmark color
-                        modifier = Modifier.size(20.dp) // Checkmark size
+                        imageVector = Icons.Rounded.Cloud,
+                        contentDescription = "Backed up",
+                        tint = Color(0xFF4CAF50), // Green color
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -599,3 +583,13 @@ fun LocalPhotoItem(
 }
 
 private const val TAG = "LocalPhotoGrid"
+
+// Helper function to find the current activity from the context
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
+}

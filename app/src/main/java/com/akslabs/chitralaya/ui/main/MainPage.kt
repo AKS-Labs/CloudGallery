@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SelectAll
@@ -284,10 +285,6 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                             }
                                             Log.d("MainPage", "🔄 Refreshing local photos after deletion")
                                             localPhotos.refresh()
-                                            // Keep IDs in deleted list longer to ensure they don't flicker back if refresh is slow
-                                            kotlinx.coroutines.delay(2000)
-                                            deletedPhotoIds.removeAll(idsToDelete)
-                                            Log.d("MainPage", "✨ Cleared deleted IDs")
                                         }
                                     }
                                 )
@@ -295,27 +292,51 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                 Column {
                                     TopAppBar(
                                         title = {
-                                            Box(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                contentAlignment = Alignment.CenterStart
-                                            ) {
+                                            Column(modifier = Modifier.padding(top = 30.dp)) {
                                                 val titleText = when (currentRoute) {
-                                                    Screens.LocalPhotos.route -> "Device ${photoCounts[0]}"
-                                                    Screens.RemotePhotos.route -> "Cloud ${photoCounts[1]}"
-                                                    else -> ""
+                                                    Screens.LocalPhotos.route -> "Device Photos"
+                                                    Screens.RemotePhotos.route -> "Cloud Gallery"
+                                                    else -> "Cloud Gallery"
                                                 }
                                                 Text(
                                                     text = titleText,
                                                     color = MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.padding(top = 30.dp)
-
                                                 )
+                                                // Show total size if available
+                                                val context = LocalContext.current
+                                                val localViewModel: com.akslabs.cloudgallery.ui.main.screens.local.LocalViewModel = screenScopedViewModel()
+                                                val remoteViewModel: com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel = screenScopedViewModel()
+                                                
+                                                val totalSize = if (currentRoute == Screens.LocalPhotos.route) {
+                                                    localViewModel.totalSize.collectAsStateWithLifecycle().value
+                                                } else if (currentRoute == Screens.RemotePhotos.route) {
+                                                    remoteViewModel.totalSize.collectAsStateWithLifecycle().value
+                                                } else {
+                                                    0L
+                                                }
+                                                
+                                                if (totalSize > 0) {
+                                                    Text(
+                                                        text = android.text.format.Formatter.formatFileSize(context, totalSize),
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
                                             }
-                                        },expandedHeight = 90.dp,
+                                        },
                                         actions = {
                                             Row(
                                                 modifier = Modifier.padding(top = 30.dp)
                                             ) {
+                                                if (currentRoute == Screens.RemotePhotos.route) {
+                                                    IconButton(onClick = { navController.navigate(Screens.TrashBin.route) }) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.DeleteOutline,
+                                                            contentDescription = "Trash Bin",
+                                                            tint = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    }
+                                                }
                                                 // Grid options menu button
                                                 Box {
                                                     IconButton(onClick = { showGridOptionsDropdown = true }) {
@@ -642,11 +663,16 @@ fun SelectionTopAppBar(
                             }
                         )
                     } else { // Cloud photos
+                        val viewModel: com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel = screenScopedViewModel()
                         DropdownMenuItem(
                             text = { Text("Move to Trash Bin") },
                             onClick = {
-                                // TODO: Delete Selected Images from Cloud and Move it to Trash Bin
                                 showExtraActions = false
+                                scope.launch {
+                                    viewModel.moveToTrash(selectedPhotos)
+                                    context.toastFromMainThread("Moved ${selectedPhotos.size} photos to Trash Bin")
+                                    onClearSelection()
+                                }
                             }
                         )
                     }

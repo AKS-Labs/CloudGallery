@@ -44,6 +44,34 @@ class LocalViewModel(application: Application) : AndroidViewModel(application) {
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
     }
 
+    val totalSize: StateFlow<Long> by lazy {
+        kotlinx.coroutines.flow.flow {
+            emit(calculateTotalLocalSize())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+    }
+
+    private suspend fun calculateTotalLocalSize(): Long = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        var total: Long = 0
+        try {
+            val projection = arrayOf(android.provider.MediaStore.Images.Media.SIZE)
+            getApplication<Application>().contentResolver.query(
+                android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL),
+                projection,
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val sizeIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.SIZE)
+                while (cursor.moveToNext()) {
+                    total += cursor.getLong(sizeIdx)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error calculating local size", e)
+        }
+        total
+    }
+
     init {
         Log.e(TAG, "🚀 === LOCAL VIEW MODEL INITIALIZED ===")
         debugDatabaseState()
@@ -85,9 +113,10 @@ class LocalViewModel(application: Application) : AndroidViewModel(application) {
                 Log.i(TAG, "=== LOCAL PHOTOS DATABASE DEBUG ===")
 
                 // Check Photo table
-                val allPhotos = DbHolder.database.photoDao().getAll()
-                Log.i(TAG, "Total Photo records in database: ${allPhotos.size}")
+                // val allPhotos = DbHolder.database.photoDao().getAll()
+                // Log.i(TAG, "Total Photo records in database: ${allPhotos.size}")
 
+                /*
                 if (allPhotos.isEmpty()) {
                     Log.w(TAG, "❌ NO Photo records found in database!")
                 } else {
@@ -102,9 +131,10 @@ class LocalViewModel(application: Application) : AndroidViewModel(application) {
 
                     // Test paging source directly
                     Log.i(TAG, "Testing Local PagingSource directly...")
-                    val pagingSource = DbHolder.database.photoDao().getAllPaging()
+                    val pagingSource = DbHolder.database.photoDao().getAllPagingSource()
                     Log.d(TAG, "Local PagingSource created: ${pagingSource::class.simpleName}")
                 }
+                */
 
                 // Check total count flow
                 val totalCount = DbHolder.database.photoDao().getAllCountFlow()

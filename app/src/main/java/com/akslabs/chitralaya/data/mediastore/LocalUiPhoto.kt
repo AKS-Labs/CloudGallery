@@ -9,6 +9,8 @@ data class LocalUiPhoto(
     val pathUri: String,
     val mimeType: String,
     val displayDateMillis: Long,
+    val size: Long = 0,
+    val remoteId: String? = null
 ) : Parcelable
 
 

@@ -4,44 +4,51 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.akslabs.cloudgallery.data.localdb.dao.DeletedPhotoDao
 import com.akslabs.cloudgallery.data.localdb.dao.PhotoDao
 import com.akslabs.cloudgallery.data.localdb.dao.RemotePhotoDao
+import com.akslabs.cloudgallery.data.localdb.entities.DeletedPhoto
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import com.akslabs.cloudgallery.data.localdb.migration.Migration1to2_NullableRemoteId
 import com.akslabs.cloudgallery.data.localdb.migration.Migration2to3_RemotePhotoTable
 import com.akslabs.cloudgallery.data.localdb.migration.Migration3to4_EnhancedRemotePhoto
+import com.akslabs.cloudgallery.data.localdb.migration.Migration4to5_DeletedPhotos
 
 @Database(
-    entities = [
-        Photo::class, RemotePhoto::class
-    ],
-    version = 4
+    entities = [Photo::class, RemotePhoto::class, DeletedPhoto::class],
+    version = 5,
+    exportSchema = false
 )
 abstract class WhDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun remotePhotoDao(): RemotePhotoDao
+    abstract fun deletedPhotoDao(): DeletedPhotoDao
 
     companion object {
-        private const val DATABASE_NAME = "TeledriveDb"
+        private const val DATABASE_NAME = "wh_database"
 
-        private fun migrations() = arrayOf(
-            Migration1to2_NullableRemoteId(),
-            Migration2to3_RemotePhotoTable(),
-            Migration3to4_EnhancedRemotePhoto()
-        )
+        @Volatile
+        private var INSTANCE: WhDatabase? = null
 
-        fun create(applicationContext: Context): WhDatabase {
-            return Room
-                .databaseBuilder(
-                    applicationContext,
+        fun getInstance(context: Context): WhDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
                     WhDatabase::class.java,
                     DATABASE_NAME
                 )
-                .addMigrations(*migrations())
+                .addMigrations(
+                    Migration1to2_NullableRemoteId(),
+                    Migration2to3_RemotePhotoTable(),
+                    Migration3to4_EnhancedRemotePhoto(),
+                    Migration4to5_DeletedPhotos()
+                )
                 .fallbackToDestructiveMigration()
-                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
+                INSTANCE = instance
+                instance
+            }
         }
     }
 }

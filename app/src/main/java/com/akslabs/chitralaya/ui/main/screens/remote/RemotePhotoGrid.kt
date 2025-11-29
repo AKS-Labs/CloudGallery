@@ -1,3 +1,5 @@
+package com.akslabs.cloudgallery.ui.main.screens.remote
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -108,21 +110,14 @@ private fun groupRemotePhotosByDateOptimized(
         val photo = cloudPhotos.peek(i)
         if (photo != null) {
             val dateLabel = formatRemotePhotoDate(photo.uploadedAt)
-
             photosByDate.getOrPut(dateLabel) { mutableListOf() }.add(photo to i)
             processedCount++
-
-            if (processedCount % 100 == 0) {
-                Log.d(TAG, "📊 Processed $processedCount remote photos so far...")
-            }
         } else {
             skippedCount++
-            Log.w(TAG, "⚠️ Skipped null remote photo at index $i")
         }
     }
 
     Log.d(TAG, "✅ Remote date grouping complete: $processedCount processed, $skippedCount skipped")
-    Log.d(TAG, "📅 Created ${photosByDate.size} remote date groups")
 
     // Convert to sorted list of RemoteDateGroups (most recent first)
     return photosByDate.map { (dateLabel, photos) ->
@@ -140,7 +135,6 @@ private fun createRemoteLayoutCache(
     cloudPhotos: LazyPagingItems<RemotePhoto>
 ): RemoteLayoutCache {
     val startTime = System.currentTimeMillis()
-    Log.d(TAG, "🚀 Creating remote layout cache for ${cloudPhotos.itemCount} photos")
 
     // Create normal grid items (simple list)
     val normalGridItems = (0 until cloudPhotos.itemCount).mapNotNull { index ->
@@ -166,10 +160,6 @@ private fun createRemoteLayoutCache(
         }
     }
 
-    val endTime = System.currentTimeMillis()
-    Log.d(TAG, "⚡ Remote layout cache created in ${endTime - startTime}ms")
-    Log.d(TAG, "📊 Normal grid: ${normalGridItems.size} items, Date grouped: ${dateGroupedItems.size} items")
-
     return RemoteLayoutCache(
         normalGridItems = normalGridItems,
         dateGroupedItems = dateGroupedItems,
@@ -178,6 +168,7 @@ private fun createRemoteLayoutCache(
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun RemotePhotosGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
@@ -188,14 +179,15 @@ fun RemotePhotosGrid(
     selectedPhotos: Set<String>,
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
-)
- {
+) {
     Log.e(TAG, "🎯 === REMOTE PHOTO GRID COMPOSING ===")
     val context = LocalContext.current
     val activity = context.findActivity()
     val window = activity?.window
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhoto by remember { mutableStateOf<RemotePhoto?>(null) }
+
+    val glideSelectionBehavior by Preferences.getStringFlow(Preferences.glideSelectionBehaviorKey, "Fixed").collectAsStateWithLifecycle()
 
     if (selectionMode) {
         BackHandler(enabled = true) {
@@ -216,82 +208,140 @@ fun RemotePhotosGrid(
         }
     }
 
-    // Comprehensive debug logging for cloud photos data
-    LaunchedEffect(cloudPhotos.loadState, cloudPhotos.itemCount) {
-        Log.d(TAG, "=== REMOTE PHOTO GRID DEBUG ===")
-//        Log.d(TAG, "Total count from ViewModel: $totalCount")
-        Log.d(TAG, "CloudPhotos itemCount: ${cloudPhotos.itemCount}")
-        Log.d(TAG, "LoadState.refresh: ${cloudPhotos.loadState.refresh}")
-        Log.d(TAG, "LoadState.append: ${cloudPhotos.loadState.append}")
-        Log.d(TAG, "LoadState.prepend: ${cloudPhotos.loadState.prepend}")
+    // Preserve scroll
+    val lazyGridState = rememberLazyGridState()
+    // Responsive grid configuration (3-6 columns, default 4)
+    val gridState = rememberGridState()
+    val columns = gridState.columnCount.coerceIn(3, 6)
+    val horizontalSpacing = 12.dp
+    val verticalSpacing = 12.dp
 
-        // Check if refresh is loading
-        if (cloudPhotos.loadState.refresh is LoadState.Loading) {
-            Log.i(TAG, "REFRESH is currently LOADING")
-        } else if (cloudPhotos.loadState.refresh is LoadState.Error) {
-            Log.e(TAG, "REFRESH ERROR: ${(cloudPhotos.loadState.refresh as LoadState.Error).error}")
-        } else {
-            Log.i(TAG, "REFRESH completed successfully")
-        }
+    // Layout mode configuration
+    val isDateGroupedLayout = gridState.isDateGroupedLayout
 
-        // Check append state for scrolling
-        if (cloudPhotos.loadState.append is LoadState.Loading) {
-            Log.i(TAG, "APPEND is currently LOADING (scrolling down)")
-        } else if (cloudPhotos.loadState.append is LoadState.Error) {
-            Log.e(TAG, "APPEND ERROR: ${(cloudPhotos.loadState.append as LoadState.Error).error}")
-        }
-
-        if (cloudPhotos.itemCount > 0) {
-            Log.i(TAG, "Checking first 5 cloud photos with peek():")
-            for (i in 0 until minOf(5, cloudPhotos.itemCount)) {
-                val photo = cloudPhotos.peek(i)
-                if (photo != null) {
-                    Log.d(TAG, "Photo[$i] LOADED: remoteId=${photo.remoteId}, type=${photo.photoType}, fileName=${photo.fileName}")
-                } else {
-                    Log.w(TAG, "Photo[$i] NULL: not loaded yet or loading")
-                }
-            }
-
-            // Also check snapshot list
-            val snapshotItems = cloudPhotos.itemSnapshotList.items
-            Log.i(TAG, "Snapshot list size: ${snapshotItems.size}")
-            snapshotItems.take(3).forEachIndexed { index, item ->
-                if (item != null) {
-                    Log.d(TAG, "Snapshot[$index]: remoteId=${item.remoteId}")
-                } else {
-                    Log.w(TAG, "Snapshot[$index]: null")
-                }
-            }
-        } else {
-            Log.w(TAG, "CloudPhotos itemCount is 0!")
-        }
-        Log.d(TAG, "=== END REMOTE PHOTO GRID DEBUG ===")
+    // Create layout cache
+    val layoutCache = remember(cloudPhotos.itemCount, isDateGroupedLayout) {
+        createRemoteLayoutCache(cloudPhotos)
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Unified cloud photos grid
-        // Unified cloud photos grid
-        CloudPhotosGrid(
-            cloudPhotos = cloudPhotos,
-            selectionMode = selectionMode,
-            selectedPhotos = selectedPhotos,
-            onPhotoClick = { index, photo ->
-                selectedIndex = index
-                selectedPhoto = photo
-            },
-            onToggleSelection = { photoId ->
-                toggleSelection(photoId)
-            },
-            onSelectionModeChange = { mode ->
-                onSelectionModeChange(mode)
-            },
-            onSelectedPhotosChange = { photos -> // Add this line
-                onSelectedPhotosChange(photos)
-            },
-            expanded = expanded,
-            onExpandedChange = onExpandedChange
-        )
+    val currentLayoutItems = if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
+    val maxLineSpan = columns
 
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (cloudPhotos.loadState.refresh == LoadState.Loading) {
+            LoadAnimation(modifier = Modifier.align(Alignment.Center))
+        } else if (cloudPhotos.itemCount == 0 && cloudPhotos.loadState.refresh is LoadState.NotLoading) {
+             // Empty state
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Cloud,
+                    contentDescription = "No cloud photos",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Sync images to view here",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            ExpressiveScrollbar(
+                lazyGridState = lazyGridState,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            )
+            DragSelectableLazyVerticalGrid(
+                lazyGridState = lazyGridState,
+                selectionEnabled = selectionMode,
+                glideSelectionBehavior = glideSelectionBehavior,
+                onItemSelectionChange = { key, isSelected ->
+                    if (key is String && !key.startsWith("header_")) {
+                        val photoId = key
+                        val currentlySelected = selectedPhotos.contains(photoId)
+                        if (isSelected != currentlySelected) {
+                            toggleSelection(photoId)
+                        }
+                        if (!selectionMode && isSelected) {
+                            onSelectionModeChange(true)
+                        }
+                    }
+                },
+                isItemSelected = { key ->
+                    if (key is String && !key.startsWith("header_")) {
+                        selectedPhotos.contains(key)
+                    } else false
+                },
+                onDragSelectionEnd = {
+                    if (selectedPhotos.isEmpty()) {
+                        onSelectionModeChange(false)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .floatingToolbarVerticalNestedScroll(
+                        expanded = expanded,
+                        onExpand = { onExpandedChange(true) },
+                        onCollapse = { onExpandedChange(false) },
+                    ),
+                columns = GridCells.Fixed(columns),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+                horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
+            ) {
+                // Unified remote layout rendering with smooth transitions
+                items(
+                    count = currentLayoutItems.size,
+                    key = { index ->
+                        when (val item = currentLayoutItems[index]) {
+                            is RemoteGridItem.HeaderItem -> item.id
+                            is RemoteGridItem.PhotoItem -> item.photo.remoteId
+                        }
+                    },
+                    span = { index ->
+                        when (currentLayoutItems[index]) {
+                            is RemoteGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
+                            is RemoteGridItem.PhotoItem -> GridItemSpan(1)
+                        }
+                    }
+                ) { index ->
+                    when (val item = currentLayoutItems[index]) {
+                        is RemoteGridItem.HeaderItem -> {
+                            // Date header
+                            Text(
+                                text = item.dateLabel,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp, bottom = 4.dp)
+                            )
+                        }
+                        is RemoteGridItem.PhotoItem -> {
+                            val isSelected = selectedPhotos.contains(item.photo.remoteId)
+                            CloudPhotoItem(
+                                remotePhoto = item.photo,
+                                index = item.originalIndex,
+                                isSelected = isSelected,
+                                modifier = Modifier.clickable(
+                                    onClick = {
+                                        if (selectionMode) {
+                                            toggleSelection(item.photo.remoteId)
+                                        } else {
+                                            onPhotoClick(item.originalIndex, item.photo)
+                                        }
+                                    }
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // Photo viewer overlay
         selectedIndex?.let { index ->
@@ -325,198 +375,6 @@ fun RemotePhotosGrid(
                         selectedPhoto = null
                     }
                 }
-            } else {
-                selectedIndex = null
-                selectedPhoto = null
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
-@Composable
-fun CloudPhotosGrid(
-    cloudPhotos: LazyPagingItems<RemotePhoto>,
-    selectionMode: Boolean,
-    selectedPhotos: Set<String>,
-    onPhotoClick: (Int, RemotePhoto?) -> Unit,
-    onToggleSelection: (String) -> Unit,
-    onSelectionModeChange: (Boolean) -> Unit,
-    onSelectedPhotosChange: (Set<String>) -> Unit,
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.background)
-) {
-    val lazyGridState = rememberLazyGridState()
-
-    // Responsive grid configuration (3-6 columns, default 4) - matches LocalPhotoGrid
-    val gridState = rememberGridState()
-    val columns = gridState.columnCount.coerceIn(3, 6)
-    val horizontalSpacing = 12.dp
-    val verticalSpacing = 12.dp
-
-    // Layout mode configuration
-    val isDateGroupedLayout = gridState.isDateGroupedLayout
-
-    val glideSelectionBehavior by Preferences.getStringFlow(Preferences.glideSelectionBehaviorKey, "Fixed").collectAsStateWithLifecycle()
-
-    fun getDateLabel(uploadedAt: Long): String? {
-        return try {
-            java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(uploadedAt))
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    // Optimized remote layout cache with instant switching
-    val layoutCache = remember(cloudPhotos.itemSnapshotList.items.hashCode()) {
-        createRemoteLayoutCache(cloudPhotos)
-    }
-
-    // Get current layout items instantly (no recomputation)
-    val currentLayoutItems = remember(isDateGroupedLayout, layoutCache) {
-        Log.d(TAG, "⚡ Switching to ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"} remote layout")
-        if (isDateGroupedLayout) {
-            layoutCache.dateGroupedItems
-        } else {
-            layoutCache.normalGridItems
-        }
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        when {
-            cloudPhotos.loadState.refresh == LoadState.Loading -> {
-                LoadAnimation(modifier = Modifier.align(Alignment.Center))
-            }
-            cloudPhotos.itemCount == 0 && cloudPhotos.loadState.refresh is LoadState.NotLoading -> {
-                // Empty state
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Cloud,
-                        contentDescription = "No cloud photos",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Sync images to view here",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            else -> {
-                ExpressiveScrollbar(
-                    lazyGridState = lazyGridState,
-                    modifier = Modifier.align(Alignment.CenterEnd)
-                )
-                DragSelectableLazyVerticalGrid(
-                    lazyGridState = lazyGridState,
-                    selectionEnabled = selectionMode,
-                    glideSelectionBehavior = glideSelectionBehavior,
-                    onItemSelectionChange = { key, isSelected ->
-                        if (key is String && !key.startsWith("header_")) {
-                            val photoId = key
-                            val currentlySelected = selectedPhotos.contains(photoId)
-                            if (isSelected != currentlySelected) {
-                                onToggleSelection(photoId)
-                            }
-                            if (!selectionMode && isSelected) {
-                                onSelectionModeChange(true)
-                            }
-                        }
-                    },
-                    isItemSelected = { key ->
-                        if (key is String && !key.startsWith("header_")) {
-                            selectedPhotos.contains(key)
-                        } else false
-                    },
-                    onDragSelectionEnd = {
-                        if (selectedPhotos.isEmpty()) {
-                            onSelectionModeChange(false)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .floatingToolbarVerticalNestedScroll(
-                            expanded = expanded,
-                            onExpand = { onExpandedChange(true) },
-                            onCollapse = { onExpandedChange(false) },
-                        ),
-                    columns = GridCells.Fixed(columns),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(verticalSpacing),
-                    horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
-                ) {
-                    Log.d(TAG, "=== OPTIMIZED REMOTE LAZY GRID ITEMS BLOCK ===")
-                    Log.d(TAG, "Layout mode: ${if (isDateGroupedLayout) "Date Grouped" else "Normal Grid"}")
-                    Log.d(TAG, "Rendering ${currentLayoutItems.size} items (Total photos in cache: ${layoutCache.totalPhotos})")
-
-                    // Unified remote layout rendering with smooth transitions
-                    items(
-                        count = currentLayoutItems.size,
-                        key = { index ->
-                            when (val item = currentLayoutItems[index]) {
-                                is RemoteGridItem.HeaderItem -> item.id
-                                is RemoteGridItem.PhotoItem -> item.photo.remoteId
-                            }
-                        },
-                        span = { index ->
-                            when (currentLayoutItems[index]) {
-                                is RemoteGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
-                                is RemoteGridItem.PhotoItem -> GridItemSpan(1)
-                            }
-                        }
-                    ) { index ->
-                        when (val item = currentLayoutItems[index]) {
-                            is RemoteGridItem.HeaderItem -> {
-                                // Date header with smooth animation
-                                androidx.compose.animation.AnimatedVisibility(
-                                    visible = true,
-                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(),
-                                    exit = androidx.compose.animation.fadeOut()
-                                ) {
-                                    Text(
-                                        text = item.dateLabel,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 8.dp, bottom = 4.dp)
-                                    )
-                                }
-                            }
-                            is RemoteGridItem.PhotoItem -> {
-                                val isSelected = selectedPhotos.contains(item.photo.remoteId)
-                                // Photo item with smooth animation
-                                androidx.compose.animation.AnimatedVisibility(
-                                    visible = true,
-                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
-                                    exit = androidx.compose.animation.fadeOut()
-                                ) {
-                                    CloudPhotoItem(
-                                        remotePhoto = item.photo,
-                                        index = item.originalIndex,
-                                        isSelected = isSelected,
-                                        modifier = Modifier.clickable(
-                                            onClick = {
-                                                if (selectionMode) {
-                                                    onToggleSelection(item.photo.remoteId)
-                                                } else {
-                                                    onPhotoClick(item.originalIndex, item.photo)
-                                                }
-                                            }
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -530,17 +388,6 @@ fun CloudPhotoItem(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-
-    // Comprehensive debug logging for CloudPhotoItem
-    LaunchedEffect(remotePhoto, index) {
-        Log.d(TAG, "=== CLOUD PHOTO ITEM RENDER ===")
-        Log.d(TAG, "Index: $index")
-        if (remotePhoto != null) {
-            Log.i(TAG, "Item[$index] RENDERING with data: remoteId=${remotePhoto.remoteId}, type=${remotePhoto.photoType}, fileName=${remotePhoto.fileName}")
-        } else {
-            Log.w(TAG, "Item[$index] RENDERING with NULL data - will show placeholder")
-        }
-    }
 
     Box(
         modifier = modifier
@@ -557,30 +404,15 @@ fun CloudPhotoItem(
                 .then(if (isSelected) Modifier.padding(4.dp) else Modifier) // Padding for the content
         ) {
             if (remotePhoto != null) {
-                Log.d(TAG, "Item[$index] Creating ImageRequest for remoteId=${remotePhoto.remoteId}")
-
                 val imageRequest = ImageRequest.Builder(context)
                     .data(remotePhoto)
-                    .size(Size(15, 150)) // Even smaller for faster loading
+                    .size(Size(150, 150)) // Even smaller for faster loading
                     .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
                     .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
                     .crossfade(100) // Faster transition
                     .allowHardware(true) // Use hardware acceleration
                     .allowRgb565(true) // Use less memory
-                    .listener(
-                        onStart = {
-                            Log.i(TAG, "Item[$index] Image loading STARTED for remoteId=${remotePhoto.remoteId}")
-                        },
-                        onSuccess = { _, result ->
-                            Log.i(TAG, "Item[$index] Image loading SUCCESS for remoteId=${remotePhoto.remoteId}, dataSource=${result.dataSource}")
-                        },
-                        onError = { _, error ->
-                            Log.e(TAG, "Item[$index] Image loading ERROR for remoteId=${remotePhoto.remoteId}: ${error.throwable?.message}")
-                        }
-                    )
                     .build()
-
-                Log.d(TAG, "Item[$index] ImageRequest created, starting SubcomposeAsyncImage")
 
                 SubcomposeAsyncImage(
                     imageLoader = ImageLoaderModule.thumbnailImageLoader,
@@ -593,7 +425,6 @@ fun CloudPhotoItem(
                         LoadAnimation()
                     },
                     error = { error ->
-                        Log.e(TAG, "Item[$index] Showing ERROR state for remoteId=${remotePhoto.remoteId}: ${error.result.throwable?.message}")
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -610,7 +441,6 @@ fun CloudPhotoItem(
                     }
                 )
             } else {
-                Log.w(TAG, "Item[$index] Showing PLACEHOLDER - remotePhoto is null")
                 // Simplified placeholder for null items during loading - just background color
                 Box(
                     modifier = Modifier

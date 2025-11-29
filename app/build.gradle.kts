@@ -3,13 +3,14 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.android.application)
+    alias(libs.plugins.compose.compiler)
     id("org.jetbrains.kotlin.kapt")
     id("kotlin-parcelize")
 }
 
 android {
     namespace = "com.akslabs.cloudgallery"
-    compileSdk = 35  // Updated to compile against Android 15
+    compileSdk = 36  // Updated to compile against Android 15
 
     defaultConfig {
         applicationId = "com.akslabs.cloudgallery"
@@ -97,9 +98,7 @@ android {
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KaptGenerateStubs> {
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
+
 }
 
 // Completely disable all lint tasks to prevent build issues
@@ -190,7 +189,7 @@ dependencies {
 
     implementation("androidx.activity:activity-compose:1.10.0")      // predictive back APIs
     implementation("androidx.navigation:navigation-compose:2.8.3")   // predictive back animation built-in
-    implementation("androidx.compose.material3:material3:1.3.1")     // UI
+//    implementation("androidx.compose.material3:material3:1.3.1")     // UI
 
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")
 

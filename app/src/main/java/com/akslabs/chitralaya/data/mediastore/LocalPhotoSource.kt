@@ -28,6 +28,10 @@ class LocalPhotoSource(context: Context) : PagingSource<Int, LocalUiPhoto>() {
                         ContentResolver.QUERY_ARG_SQL_SORT_ORDER,
                         "${MediaStore.Images.ImageColumns.DATE_MODIFIED} DESC"
                     )
+                    putStringArray(
+                        ContentResolver.QUERY_ARG_SORT_COLUMNS,
+                        arrayOf(MediaStore.Images.ImageColumns.DATE_MODIFIED)
+                    )
                     putInt(
                         ContentResolver.QUERY_ARG_OFFSET,
                         offset
@@ -47,13 +51,24 @@ class LocalPhotoSource(context: Context) : PagingSource<Int, LocalUiPhoto>() {
                     null
                 )
                 cursor?.use { _ ->
+                    val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns._ID)
+                    val mimeIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.MIME_TYPE)
+                    val sizeIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.SIZE)
+                    val takenIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_TAKEN)
+                    val addedIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_ADDED)
+                    val modIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_MODIFIED)
+
+                    val tempPhotos = mutableListOf<LocalUiPhoto>()
+                    val localIds = mutableListOf<String>()
+
                     while (cursor.moveToNext()) {
                         try {
-                            val id: Long = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns._ID))
-                            val mime: String = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.MIME_TYPE))
-                            val dateTaken = runCatching { cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_TAKEN)) }.getOrDefault(0L)
-                            val dateAdded = runCatching { cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_ADDED)) }.getOrDefault(0L) * 1000L
-                            val dateModified = runCatching { cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_MODIFIED)) }.getOrDefault(0L) * 1000L
+                            val id = cursor.getLong(idIdx).toString()
+                            val mime = cursor.getString(mimeIdx) ?: "image/jpeg"
+                            val size = runCatching { cursor.getLong(sizeIdx) }.getOrDefault(0L)
+                            val dateTaken = runCatching { cursor.getLong(takenIdx) }.getOrDefault(0L)
+                            val dateAdded = runCatching { cursor.getLong(addedIdx) }.getOrDefault(0L) * 1000L
+                            val dateModified = runCatching { cursor.getLong(modIdx) }.getOrDefault(0L) * 1000L
                             val ts = when {
                                 dateTaken > 0L -> dateTaken
                                 dateModified > 0L -> dateModified
@@ -61,10 +76,23 @@ class LocalPhotoSource(context: Context) : PagingSource<Int, LocalUiPhoto>() {
                                 else -> 0L
                             }
                             val contentUri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-                            val uri = android.content.ContentUris.withAppendedId(contentUri, id)
-                            pagePhotoList.add(LocalUiPhoto(id.toString(), uri.toString(), mime, ts))
+                            val uri = android.content.ContentUris.withAppendedId(contentUri, id.toLong())
+                            
+                            tempPhotos.add(LocalUiPhoto(id, uri.toString(), mime, ts, size, null))
+                            localIds.add(id)
                         } catch (e: Exception) {
                             e.printStackTrace()
+                        }
+                    }
+
+                    // Batch query remote status
+                    if (localIds.isNotEmpty()) {
+                        val remotePhotos = com.akslabs.cloudgallery.data.localdb.DbHolder.database.photoDao().getRemoteIdsForLocals(localIds)
+                        val remoteIdMap = remotePhotos.associate { it.localId to it.remoteId }
+                        
+                        tempPhotos.forEach { photo ->
+                            val remoteId = remoteIdMap[photo.localId]
+                            pagePhotoList.add(photo.copy(remoteId = remoteId))
                         }
                     }
                 }

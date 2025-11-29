@@ -15,20 +15,17 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PhotoDao {
 
-    @Query("SELECT * FROM photos ORDER BY CAST(localId AS INTEGER) DESC")
+    @Query("SELECT * FROM photos ORDER BY localId DESC")
+    fun getAllPagingSource(): PagingSource<Int, Photo>
+
+    @Query("SELECT * FROM photos")
     suspend fun getAll(): List<Photo>
-
-    @Query("SELECT * FROM photos ORDER BY CAST(localId AS INTEGER) DESC")
-    fun getAllPaging(): PagingSource<Int, Photo>
-
-    @Query("SELECT * FROM photos WHERE remoteId IS NOT NULL")
-    fun getAllUploadedPaging(): PagingSource<Int, Photo>
 
     @Query("SELECT COUNT(*) FROM photos")
     fun getAllCountFlow(): Flow<Int>
 
-    @Query("SELECT EXISTS(SELECT 1 FROM photos WHERE localId = :localId AND remoteId IS NOT NULL)")
-    suspend fun isUploaded(localId: String): Int
+    @Query("SELECT * FROM photos WHERE localId IN (:localIds) AND remoteId IS NOT NULL")
+    suspend fun getRemoteIdsForLocals(localIds: List<String>): List<Photo>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertPhotos(vararg photos: Photo): List<Long>

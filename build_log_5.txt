@@ -1,0 +1,114 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:kaptGenerateStubsDebugKotlin
+> Task :app:kaptDebugKotlin
+
+> Task :app:compileDebugKotlin
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/data/localdb/WhDatabase.kt:42:21 Type mismatch: inferred type is Migration1to2_NullableRemoteId.Companion but Migration was expected
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/data/localdb/WhDatabase.kt:43:21 Type mismatch: inferred type is Migration2to3_RemotePhotoTable.Companion but Migration was expected
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/data/localdb/WhDatabase.kt:44:21 Type mismatch: inferred type is Migration3to4_EnhancedRemotePhoto.Companion but Migration was expected
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/data/localdb/WhDatabase.kt:45:21 Classifier 'Migration4to5_DeletedPhotos' does not have a companion object, and thus must be initialized here
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/data/mediastore/LocalPhotoSource.kt:91:56 Not enough information to infer type variable K
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/data/mediastore/LocalPhotoSource.kt:91:71 Unresolved reference: localId
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/data/mediastore/LocalPhotoSource.kt:91:85 Unresolved reference: remoteId
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:671:118 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:3:8 Unresolved reference: RemotePhotosGrid
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:91:13 Unresolved reference: RemotePhotosGrid
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:93:34 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:93:37 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:109:39 Unresolved reference: main
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/Screens.kt:22:106 Unresolved reference: DeleteOutline
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:592:13 Unresolved reference: Context
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:594:23 Unresolved reference: ContextWrapper
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemotePhotoGrid.kt:284:22 This material3 API is experimental and is likely to change or to be removed in the future.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:22:62 Property delegate must have a 'getValue(RemoteViewModel, KProperty<*>)' method. None of the following functions is suitable: 
+public inline operator fun <T> Lazy<Flow<PagingData<RemotePhoto>>>.getValue(thisRef: Any?, property: KProperty<*>): Flow<PagingData<RemotePhoto>> defined in kotlin
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:23:9 Not enough information to infer type variable Key
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:32:71 Unresolved reference: getAllPaging
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:56:33 Unresolved reference: getByRemoteId
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:108:74 Unresolved reference: getAll
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:115:66 Unresolved reference: getAll
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:116:61 Unresolved reference: it
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:122:48 Overload resolution ambiguity: 
+public inline fun <T> Iterable<TypeVariable(T)>.forEach(action: (TypeVariable(T)) -> Unit): Unit defined in kotlin.collections
+public inline fun <K, V> Map<out TypeVariable(K), TypeVariable(V)>.forEach(action: (Map.Entry<TypeVariable(K), TypeVariable(V)>) -> Unit): Unit defined in kotlin.collections
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:122:58 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:130:63 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:130:70 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/remote/RemoteViewModel.kt:141:75 Unresolved reference: getAllPaging
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/trash/TrashViewModel.kt:37:23 Unresolved reference. None of the following candidates is applicable because of receiver type mismatch: 
+public inline fun kotlin.text.StringBuilder /* = java.lang.StringBuilder */.insert(index: Int, value: Byte): kotlin.text.StringBuilder /* = java.lang.StringBuilder */ defined in kotlin.text
+public inline fun kotlin.text.StringBuilder /* = java.lang.StringBuilder */.insert(index: Int, value: Short): kotlin.text.StringBuilder /* = java.lang.StringBuilder */ defined in kotlin.text
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/InstantPhotoUploadWorker.kt:36:37 Destructuring declaration initializer of type Unit must have a 'component1()' function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/InstantPhotoUploadWorker.kt:36:37 Destructuring declaration initializer of type Unit must have a 'component2()' function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/InstantPhotoUploadWorker.kt:39:59 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/InstantPhotoUploadWorker.kt:44:47 Unresolved reference: getByRemoteId
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/InstantPhotoUploadWorker.kt:46:33 Unresolved reference. None of the following candidates is applicable because of receiver type mismatch: 
+public inline fun kotlin.text.StringBuilder /* = java.lang.StringBuilder */.insert(index: Int, value: Byte): kotlin.text.StringBuilder /* = java.lang.StringBuilder */ defined in kotlin.text
+public inline fun kotlin.text.StringBuilder /* = java.lang.StringBuilder */.insert(index: Int, value: Short): kotlin.text.StringBuilder /* = java.lang.StringBuilder */ defined in kotlin.text
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/SyncRemoteSizesWorker.kt:25:45 Unresolved reference: getAll
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/SyncRemoteSizesWorker.kt:25:63 Unresolved reference: it
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/SyncRemoteSizesWorker.kt:44:39 Overload resolution ambiguity: 
+public inline fun <T> Iterable<TypeVariable(T)>.forEach(action: (TypeVariable(T)) -> Unit): Unit defined in kotlin.collections
+public inline fun <K, V> Map<out TypeVariable(K), TypeVariable(V)>.forEach(action: (Map.Entry<TypeVariable(K), TypeVariable(V)>) -> Unit): Unit defined in kotlin.collections
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/SyncRemoteSizesWorker.kt:44:49 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/workers/SyncRemoteSizesWorker.kt:47:33 Unresolved reference. None of the following candidates is applicable because of receiver type mismatch: 
+public inline fun kotlin.text.StringBuilder /* = java.lang.StringBuilder */.insert(index: Int, value: Byte): kotlin.text.StringBuilder /* = java.lang.StringBuilder */ defined in kotlin.text
+public inline fun kotlin.text.StringBuilder /* = java.lang.StringBuilder */.insert(index: Int, value: Short): kotlin.text.StringBuilder /* = java.lang.StringBuilder */ defined in kotlin.text
+
+> Task :app:compileDebugKotlin FAILED
+[Incubating] Problems report is available at: file:///C:/Users/ashin/StudioProjects/CloudGallery/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 44s
+32 actionable tasks: 4 executed, 28 up-to-date

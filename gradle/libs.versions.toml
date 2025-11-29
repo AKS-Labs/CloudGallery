@@ -1,44 +1,46 @@
 [versions]
 contentpager = "1.0.0"
-kotlin = "1.9.24"
-converterJackson = "2.11.0"
-androidGradlePlugin = "8.6.0"
-activityCompose = "1.9.0"
-animation = "1.7.0-beta03"
-coilCompose = "2.6.0"
-composeBom = "2024.10.00"
-converterGson = "2.9.0"
-coreKtx = "1.13.1"
-espressoCore = "3.5.1"
+kotlin = "2.2.21"
+converterJackson = "3.0.0"
+androidGradlePlugin = "8.9.3"
+activityCompose = "1.12.0"
+animation = "1.9.5"
+coilCompose = "2.7.0"
+composeBom = "2025.11.01"
+converterGson = "3.0.0"
+coreKtx = "1.17.0"
+espressoCore = "3.7.0"
 junit = "4.13.2"
-junitVersion = "1.1.5"
-kotlinxCoroutinesAndroid = "1.8.0"
-kotlinxCoroutinesCore = "1.6.2"
-lifecycleRuntimeKtx = "2.8.2"
-materialIconsExtended = "1.6.8"
-navigationCompose = "2.8.0-beta03"
-paging = "3.3.0"
+junitVersion = "1.3.0"
+kotlinxCoroutinesAndroid = "1.9.0"
+kotlinxCoroutinesCore = "1.8.1"
+lifecycleRuntimeKtx = "2.10.0"
+materialIconsExtended = "1.7.8"
+navigationCompose = "2.9.6"
+paging = "3.3.6"
 
-room = "2.6.1"
-okhttp = "4.12.0"
-retrofit = "2.11.0"
+room = "2.8.4"
+okhttp = "5.3.2"
+retrofit = "3.0.0"
 telegram = "6.1.0"
-ui = "1.7.0-beta03"
-adaptiveNavigationSuite = "1.0.0-alpha07"
-material3-adaptive = "1.0.0-beta03"
-workRuntime = "2.9.0"
-securityCrypto = "1.0.0"
-foundationLayout = "1.9.4"
-runtimeSaveable = "1.9.4"
-foundation = "1.9.4"
-foundationVersion = "1.9.5"
+ui = "1.9.5"
+adaptiveNavigationSuite = "1.4.0"
+material3-adaptive = "1.2.0"
+workRuntime = "2.11.0"
+securityCrypto = "1.1.0"
+foundationLayout = "1.9.5"
+runtimeSaveable = "1.9.5"
+foundation = "1.9.5"
+material3 = "1.5.0-alpha09"
+graphicsShapes = "1.1.0"
+exifinterface = "1.4.1"
 
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-animation = { module = "androidx.compose.animation:animation", version.ref = "animation" }
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
-androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 androidx-contentpager = { module = "androidx.contentpager:contentpager", version.ref = "contentpager" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espressoCore" }
@@ -78,9 +80,12 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 androidx-compose-runtime-saveable = { group = "androidx.compose.runtime", name = "runtime-saveable", version.ref = "runtimeSaveable" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
-androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundationVersion" }
+androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-graphics-shapes = { module = "androidx.graphics:graphics-shapes", version.ref = "graphicsShapes" }
+androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
 
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

@@ -29,7 +29,7 @@ class RemoteViewModel : ViewModel() {
             pagingSourceFactory = {
                 Log.d(TAG, "=== CREATING NEW PAGING SOURCE ===")
                 Log.d(TAG, "PageSize: $PAGE_SIZE, PrefetchDistance: $PREFETCH_DISTANCE, JumpThreshold: $JUMP_THRESHOLD")
-                val pagingSource = DbHolder.database.remotePhotoDao().getAllPaging()
+                val pagingSource = DbHolder.database.remotePhotoDao().getAllPagingSource()
                 Log.d(TAG, "PagingSource created: ${pagingSource::class.simpleName}")
                 pagingSource
             }
@@ -40,6 +40,36 @@ class RemoteViewModel : ViewModel() {
     val totalCloudPhotosCount: StateFlow<Int> by lazy {
         DbHolder.database.remotePhotoDao().getTotalCountFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    }
+
+    val totalSize: StateFlow<Long> by lazy {
+        DbHolder.database.remotePhotoDao().getTotalSizeFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+    }
+
+    fun moveToTrash(selectedIds: Set<String>) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val dao = DbHolder.database.remotePhotoDao()
+            val deletedDao = DbHolder.database.deletedPhotoDao()
+            
+            selectedIds.forEach { id ->
+                val photo = dao.getById(id)
+                if (photo != null) {
+                    // Move to deleted table
+                    deletedDao.insert(
+                        com.akslabs.cloudgallery.data.localdb.entities.DeletedPhoto(
+                            remoteId = photo.remoteId,
+                            photoType = photo.photoType,
+                            fileName = photo.fileName,
+                            fileSize = photo.fileSize,
+                            uploadedAt = photo.uploadedAt
+                        )
+                    )
+                    // Remove from remote table
+                    dao.delete(id)
+                }
+            }
+        }
     }
 
     init {
@@ -80,21 +110,6 @@ class RemoteViewModel : ViewModel() {
 
                 if (allRemotePhotos.isEmpty()) {
                     Log.w(TAG, "❌ NO RemotePhoto records found in database!")
-                    Log.i(TAG, "Checking if any photos have been uploaded...")
-
-                    val allPhotos = DbHolder.database.photoDao().getAll()
-                    val uploadedPhotos = allPhotos.filter { it.remoteId != null }
-                    Log.i(TAG, "Total Photo records: ${allPhotos.size}")
-                    Log.i(TAG, "Photos with remoteId (uploaded): ${uploadedPhotos.size}")
-
-                    if (uploadedPhotos.isNotEmpty()) {
-                        Log.w(TAG, "⚠️ Found uploaded photos but no RemotePhoto records - migration issue?")
-                        uploadedPhotos.take(3).forEach { photo ->
-                            Log.d(TAG, "Uploaded photo: remoteId=${photo.remoteId}, type=${photo.photoType}")
-                        }
-                    } else {
-                        Log.w(TAG, "❌ No uploaded photos found either - database is empty")
-                    }
                 } else {
                     Log.i(TAG, "✅ RemotePhoto records found:")
                     allRemotePhotos.take(10).forEachIndexed { index, remotePhoto ->
@@ -108,7 +123,7 @@ class RemoteViewModel : ViewModel() {
 
                     // Test paging source directly
                     Log.i(TAG, "Testing PagingSource directly...")
-                    val pagingSource = DbHolder.database.remotePhotoDao().getAllPaging()
+                    val pagingSource = DbHolder.database.remotePhotoDao().getAllPagingSource()
                     Log.d(TAG, "PagingSource created: ${pagingSource::class.simpleName}")
                 }
 

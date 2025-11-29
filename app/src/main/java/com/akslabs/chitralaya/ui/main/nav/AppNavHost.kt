@@ -1,6 +1,5 @@
 package com.akslabs.cloudgallery.ui.main.nav
 
-import RemotePhotosGrid
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -10,22 +9,22 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigation.NavHostController
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.navigation.compose.NavHost
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-
-import androidx.paging.compose.collectAsLazyPagingItems
 import com.akslabs.cloudgallery.ui.main.MainViewModel
 import com.akslabs.cloudgallery.ui.main.screens.local.LocalPhotoGrid
+import com.akslabs.cloudgallery.ui.main.screens.remote.RemotePhotosGrid
 import com.akslabs.cloudgallery.ui.main.screens.settings.SettingsScreen
+import com.akslabs.cloudgallery.ui.main.screens.trash.TrashBinScreen
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.compose.collectAsLazyPagingItems
 
 @Composable
 fun AppNavHost(
@@ -103,6 +102,10 @@ fun AppNavHost(
 
         composable(route = Screens.Settings.route) {
             SettingsScreen()
+        }
+
+        composable(route = Screens.TrashBin.route) {
+            TrashBinScreen()
         }
     }
 }

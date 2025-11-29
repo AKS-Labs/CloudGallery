@@ -22,6 +22,7 @@ class InstantPhotoUploadWorker(
 
     private val channelId = Preferences.getEncryptedLong(Preferences.channelId, 0L)
     private val botApi = BotApi
+    
     override suspend fun doWork(): Result {
         try {
             setForeground(getForegroundInfo())
@@ -29,11 +30,14 @@ class InstantPhotoUploadWorker(
             Log.d("PhotoUpload", "FAILED: ${e.localizedMessage}")
             return Result.failure()
         }
+        
         return withContext(Dispatchers.IO) {
             try {
                 val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
                 val photoUri = photoUriString.toUri()
+                
                 sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext)
+
                 setForeground(
                     ForegroundInfo(
                         NOTIFICATION_ID,

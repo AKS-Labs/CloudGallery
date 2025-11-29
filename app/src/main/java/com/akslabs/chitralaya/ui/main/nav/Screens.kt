@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.DeleteOutline
 
 sealed class Screens(val displayTitle: String, val route: String, val icon: ImageVector? = null) {
     data object RemotePhotos :
@@ -18,6 +19,8 @@ sealed class Screens(val displayTitle: String, val route: String, val icon: Imag
         Screens(displayTitle = "Settings", route = "settings", icon = Icons.Default.Settings)
 
     data object About : Screens(displayTitle = "About", route = "about", icon = Icons.Default.Info)
+
+    data object TrashBin : Screens(displayTitle = "Trash Bin", route = "trash_bin", icon = Icons.Default.DeleteOutline)
 
     companion object {
         val drawerScreens by lazy { listOf(LocalPhotos, RemotePhotos, Settings) }

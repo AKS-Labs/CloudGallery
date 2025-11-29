@@ -62,7 +62,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ),
             pagingSourceFactory = {
                 Log.d("MainViewModel", "=== CREATING NEW REMOTE PAGING SOURCE ===")
-                DbHolder.database.remotePhotoDao().getAllPaging()
+                DbHolder.database.remotePhotoDao().getAllPagingSource()
             }
         ).flow.cachedIn(viewModelScope)
     }

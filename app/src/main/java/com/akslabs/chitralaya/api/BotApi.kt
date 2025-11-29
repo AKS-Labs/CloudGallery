@@ -99,6 +99,18 @@ object BotApi {
         }
     }
 
+    suspend fun deleteMessage(chatId: Long, messageId: Long): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val result = bot.deleteMessage(ChatId.fromId(chatId), messageId)
+                result.isSuccess
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting message $messageId from chat $chatId", e)
+                false
+            }
+        }
+    }
+
     /**
      * Scan Telegram channel/chat for all media files (documents and photos)
      * Returns a list of discovered media files with their metadata

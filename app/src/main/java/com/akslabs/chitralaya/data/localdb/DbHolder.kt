@@ -6,6 +6,6 @@ object DbHolder {
     lateinit var database: WhDatabase
 
     fun create(applicationContext: Context) {
-        database = WhDatabase.create(applicationContext)
+        database = WhDatabase.getInstance(applicationContext)
     }
 }

@@ -14,30 +14,29 @@ import kotlinx.coroutines.flow.Flow
 @Keep
 @Dao
 interface RemotePhotoDao {
-
     @Query("SELECT * FROM remote_photos ORDER BY uploadedAt DESC")
+    fun getAllPagingSource(): PagingSource<Int, RemotePhoto>
+
+    @Query("SELECT * FROM remote_photos")
     suspend fun getAll(): List<RemotePhoto>
-
-    @Query("SELECT * FROM remote_photos ORDER BY uploadedAt DESC")
-    fun getAllPaging(): PagingSource<Int, RemotePhoto>
 
     @Query("SELECT COUNT(*) FROM remote_photos")
     fun getTotalCountFlow(): Flow<Int>
 
+    @Query("SELECT SUM(fileSize) FROM remote_photos")
+    fun getTotalSizeFlow(): Flow<Long>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vararg remotePhotos: RemotePhoto)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(remotePhoto: RemotePhoto)
-
-    @Delete
-    suspend fun deleteAll(vararg remotePhotos: RemotePhoto)
-
     @Query("DELETE FROM remote_photos WHERE remoteId = :remoteId")
-    suspend fun deleteByRemoteId(remoteId: String)
+    suspend fun delete(remoteId: String)
+
+    @Query("DELETE FROM remote_photos")
+    suspend fun clearAll()
 
     @Query("SELECT * FROM remote_photos WHERE remoteId = :remoteId")
-    suspend fun getByRemoteId(remoteId: String): RemotePhoto?
+    suspend fun getById(remoteId: String): RemotePhoto?
 
     @Query("UPDATE remote_photos SET thumbnailCached = :cached WHERE remoteId = :remoteId")
     suspend fun updateThumbnailCached(remoteId: String, cached: Boolean)

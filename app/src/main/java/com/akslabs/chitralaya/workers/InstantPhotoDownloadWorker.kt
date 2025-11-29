@@ -42,7 +42,7 @@ class InstantPhotoDownloadWorker(
             try {
                 Log.d(TAG, "Getting remote photo from database for remoteId: $remoteId")
                 // Get remote photo details from database
-                val remotePhoto = DbHolder.database.remotePhotoDao().getByRemoteId(remoteId)
+                val remotePhoto = DbHolder.database.remotePhotoDao().getById(remoteId)
                     ?: return@withContext Result.failure(workDataOf(KEY_RESULT_ERROR to "Remote photo not found"))
                 
                 Log.d(TAG, "Found remote photo: ${remotePhoto.remoteId}")
