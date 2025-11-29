@@ -13,6 +13,7 @@ import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -44,6 +45,7 @@ class RemoteViewModel : ViewModel() {
 
     val totalSize: StateFlow<Long> by lazy {
         DbHolder.database.remotePhotoDao().getTotalSizeFlow()
+            .map { it ?: 0L }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
     }
 

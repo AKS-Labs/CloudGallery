@@ -29,7 +29,10 @@ sealed class Query(
         projection = arrayOf(
             MediaStore.Images.ImageColumns._ID,
             MediaStore.Images.ImageColumns.DATE_MODIFIED,
-            MediaStore.Images.ImageColumns.MIME_TYPE
+            MediaStore.Images.ImageColumns.MIME_TYPE,
+            MediaStore.Images.ImageColumns.SIZE,
+            MediaStore.Images.ImageColumns.DATE_TAKEN,
+            MediaStore.Images.ImageColumns.DATE_ADDED
         ),
         bundle = Bundle()
             .apply {

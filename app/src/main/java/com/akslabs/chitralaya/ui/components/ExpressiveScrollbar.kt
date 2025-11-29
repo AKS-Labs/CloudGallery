@@ -221,21 +221,6 @@ fun ExpressiveScrollbar(
 
                             val scrollRatio = clampedThumbOffsetY / (scrollbarTrackHeight - thumbHeightPx)
                             val targetScrollPx = scrollRatio * (totalContentHeightPx - viewportHeight).coerceAtLeast(0f)
-
-                            val layoutInfo = lazyGridState.layoutInfo
-                            val spanCount = layoutInfo.visibleItemsInfo.maxOfOrNull { it.column }?.plus(1) ?: 1
-                            if (spanCount > 0) {
-                                val averageRowHeight = singleItemHeight + mainAxisSpacing
-                                if (averageRowHeight > 0f) {
-                                    val targetRow = (targetScrollPx / averageRowHeight).toInt()
-                                    val targetRowOffset = (targetScrollPx % averageRowHeight).toInt()
-                                    val targetItemIndex = (targetRow * spanCount).coerceIn(0, totalItemsCount - 1)
-
-                                    coroutineScope.launch {
-                                        lazyGridState.scrollToItem(targetItemIndex, targetRowOffset)
-                                    }
-                                }
-                            }
                         }
                     )
                 }

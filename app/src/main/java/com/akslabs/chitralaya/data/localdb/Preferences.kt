@@ -76,7 +76,15 @@ object Preferences {
     fun getBoolean(key: String, defValue: Boolean) = preferences.getBoolean(key, defValue)
     fun getString(key: String, defValue: String) = preferences.getString(key, defValue) ?: defValue
     fun getFloat(key: String, defValue: Float) = preferences.getFloat(key, defValue)
-    fun getLong(key: String, defValue: Long) = preferences.getLong(key, defValue)
+    fun getLong(key: String, defValue: Long): Long {
+        return try {
+            preferences.getLong(key, defValue)
+        } catch (e: ClassCastException) {
+            Log.e("Preferences", "Error getting long for key $key", e)
+            edit { remove(key) }
+            defValue
+        }
+    }
     fun getInt(key: String, defValue: Int) = preferences.getInt(key, defValue)
     fun getStringSet(key: String, defValue: Set<String>) =
         preferences.getStringSet(key, defValue) ?: defValue

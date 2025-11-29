@@ -308,9 +308,9 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                 val remoteViewModel: com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel = screenScopedViewModel()
                                                 
                                                 val totalSize = if (currentRoute == Screens.LocalPhotos.route) {
-                                                    localViewModel.totalSize.collectAsStateWithLifecycle().value
+                                                    localViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
                                                 } else if (currentRoute == Screens.RemotePhotos.route) {
-                                                    remoteViewModel.totalSize.collectAsStateWithLifecycle().value
+                                                    remoteViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
                                                 } else {
                                                     0L
                                                 }
@@ -323,7 +323,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                     )
                                                 }
                                             }
-                                        },
+                                        },expandedHeight = 90.dp,
                                         actions = {
                                             Row(
                                                 modifier = Modifier.padding(top = 30.dp)

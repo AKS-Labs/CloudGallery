@@ -24,7 +24,7 @@ interface RemotePhotoDao {
     fun getTotalCountFlow(): Flow<Int>
 
     @Query("SELECT SUM(fileSize) FROM remote_photos")
-    fun getTotalSizeFlow(): Flow<Long>
+    fun getTotalSizeFlow(): Flow<Long?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vararg remotePhotos: RemotePhoto)
