@@ -8,7 +8,6 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.akslabs.cloudgallery.data.localdb.DbHolder
-import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -43,41 +42,14 @@ class RemoteViewModel : ViewModel() {
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
     }
 
+    // Total size of cloud photos
     val totalSize: StateFlow<Long> by lazy {
         DbHolder.database.remotePhotoDao().getTotalSizeFlow()
             .map { it ?: 0L }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
     }
 
-    fun moveToTrash(selectedIds: Set<String>) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val dao = DbHolder.database.remotePhotoDao()
-            val deletedDao = DbHolder.database.deletedPhotoDao()
-            
-            selectedIds.forEach { id ->
-                val photo = dao.getById(id)
-                if (photo != null) {
-                    // Move to deleted table
-                    deletedDao.insert(
-                        com.akslabs.cloudgallery.data.localdb.entities.DeletedPhoto(
-                            remoteId = photo.remoteId,
-                            photoType = photo.photoType,
-                            fileName = photo.fileName,
-                            fileSize = photo.fileSize,
-                            uploadedAt = photo.uploadedAt
-                        )
-                    )
-                    // Remove from remote table
-                    dao.delete(id)
-                }
-            }
-        }
-    }
-
     init {
-        Log.e(TAG, "🚀 === REMOTE VIEW MODEL INITIALIZED ===")
-        debugDatabaseState()
-
         // Monitor paging data changes
         viewModelScope.launch {
             try {
@@ -97,6 +69,39 @@ class RemoteViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error collecting from totalCloudPhotosCount", e)
+            }
+        }
+    }
+
+    fun moveToTrash(selectedIds: Set<String>) {
+        viewModelScope.launch {
+            val dao = DbHolder.database.remotePhotoDao()
+            val deletedDao = DbHolder.database.deletedPhotoDao()
+            val channelId = com.akslabs.cloudgallery.data.localdb.Preferences.getEncryptedLong(com.akslabs.cloudgallery.data.localdb.Preferences.channelId, 0L)
+
+            selectedIds.forEach { id ->
+                val photo = dao.getById(id)
+                if (photo != null) {
+                    // Move to DeletedPhoto
+                    val deletedPhoto = com.akslabs.cloudgallery.data.localdb.entities.DeletedPhoto(
+                        remoteId = photo.remoteId,
+                        photoType = photo.photoType,
+                        fileName = photo.fileName,
+                        fileSize = photo.fileSize,
+                        uploadedAt = photo.uploadedAt,
+                        deletedAt = System.currentTimeMillis(),
+                        messageId = photo.messageId
+                    )
+                    deletedDao.insert(deletedPhoto)
+
+                    // Delete from RemotePhoto
+                    dao.delete(id)
+
+                    // Delete from Telegram if possible
+                    if (channelId != 0L && photo.messageId != null) {
+                         com.akslabs.cloudgallery.api.BotApi.deleteMessage(channelId, photo.messageId)
+                    }
+                }
             }
         }
     }

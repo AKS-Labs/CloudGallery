@@ -16,5 +16,6 @@ data class DeletedPhoto(
     @ColumnInfo val fileName: String? = null,
     @ColumnInfo val fileSize: Long? = null,
     @ColumnInfo val uploadedAt: Long,
-    @ColumnInfo val deletedAt: Long = System.currentTimeMillis()
+    @ColumnInfo val deletedAt: Long = System.currentTimeMillis(),
+    @ColumnInfo val messageId: Long? = null
 ) : Parcelable

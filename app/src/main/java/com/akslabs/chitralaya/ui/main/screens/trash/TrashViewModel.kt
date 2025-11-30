@@ -40,7 +40,8 @@ class TrashViewModel : ViewModel() {
                     photoType = photo.photoType,
                     fileName = photo.fileName,
                     fileSize = photo.fileSize,
-                    uploadedAt = photo.uploadedAt
+                    uploadedAt = photo.uploadedAt,
+                    messageId = photo.messageId
                 )
             )
             // Remove from deleted table
@@ -51,7 +52,12 @@ class TrashViewModel : ViewModel() {
     fun permanentlyDelete(photo: DeletedPhoto) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             DbHolder.database.deletedPhotoDao().delete(photo)
-            // Also try to delete from Telegram if we had messageId
+            // Note: We already deleted from Telegram when moving to trash, 
+            // or if we didn't, we can try again here if we want, but usually "Trash" implies it's already "gone" from the main view.
+            // If the user wants to ensure it's gone from Telegram, we did that in moveToTrash.
+            // If we want to support "Delete from Telegram ONLY when permanently deleting", we should change moveToTrash.
+            // But the user said "ensure selected images gets deleted from chat ... and show those photos in trash bin".
+            // So we delete from chat FIRST.
         }
     }
 }

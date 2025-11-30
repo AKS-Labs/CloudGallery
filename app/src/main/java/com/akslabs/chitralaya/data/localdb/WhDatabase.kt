@@ -17,7 +17,7 @@ import com.akslabs.cloudgallery.data.localdb.migration.Migration4to5_DeletedPhot
 
 @Database(
     entities = [Photo::class, RemotePhoto::class, DeletedPhoto::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class WhDatabase : RoomDatabase() {
@@ -38,14 +38,15 @@ abstract class WhDatabase : RoomDatabase() {
                     WhDatabase::class.java,
                     DATABASE_NAME
                 )
-                .addMigrations(
-                    Migration1to2_NullableRemoteId(),
-                    Migration2to3_RemotePhotoTable(),
-                    Migration3to4_EnhancedRemotePhoto(),
-                    Migration4to5_DeletedPhotos()
-                )
-                .fallbackToDestructiveMigration()
-                .build()
+                    .addMigrations(
+                        Migration1to2_NullableRemoteId(),
+                        Migration2to3_RemotePhotoTable(),
+                        Migration3to4_EnhancedRemotePhoto(),
+                        Migration4to5_DeletedPhotos(),
+                        com.akslabs.cloudgallery.data.localdb.migration.Migration5to6_MessageId()
+                    )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

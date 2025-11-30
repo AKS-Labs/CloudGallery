@@ -163,7 +163,8 @@ suspend fun sendFileApi(
                 fileName = file.name,
                 fileSize = file.length(),
                 uploadedAt = System.currentTimeMillis(),
-                thumbnailCached = false
+                thumbnailCached = false,
+                messageId = message?.messageId
             )
         )
         Log.d(TAG, "sendFile: Success! Metadata included in caption.")

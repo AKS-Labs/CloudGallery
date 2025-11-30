@@ -19,6 +19,7 @@ data class RemotePhoto(
     @ColumnInfo val fileSize: Long? = null,
     @ColumnInfo val uploadedAt: Long = System.currentTimeMillis(),
     @ColumnInfo val thumbnailCached: Boolean = false,
+    @ColumnInfo val messageId: Long? = null,
 ) : Parcelable {
 
     fun toPhoto(): Photo = Photo("", remoteId, photoType, "")
@@ -33,6 +34,7 @@ data class RemotePhoto(
             @JsonProperty("fileSize") fileSize: Long? = null,
             @JsonProperty("uploadedAt") uploadedAt: Long = System.currentTimeMillis(),
             @JsonProperty("thumbnailCached") thumbnailCached: Boolean = false,
-        ): RemotePhoto = RemotePhoto(remoteId, photoType, fileName, fileSize, uploadedAt, thumbnailCached)
+            @JsonProperty("messageId") messageId: Long? = null,
+        ): RemotePhoto = RemotePhoto(remoteId, photoType, fileName, fileSize, uploadedAt, thumbnailCached, messageId)
     }
 }

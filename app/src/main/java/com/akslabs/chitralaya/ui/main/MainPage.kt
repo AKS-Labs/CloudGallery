@@ -316,8 +316,9 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                 }
                                                 
                                                 if (totalSize > 0) {
+                                                    val count = if (currentRoute == Screens.LocalPhotos.route) localPhotosCount else cloudPhotosCount
                                                     Text(
-                                                        text = android.text.format.Formatter.formatFileSize(context, totalSize),
+                                                        text = "${android.text.format.Formatter.formatFileSize(context, totalSize)} • $count photos",
                                                         style = MaterialTheme.typography.labelMedium,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )

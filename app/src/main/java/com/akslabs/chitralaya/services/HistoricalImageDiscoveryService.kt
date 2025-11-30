@@ -211,6 +211,7 @@ private fun DiscoveredMediaFile.toRemotePhoto(): RemotePhoto {
         fileName = fileName,
         fileSize = fileSize,
         uploadedAt = uploadDate,
-        thumbnailCached = false
+        thumbnailCached = false,
+        messageId = messageId.toLong()
     )
 }
