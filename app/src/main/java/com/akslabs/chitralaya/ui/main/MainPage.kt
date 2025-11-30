@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChecklistRtl
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
@@ -296,6 +297,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                 val titleText = when (currentRoute) {
                                                     Screens.LocalPhotos.route -> "Device Photos"
                                                     Screens.RemotePhotos.route -> "Cloud Gallery"
+                                                    Screens.TrashBin.route -> "Trash Bin"
                                                     else -> "Cloud Gallery"
                                                 }
                                                 Text(
@@ -306,17 +308,22 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                 val context = LocalContext.current
                                                 val localViewModel: com.akslabs.cloudgallery.ui.main.screens.local.LocalViewModel = screenScopedViewModel()
                                                 val remoteViewModel: com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel = screenScopedViewModel()
+                                                val trashViewModel: com.akslabs.cloudgallery.ui.main.screens.trash.TrashViewModel = screenScopedViewModel()
                                                 
-                                                val totalSize = if (currentRoute == Screens.LocalPhotos.route) {
-                                                    localViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
-                                                } else if (currentRoute == Screens.RemotePhotos.route) {
-                                                    remoteViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
-                                                } else {
-                                                    0L
+                                                val totalSize = when (currentRoute) {
+                                                    Screens.LocalPhotos.route -> localViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
+                                                    Screens.RemotePhotos.route -> remoteViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
+                                                    Screens.TrashBin.route -> trashViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
+                                                    else -> 0L
                                                 }
                                                 
                                                 if (totalSize > 0) {
-                                                    val count = if (currentRoute == Screens.LocalPhotos.route) localPhotosCount else cloudPhotosCount
+                                                    val count = when (currentRoute) {
+                                                        Screens.LocalPhotos.route -> localPhotosCount
+                                                        Screens.RemotePhotos.route -> cloudPhotosCount
+                                                        Screens.TrashBin.route -> trashViewModel.deletedPhotosFlow.collectAsLazyPagingItems().itemCount
+                                                        else -> 0
+                                                    }
                                                     Text(
                                                         text = "${android.text.format.Formatter.formatFileSize(context, totalSize)} • $count photos",
                                                         style = MaterialTheme.typography.labelMedium,
@@ -324,7 +331,22 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                     )
                                                 }
                                             }
-                                        },expandedHeight = 90.dp,
+                                        },
+                                        navigationIcon = {
+                                            if (currentRoute == Screens.TrashBin.route) {
+                                                IconButton(
+                                                    onClick = { navController.popBackStack() },
+                                                    modifier = Modifier.padding(top = 30.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.ArrowBack,
+                                                        contentDescription = "Back",
+                                                        tint = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        expandedHeight = 95.dp,
                                         actions = {
                                             Row(
                                                 modifier = Modifier.padding(top = 30.dp)

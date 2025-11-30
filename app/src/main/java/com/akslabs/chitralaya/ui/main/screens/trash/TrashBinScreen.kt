@@ -162,32 +162,6 @@ fun TrashBinScreen(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
-            } else {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text("Trash Bin")
-                            if (totalSize > 0) {
-                                Text(
-                                    text = "${Formatter.formatFileSize(context, totalSize)} • ${deletedPhotos.itemCount} items",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        // Assuming this screen is navigated to, we might want a back button if not handled by parent
-                        // But usually the parent NavHost handles the back button or the user uses system back.
-                        // If we want an explicit back button:
-                         androidx.compose.material3.IconButton(onClick = onBackClick) {
-                             androidx.compose.material3.Icon(
-                                 imageVector = androidx.compose.material.icons.Icons.Filled.ArrowBack,
-                                 contentDescription = "Back"
-                             )
-                         }
-                    }
-                )
             }
         }
     ) { padding ->
