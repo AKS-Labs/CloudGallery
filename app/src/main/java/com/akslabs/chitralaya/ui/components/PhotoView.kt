@@ -22,6 +22,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
@@ -69,6 +70,7 @@ import android.content.ContextWrapper
 
 import android.view.Window
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PhotoView(
     photo: Photo,
@@ -191,7 +193,7 @@ fun PhotoView(
             contentScale = ContentScale.Fit,
             loading = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+                    androidx.compose.material3.ContainedLoadingIndicator()
                 }
             },
             modifier = Modifier
