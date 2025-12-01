@@ -163,14 +163,20 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         .collectAsStateWithLifecycle(initialValue = 0)
     val cloudPhotosCount by DbHolder.database.remotePhotoDao().getTotalCountFlow()
         .collectAsStateWithLifecycle(initialValue = 0)
+    val deletedPhotosCount by DbHolder.database.deletedPhotoDao().getCountFlow()
+        .collectAsStateWithLifecycle(initialValue = 0)
 
     val photoCounts = listOf(localPhotosCount, cloudPhotosCount)
 
     val localPhotos = viewModel.localPhotosFlow.collectAsLazyPagingItems()
     val allCloudPhotos = viewModel.allCloudPhotosFlow.collectAsLazyPagingItems()
 
-    val areAllSelected = remember(selectedPhotos, currentRoute, localPhotos.itemCount, allCloudPhotos.itemCount) {
-        val totalCount = if (currentRoute == Screens.LocalPhotos.route) localPhotos.itemCount else allCloudPhotos.itemCount
+    val areAllSelected = remember(selectedPhotos, currentRoute, localPhotos.itemCount, allCloudPhotos.itemCount, deletedPhotosCount) {
+        val totalCount = when (currentRoute) {
+            Screens.LocalPhotos.route -> localPhotos.itemCount
+            Screens.TrashBin.route -> deletedPhotosCount
+            else -> allCloudPhotos.itemCount
+        }
         totalCount > 0 && selectedPhotos.size == totalCount
     }
 
@@ -178,10 +184,18 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         if (areAllSelected) {
             clearSelection()
         } else {
-            selectedPhotos = if (currentRoute == Screens.LocalPhotos.route) {
-                (0 until localPhotos.itemCount).mapNotNull { localPhotos.peek(it)?.localId }.toSet()
+            if (currentRoute == Screens.LocalPhotos.route) {
+                selectedPhotos = (0 until localPhotos.itemCount).mapNotNull { localPhotos.peek(it)?.localId }.toSet()
+            } else if (currentRoute == Screens.TrashBin.route) {
+                scope.launch(Dispatchers.IO) {
+                    val allDeleted = DbHolder.database.deletedPhotoDao().getAll()
+                    val allIds = allDeleted.map { it.remoteId }.toSet()
+                    withContext(Dispatchers.Main) {
+                        selectedPhotos = allIds
+                    }
+                }
             } else {
-                (0 until allCloudPhotos.itemCount).mapNotNull { allCloudPhotos.peek(it)?.remoteId }.toSet()
+                selectedPhotos = (0 until allCloudPhotos.itemCount).mapNotNull { allCloudPhotos.peek(it)?.remoteId }.toSet()
             }
         }
     }

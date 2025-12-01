@@ -189,6 +189,11 @@ fun PhotoView(
                 .build(),
             contentDescription = "Photo",
             contentScale = ContentScale.Fit,
+            loading = {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
