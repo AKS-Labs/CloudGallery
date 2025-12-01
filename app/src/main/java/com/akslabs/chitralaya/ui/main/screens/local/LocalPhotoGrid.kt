@@ -136,7 +136,8 @@ private fun formatPhotoDate(timestamp: Long): String {
 // Optimized function to group photos by date ensuring ALL photos are included
 private fun groupPhotosByDateOptimized(
     localPhotos: LazyPagingItems<LocalUiPhoto>,
-    dateMap: Map<String, Long>
+    dateMap: Map<String, Long>,
+    deletedPhotoIds: List<String>
 ): List<DateGroup> {
     val photosByDate = mutableMapOf<String, MutableList<Pair<LocalUiPhoto, Int>>>()
     var processedCount = 0
@@ -147,7 +148,7 @@ private fun groupPhotosByDateOptimized(
     // Process ALL photos - no filtering
     for (i in 0 until localPhotos.itemCount) {
         val photo = localPhotos.peek(i)
-        if (photo != null) {
+        if (photo != null && !deletedPhotoIds.contains(photo.localId)) {
             val timestamp = dateMap[photo.localId] ?: safeTimestampFromLocalId(photo.localId)
             val dateLabel = formatPhotoDate(timestamp)
 
@@ -174,19 +175,20 @@ private fun groupPhotosByDateOptimized(
 // Optimized function to create layout cache
 private fun createLayoutCache(
     localPhotos: LazyPagingItems<LocalUiPhoto>,
-    dateMap: Map<String, Long>
+    dateMap: Map<String, Long>,
+    deletedPhotoIds: List<String>
 ): LayoutCache {
     val start = System.currentTimeMillis()
 
     // Create normal grid items
     val normalGridItems = (0 until localPhotos.itemCount).mapNotNull { index ->
         localPhotos.peek(index)?.let { photo ->
-            LocalGridItem.PhotoItem(photo, index)
+            if (deletedPhotoIds.contains(photo.localId)) null else LocalGridItem.PhotoItem(photo, index)
         }
     }
 
     // Create date grouped items
-    val dateGroups = groupPhotosByDateOptimized(localPhotos, dateMap)
+    val dateGroups = groupPhotosByDateOptimized(localPhotos, dateMap, deletedPhotoIds)
     val dateGroupedItems = mutableListOf<LocalGridItem>()
 
     dateGroups.forEachIndexed { groupIndex, dateGroup ->
@@ -284,8 +286,8 @@ fun LocalPhotoGrid(
     }
 
     // Create layout cache
-    val layoutCache = remember(localPhotos.itemCount, isDateGroupedLayout, dateMap) {
-        createLayoutCache(localPhotos, dateMap)
+    val layoutCache = remember(localPhotos.itemCount, isDateGroupedLayout, dateMap, deletedPhotoIds.toList()) {
+        createLayoutCache(localPhotos, dateMap, deletedPhotoIds)
     }
 
     val currentLayoutItems = if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
