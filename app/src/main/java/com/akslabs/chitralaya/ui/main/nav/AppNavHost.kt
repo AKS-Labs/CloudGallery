@@ -105,7 +105,14 @@ fun AppNavHost(
         }
 
         composable(route = Screens.TrashBin.route) {
-            TrashBinScreen()
+            TrashBinScreen(
+                expanded = expanded,
+                onExpandedChange = onExpandedChange,
+                selectionMode = selectionMode,
+                selectedPhotos = selectedPhotos,
+                onSelectionModeChange = onSelectionModeChange,
+                onSelectedPhotosChange = onSelectedPhotosChange
+            )
         }
     }
 }

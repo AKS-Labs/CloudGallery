@@ -182,6 +182,7 @@ fun PhotoView(
             .background(Color.Black)
     ) {
         SubcomposeAsyncImage(
+            imageLoader = if (isOnlyRemote) ImageLoaderModule.remoteImageLoader else ImageLoaderModule.defaultImageLoader,
             model = ImageRequest.Builder(LocalContext.current)
                 .data(if (isOnlyRemote) photo.toRemotePhoto() else photo.pathUri)
                 .crossfade(true)

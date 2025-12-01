@@ -29,6 +29,9 @@ interface DeletedPhotoDao {
     @Query("DELETE FROM deleted_photos WHERE remoteId = :remoteId")
     suspend fun deleteById(remoteId: String)
 
+    @Query("SELECT * FROM deleted_photos WHERE remoteId = :remoteId")
+    suspend fun getById(remoteId: String): DeletedPhoto?
+
     @Query("SELECT COALESCE(SUM(fileSize), 0) FROM deleted_photos")
     fun getTotalSizeFlow(): Flow<Long>
 

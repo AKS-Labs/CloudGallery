@@ -333,6 +333,8 @@ fun RemotePhotosGrid(
                                             toggleSelection(item.photo.remoteId)
                                         } else {
                                             onPhotoClick(item.originalIndex, item.photo)
+                                            selectedIndex = item.originalIndex
+                                            selectedPhoto = item.photo
                                         }
                                     }
                                 )
