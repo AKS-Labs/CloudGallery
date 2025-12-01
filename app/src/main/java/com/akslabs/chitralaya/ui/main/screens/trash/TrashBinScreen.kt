@@ -124,6 +124,8 @@ fun TrashBinScreen(
             
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
+                totalItemsCount = deletedPhotos.itemCount,
+                columnCount = columns,
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
             

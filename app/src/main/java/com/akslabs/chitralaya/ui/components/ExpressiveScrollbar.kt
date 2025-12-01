@@ -49,22 +49,11 @@ import kotlinx.coroutines.launch
 
 private enum class ScrollbarVisibilityState { Hidden, Visible }
 
-/**
- * An expressive, performant, and Material3-style scrollbar for LazyVerticalGrid.
- *
- * @param lazyGridState The [LazyGridState] of the grid to connect this scrollbar to.
- * @param modifier The modifier to be applied to the scrollbar container.
- * @param indicatorColor The color of the scrollbar thumb. Defaults to `MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)`.
- * @param trackColor The color of the scrollbar track. Defaults to `MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)`.
- * @param thumbWidth The width of the scrollbar thumb. Defaults to 6.dp.
- * @param thumbHeightMin The minimum height of the scrollbar thumb. Defaults to 24.dp.
- * @param thumbCornerRadius The corner radius of the scrollbar thumb. Defaults to 3.dp.
- * @param paddingEnd The padding at the end of the scrollbar. Defaults to 4.dp.
- * @param gridContentPadding The content padding of the grid, used to align the scrollbar correctly.
- */
 @Composable
 fun ExpressiveScrollbar(
     lazyGridState: LazyGridState,
+    totalItemsCount: Int,
+    columnCount: Int,
     modifier: Modifier = Modifier,
     indicatorColor: Color = MaterialTheme.colorScheme.primary,
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
@@ -72,16 +61,16 @@ fun ExpressiveScrollbar(
     thumbHeightMin: Dp = 34.dp,
     thumbCornerRadius: Dp = 10.dp,
     paddingEnd: Dp = 4.dp,
-    gridContentPadding: PaddingValues = PaddingValues(0.dp) // Default to no padding
+    gridContentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     val coroutineScope = rememberCoroutineScope()
     val isScrolling by remember { derivedStateOf { lazyGridState.isScrollInProgress } }
-    var isDragging by remember { mutableStateOf(false) } // State for elevation and visibility
+    var isDragging by remember { mutableStateOf(false) }
     var dragStartY by remember { mutableStateOf(0f) }
     var dragStartThumbOffset by remember { mutableStateOf(0f) }
     var currentDragThumbOffset by remember { mutableStateOf(0f) }
 
-    val draggableAreaWidth = thumbWidth + 8.dp // Total width of the scrollbar area including extra padding for draggable target
+    val draggableAreaWidth = thumbWidth + 16.dp
 
     val showScrollbar = remember { MutableTransitionState(ScrollbarVisibilityState.Hidden) }
     val transition = updateTransition(showScrollbar, label = "ScrollbarVisibility")
@@ -93,134 +82,111 @@ fun ExpressiveScrollbar(
         if (state == ScrollbarVisibilityState.Visible) 1f else 0f
     }
 
-    LaunchedEffect(isScrolling) {
-        if (isScrolling) {
+    LaunchedEffect(isScrolling, isDragging) {
+        if (isScrolling || isDragging) {
             showScrollbar.targetState = ScrollbarVisibilityState.Visible
         } else {
-            delay(600) // Auto-hide after 600ms of inactivity
+            delay(1000)
             showScrollbar.targetState = ScrollbarVisibilityState.Hidden
         }
     }
 
-    // Only render if there's enough content to scroll
-    val canScroll by remember {
-        derivedStateOf {
-            lazyGridState.layoutInfo.totalItemsCount > lazyGridState.layoutInfo.visibleItemsInfo.size
-        }
-    }
+    if (totalItemsCount == 0) return
 
-    if (!canScroll && showScrollbar.currentState == ScrollbarVisibilityState.Hidden) return
-
-    BoxWithConstraints( // Outermost container to get constraints (maxHeight)
-        modifier = modifier // This `modifier` is from the function parameter
+    BoxWithConstraints(
+        modifier = modifier
             .fillMaxHeight()
             .padding(end = paddingEnd + gridContentPadding.calculateEndPadding(LocalLayoutDirection.current))
-            .width(draggableAreaWidth) // Total width of the scrollbar area including extra padding for draggable target
-            .zIndex(10f) // Ensure the entire scrollbar component is above the grid
-            .alpha(alpha), // Overall fading
-        contentAlignment = Alignment.TopEnd // Align content (the thumb) to top-end within this BoxWithConstraints
+            .width(draggableAreaWidth)
+            .zIndex(10f)
+            .alpha(alpha),
+        contentAlignment = Alignment.TopEnd
     ) {
         val density = LocalDensity.current
         val thumbWidthPx = with(density) { thumbWidth.toPx() }
         val thumbHeightMinPx = with(density) { thumbHeightMin.toPx() }
 
         val animatedThumbWidth by animateDpAsState(
-            targetValue = if (isDragging) thumbWidth + 3.dp else thumbWidth,
+            targetValue = if (isDragging) thumbWidth + 4.dp else thumbWidth,
             animationSpec = tween(durationMillis = 150), label = "animatedThumbWidth"
         )
         val currentThumbWidthPx = with(density) { animatedThumbWidth.toPx() }
 
-        val totalItemsCount by remember { derivedStateOf { lazyGridState.layoutInfo.totalItemsCount } }
         val viewportHeight by remember { derivedStateOf { lazyGridState.layoutInfo.viewportSize.height.toFloat() } }
         val singleItemHeight by remember { derivedStateOf { lazyGridState.layoutInfo.visibleItemsInfo.firstOrNull()?.size?.height?.toFloat() ?: 0f } }
         val mainAxisSpacing by remember { derivedStateOf { lazyGridState.layoutInfo.mainAxisItemSpacing.toFloat() } }
 
-        val totalContentHeightPx by remember {
+        val totalContentHeightPx by remember(totalItemsCount, columnCount, singleItemHeight, mainAxisSpacing) {
             derivedStateOf {
-                val layoutInfo = lazyGridState.layoutInfo
-                if (totalItemsCount == 0 || singleItemHeight == 0f) return@derivedStateOf 0f
-
-                val spanCount = layoutInfo.visibleItemsInfo.maxOfOrNull { it.column }?.plus(1) ?: 1
-                if (spanCount == 0) return@derivedStateOf 0f
-
-                val numRows = ceil(totalItemsCount.toFloat() / spanCount)
-                val contentPadding = (layoutInfo.beforeContentPadding + layoutInfo.afterContentPadding).toFloat()
-
-                (numRows * singleItemHeight) + ((numRows - 1).coerceAtLeast(0f) * mainAxisSpacing) + contentPadding
+                if (totalItemsCount == 0 || singleItemHeight == 0f || columnCount == 0) return@derivedStateOf 0f
+                val numRows = ceil(totalItemsCount.toFloat() / columnCount)
+                (numRows * singleItemHeight) + ((numRows - 1).coerceAtLeast(0f) * mainAxisSpacing)
             }
         }
 
         val currentScrollOffsetPx by remember {
             derivedStateOf {
-                val layoutInfo = lazyGridState.layoutInfo
-                if (layoutInfo.visibleItemsInfo.isEmpty() || singleItemHeight == 0f) return@derivedStateOf 0f
-
-                val spanCount = layoutInfo.visibleItemsInfo.maxOfOrNull { it.column }?.plus(1) ?: 1
-                if (spanCount == 0) return@derivedStateOf 0f
-
-                val firstVisibleItemRow = lazyGridState.firstVisibleItemIndex / spanCount
+                if (lazyGridState.layoutInfo.visibleItemsInfo.isEmpty() || singleItemHeight == 0f || columnCount == 0) return@derivedStateOf 0f
+                val firstVisibleItemIndex = lazyGridState.firstVisibleItemIndex
+                val firstVisibleItemRow = firstVisibleItemIndex / columnCount
                 firstVisibleItemRow.toFloat() * (singleItemHeight + mainAxisSpacing) + lazyGridState.firstVisibleItemScrollOffset.toFloat()
             }
         }
 
         val scrollbarTrackHeight = constraints.maxHeight.toFloat()
-        val thumbHeightPx by remember {
+        
+        val thumbHeightPx by remember(totalContentHeightPx, viewportHeight) {
             derivedStateOf {
-                thumbHeightMinPx
+                 if (totalContentHeightPx <= viewportHeight) thumbHeightMinPx
+                 else {
+                     val height = (viewportHeight / totalContentHeightPx) * scrollbarTrackHeight
+                     height.coerceAtLeast(thumbHeightMinPx)
+                 }
             }
         }
 
-        val thumbOffsetPx by remember {
+        val thumbOffsetPx by remember(currentScrollOffsetPx, totalContentHeightPx, viewportHeight, scrollbarTrackHeight, thumbHeightPx) {
             derivedStateOf {
-                if (totalItemsCount == 0 || totalContentHeightPx <= viewportHeight) 0f // No scroll needed
+                if (totalContentHeightPx <= viewportHeight) 0f
                 else {
-                    val maxScrollPx = totalContentHeightPx - viewportHeight // Total actual scrollable distance in content
-                    if (maxScrollPx <= 0f) 0f // Avoid division by zero
+                    val maxScrollPx = totalContentHeightPx - viewportHeight
+                    if (maxScrollPx <= 0f) 0f
                     else {
                         val scrollRatio = currentScrollOffsetPx / maxScrollPx
-                        (scrollbarTrackHeight - thumbHeightPx) * scrollRatio // Thumb travel distance in scrollbar track
+                        (scrollbarTrackHeight - thumbHeightPx) * scrollRatio
                     }
                 }
             }
         }
 
-        // Inner Box acts as the draggable area and visual container for the thumb
         Box(
             modifier = Modifier
                 .fillMaxHeight()
-                .width(draggableAreaWidth) // Draggable area is wider than visual thumb
-                .pointerInput(lazyGridState) {
+                .width(draggableAreaWidth)
+                .pointerInput(totalItemsCount, columnCount) {
                     detectVerticalDragGestures(
                         onDragStart = { offset ->
                             isDragging = true
-                            showScrollbar.targetState = ScrollbarVisibilityState.Visible
                             dragStartY = offset.y
                             dragStartThumbOffset = thumbOffsetPx
                             currentDragThumbOffset = thumbOffsetPx
                         },
-                        onDragEnd = {
-                            isDragging = false
-                            coroutineScope.launch {
-                                delay(600)
-                                showScrollbar.targetState = ScrollbarVisibilityState.Hidden
-                            }
-                        },
-                        onDragCancel = {
-                            isDragging = false
-                            coroutineScope.launch {
-                                delay(600)
-                                showScrollbar.targetState = ScrollbarVisibilityState.Hidden
-                            }
-                        },
+                        onDragEnd = { isDragging = false },
+                        onDragCancel = { isDragging = false },
                         onVerticalDrag = { change, _ ->
                             change.consume()
-
                             val newThumbOffsetY = dragStartThumbOffset + (change.position.y - dragStartY)
                             val clampedThumbOffsetY = newThumbOffsetY.coerceIn(0f, scrollbarTrackHeight - thumbHeightPx)
                             currentDragThumbOffset = clampedThumbOffsetY
 
                             val scrollRatio = clampedThumbOffsetY / (scrollbarTrackHeight - thumbHeightPx)
-                            val targetScrollPx = scrollRatio * (totalContentHeightPx - viewportHeight).coerceAtLeast(0f)
+                            val totalRows = ceil(totalItemsCount.toFloat() / columnCount)
+                            val targetRow = (scrollRatio * totalRows).toInt()
+                            val targetIndex = (targetRow * columnCount).coerceIn(0, (totalItemsCount - 1).coerceAtLeast(0))
+                            
+                            coroutineScope.launch {
+                                lazyGridState.scrollToItem(targetIndex)
+                            }
                         }
                     )
                 }
@@ -233,22 +199,20 @@ fun ExpressiveScrollbar(
                     IntOffset(0, yOffset.toInt())
                 }
                 .shadow(
-                    elevation = if (isDragging) 8.dp else 0.dp, // Elevation while dragging
+                    elevation = if (isDragging) 8.dp else 0.dp,
                     shape = RoundedCornerShape(thumbCornerRadius)
                 )
-                .semantics { contentDescription = "Scrollbar for photo grid" } // Accessibility
+                .semantics { contentDescription = "Scrollbar" }
         ) {
-            // Visual thumb (Canvas)
             Canvas(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(animatedThumbWidth) // The actual visual thumb width
-                    .align(Alignment.CenterEnd) // Align the visual thumb to the end of its draggable parent
+                    .width(animatedThumbWidth)
+                    .align(Alignment.CenterEnd)
             ) {
-                // Draw thumb
                 drawRoundRect(
                     color = indicatorColor,
-                    topLeft = Offset(x = (size.width - currentThumbWidthPx) / 2f, y = 0f), // Center the visual thumb
+                    topLeft = Offset(x = (size.width - currentThumbWidthPx) / 2f, y = 0f),
                     size = Size(currentThumbWidthPx, thumbHeightPx),
                     cornerRadius = CornerRadius(with(density) { thumbCornerRadius.toPx() })
                 )

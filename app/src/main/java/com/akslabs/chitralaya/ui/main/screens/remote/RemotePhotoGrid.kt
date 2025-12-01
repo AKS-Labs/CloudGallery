@@ -252,6 +252,8 @@ fun RemotePhotosGrid(
         } else {
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
+                totalItemsCount = cloudPhotos.itemCount,
+                columnCount = columns,
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
             DragSelectableLazyVerticalGrid(
