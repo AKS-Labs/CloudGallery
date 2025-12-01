@@ -59,7 +59,7 @@ fun ExpressiveScrollbar(
     indicatorColor: Color = MaterialTheme.colorScheme.primary,
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
     thumbWidth: Dp = 8.dp,
-    thumbHeight: Dp = 48.dp,  // Fixed height
+    thumbHeight: Dp = 48.dp,
     thumbCornerRadius: Dp = 10.dp,
     paddingEnd: Dp = 4.dp,
     gridContentPadding: PaddingValues = PaddingValues(0.dp)
@@ -67,7 +67,7 @@ fun ExpressiveScrollbar(
     val coroutineScope = rememberCoroutineScope()
     val isScrolling by remember { derivedStateOf { lazyGridState.isScrollInProgress } }
     var isDragging by remember { mutableStateOf(false) }
-    var targetScrollOffset by remember { mutableFloatStateOf(0f) }
+    var dragThumbY by remember { mutableFloatStateOf(0f) }
 
     val draggableAreaWidth = thumbWidth + 16.dp
 
@@ -112,7 +112,7 @@ fun ExpressiveScrollbar(
 
         val scrollbarTrackHeight = constraints.maxHeight.toFloat()
         
-        // Calculate thumb position based on scroll position
+        // Calculate thumb position based on scroll position (when not dragging)
         val thumbOffsetPx by remember {
             derivedStateOf {
                 if (totalItemsCount <= 0 || columnCount <= 0) return@derivedStateOf 0f
@@ -131,35 +131,37 @@ fun ExpressiveScrollbar(
             modifier = Modifier
                 .fillMaxHeight()
                 .width(draggableAreaWidth)
-                .pointerInput(totalItemsCount, columnCount) {
+                .pointerInput(totalItemsCount, columnCount, scrollbarTrackHeight, thumbHeightPx) {
                     detectVerticalDragGestures(
                         onDragStart = { offset ->
                             isDragging = true
-                            targetScrollOffset = offset.y
+                            dragThumbY = offset.y.coerceIn(0f, scrollbarTrackHeight - thumbHeightPx)
                         },
                         onDragEnd = { isDragging = false },
                         onDragCancel = { isDragging = false },
                         onVerticalDrag = { change, _ ->
                             change.consume()
-                            val dragPosition = change.position.y.coerceIn(0f, scrollbarTrackHeight)
-                            targetScrollOffset = dragPosition
                             
-                            val scrollRatio = dragPosition / scrollbarTrackHeight
+                            // Update thumb position immediately for real-time feedback
+                            dragThumbY = change.position.y.coerceIn(0f, scrollbarTrackHeight - thumbHeightPx)
+                            
+                            // Calculate scroll position
+                            val maxThumbOffset = scrollbarTrackHeight - thumbHeightPx
+                            val scrollRatio = if (maxThumbOffset > 0) dragThumbY / maxThumbOffset else 0f
                             val totalRows = ceil(totalItemsCount.toFloat() / columnCount)
                             val targetRow = (scrollRatio * totalRows).toInt().coerceIn(0, totalRows.toInt() - 1)
                             val targetIndex = (targetRow * columnCount).coerceIn(0, totalItemsCount - 1)
                             
+                            // Instant scroll for real-time sync
                             coroutineScope.launch {
-                                lazyGridState.animateScrollToItem(targetIndex)
+                                lazyGridState.scrollToItem(targetIndex)
                             }
                         }
                     )
                 }
                 .offset {
                     val yOffset = if (isDragging) {
-                        val scrollRatio = targetScrollOffset / scrollbarTrackHeight
-                        val maxOffset = scrollbarTrackHeight - thumbHeightPx
-                        (scrollRatio * maxOffset).coerceIn(0f, maxOffset)
+                        dragThumbY
                     } else {
                         thumbOffsetPx
                     }.coerceIn(0f, (scrollbarTrackHeight - thumbHeightPx).coerceAtLeast(0f))
