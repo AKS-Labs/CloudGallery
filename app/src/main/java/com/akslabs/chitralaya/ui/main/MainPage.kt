@@ -261,14 +261,15 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                 fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
                             }
                         ) { mode ->
-                            if (mode) {
+                             if (mode) {
+                                val ctx = LocalContext.current
                                 SelectionTopAppBar(
                                     selectedCount = selectedPhotos.size,
                                     onClearSelection = { clearSelection() },
                                     onToggleSelectAll = { toggleSelectAll() },
                                     areAllSelected = areAllSelected,
                                     scope = scope,
-                                    context = LocalContext.current,
+                                    context = ctx,
                                     selectedPhotos = selectedPhotos,
                                     currentRoute = currentRoute,
                                     onDeletionComplete = {
@@ -286,6 +287,42 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                             }
                                             Log.d("MainPage", "🔄 Refreshing local photos after deletion")
                                             localPhotos.refresh()
+                                        }
+                                    },
+                                    onRestore = {
+                                        scope.launch(Dispatchers.IO) {
+                                            val dao = DbHolder.database.deletedPhotoDao()
+                                            val remoteDao = DbHolder.database.remotePhotoDao()
+                                            selectedPhotos.forEach { id ->
+                                                val photo = dao.getById(id)
+                                                if (photo != null) {
+                                                    remoteDao.insertAll(com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto(
+                                                        remoteId = photo.remoteId,
+                                                        photoType = photo.photoType,
+                                                        fileName = photo.fileName,
+                                                        fileSize = photo.fileSize,
+                                                        uploadedAt = photo.uploadedAt,
+                                                        messageId = photo.messageId
+                                                    ))
+                                                    dao.delete(photo)
+                                                }
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                ctx.toastFromMainThread("Restored ${selectedPhotos.size} photos")
+                                                clearSelection()
+                                            }
+                                        }
+                                    },
+                                    onPermanentlyDelete = {
+                                        scope.launch(Dispatchers.IO) {
+                                            val dao = DbHolder.database.deletedPhotoDao()
+                                            selectedPhotos.forEach { id ->
+                                                dao.deleteById(id)
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                ctx.toastFromMainThread("Deleted ${selectedPhotos.size} photos permanently")
+                                                clearSelection()
+                                            }
                                         }
                                     }
                                 )
@@ -535,7 +572,9 @@ fun SelectionTopAppBar(
     context: Context,
     selectedPhotos: Set<String>,
     currentRoute: String?,
-    onDeletionComplete: () -> Unit
+    onDeletionComplete: () -> Unit,
+    onRestore: () -> Unit = {},
+    onPermanentlyDelete: () -> Unit = {}
 ) {
     var showExtraActions by remember { mutableStateOf(false) }
 
@@ -685,7 +724,7 @@ fun SelectionTopAppBar(
                                 }
                             }
                         )
-                    } else { // Cloud photos
+                    } else if (currentRoute == Screens.RemotePhotos.route) { // Cloud photos
                         val viewModel: com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel = screenScopedViewModel()
                         DropdownMenuItem(
                             text = { Text("Move to Trash Bin") },
@@ -696,6 +735,21 @@ fun SelectionTopAppBar(
                                     context.toastFromMainThread("Moved ${selectedPhotos.size} photos to Trash Bin")
                                     onClearSelection()
                                 }
+                            }
+                        )
+                    } else if (currentRoute == Screens.TrashBin.route) { // Trash Bin
+                        DropdownMenuItem(
+                            text = { Text("Restore") },
+                            onClick = {
+                                showExtraActions = false
+                                onRestore()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete Permanently") },
+                            onClick = {
+                                showExtraActions = false
+                                onPermanentlyDelete()
                             }
                         )
                     }

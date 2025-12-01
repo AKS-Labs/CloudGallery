@@ -1,85 +1,71 @@
-﻿> Task :app:preBuild UP-TO-DATE
+﻿> Task :app:clean
+> Task :app:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
 > Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :app:generateDebugBuildConfig UP-TO-DATE
-> Task :app:checkDebugAarMetadata UP-TO-DATE
-> Task :app:generateDebugResValues UP-TO-DATE
-> Task :app:mapDebugSourceSetPaths UP-TO-DATE
-> Task :app:generateDebugResources UP-TO-DATE
-> Task :app:mergeDebugResources UP-TO-DATE
-> Task :app:packageDebugResources UP-TO-DATE
-> Task :app:parseDebugLocalResources UP-TO-DATE
-> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
-> Task :app:extractDeepLinksDebug UP-TO-DATE
-> Task :app:processDebugMainManifest UP-TO-DATE
-> Task :app:processDebugManifest UP-TO-DATE
-> Task :app:processDebugManifestForPackage UP-TO-DATE
-> Task :app:processDebugResources UP-TO-DATE
-> Task :app:kaptGenerateStubsDebugKotlin UP-TO-DATE
-> Task :app:kaptDebugKotlin UP-TO-DATE
-> Task :app:javaPreCompileDebug UP-TO-DATE
-> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResValues
+> Task :app:mapDebugSourceSetPaths
+> Task :app:checkDebugAarMetadata
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:mergeDebugResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
-> Task :app:mergeDebugAssets UP-TO-DATE
-> Task :app:compressDebugAssets UP-TO-DATE
-> Task :app:checkDebugDuplicateClasses UP-TO-DATE
-> Task :app:desugarDebugFileDependencies UP-TO-DATE
-> Task :app:mergeExtDexDebug UP-TO-DATE
-> Task :app:mergeLibDexDebug UP-TO-DATE
-> Task :app:mergeDebugJniLibFolders UP-TO-DATE
-> Task :app:mergeDebugNativeLibs UP-TO-DATE
-> Task :app:stripDebugDebugSymbols UP-TO-DATE
-> Task :app:validateSigningDebug UP-TO-DATE
-> Task :app:writeDebugAppMetadata UP-TO-DATE
-> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugAssets
+> Task :app:processDebugManifestForPackage
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:mergeDebugJniLibFolders
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugNativeLibs
+> Task :app:mergeLibDexDebug
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:stripDebugDebugSymbols
+warn: removing resource com.akslabs.cloudgallery:string/Chitralaya without required default value.
+warn: removing resource com.akslabs.cloudgallery:string/download_Chitralaya without required default value.
+warn: removing resource com.akslabs.cloudgallery:string/whitehole_auto_photos_backup_json without required default value.
+warn: removing resource com.akslabs.cloudgallery:string/whitehole_photos_backup_json without required default value.
+
+> Task :app:processDebugResources
+> Task :app:mergeExtDexDebug
+> Task :app:kaptGenerateStubsDebugKotlin
+w: Experimental context receivers are superseded by context parameters.
+Replace the '-Xcontext-receivers' compiler argument with '-Xcontext-parameters' and migrate to the new syntax.
+
+See the context parameters proposal for more details: https://kotl.in/context-parameters
+This warning will become an error in future releases.
+
+> Task :app:kaptDebugKotlin
 > Task :app:compileDebugKotlin
 ./gradlew : e: file:///C:/Users/ashin/StudioProjects/CloudGallery/a
-pp/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:298:63 
-Unresolved reference 'insert'.
+pp/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:292:64 
+@Composable invocations can only happen from the context of a 
+@Composable function
 At line:1 char:1
-+ ./gradlew assembleDebug 2>&1 | Out-File -FilePath builderrors.md 
--Enc ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (e: file:///C:/U...ren 
-   ce 'insert'.:String) [], RemoteException
++ ./gradlew clean assembleDebug --console=plain 2>&1 | Out-File 
+-FilePa ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (e: file:///C:/U...osa 
+   ble function:String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
  
 e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:310:49 Function 
-invocation 'context(...)' expected.
+java/com/akslabs/chitralaya/ui/main/MainPage.kt:299:63 Unresolved 
+reference 'insert'.
 e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:322:49 Function 
-invocation 'context(...)' expected.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:722:10 Syntax 
-error: Unexpected tokens (use ';' to separate expressions on the 
-same line).
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:723:9 Unresolved 
-reference 'navigationIcon'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:723:28 Syntax 
-error: Unexpected tokens (use ';' to separate expressions on the 
-same line).
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:724:9 Unresolved 
-reference 'colors'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:724:36 @Composable 
+java/com/akslabs/chitralaya/ui/main/MainPage.kt:317:64 @Composable 
 invocations can only happen from the context of a @Composable 
 function
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:725:44 @Composable 
-invocations can only happen from the context of a @Composable 
-function
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:727:5 Syntax 
-error: Expecting an element.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/
-java/com/akslabs/chitralaya/ui/main/MainPage.kt:728:2 Syntax 
-error: Expecting '}'.
 
 > Task :app:compileDebugKotlin FAILED
 
@@ -98,5 +84,5 @@ n
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 57s
-31 actionable tasks: 1 executed, 30 up-to-date
+BUILD FAILED in 2m 45s
+32 actionable tasks: 32 executed
