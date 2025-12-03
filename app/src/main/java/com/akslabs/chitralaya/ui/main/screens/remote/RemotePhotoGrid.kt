@@ -188,6 +188,8 @@ fun RemotePhotosGrid(
     var selectedPhoto by remember { mutableStateOf<RemotePhoto?>(null) }
 
     val glideSelectionBehavior by Preferences.getStringFlow(Preferences.glideSelectionBehaviorKey, "Fixed").collectAsStateWithLifecycle()
+    val thumbnailResolution = Preferences.getInt(Preferences.thumbnailResolutionKey, Preferences.defaultThumbnailResolution)
+    var isScrollbarDragging by remember { mutableStateOf(false) }
 
     if (selectionMode) {
         BackHandler(enabled = true) {
@@ -254,7 +256,8 @@ fun RemotePhotosGrid(
                 lazyGridState = lazyGridState,
                 totalItemsCount = cloudPhotos.itemCount,
                 columnCount = columns,
-                modifier = Modifier.align(Alignment.CenterEnd)
+                modifier = Modifier.align(Alignment.CenterEnd),
+                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging }
             )
             DragSelectableLazyVerticalGrid(
                 lazyGridState = lazyGridState,
@@ -329,6 +332,8 @@ fun RemotePhotosGrid(
                                 remotePhoto = item.photo,
                                 index = item.originalIndex,
                                 isSelected = isSelected,
+                                isScrollbarDragging = isScrollbarDragging,
+                                thumbnailResolution = thumbnailResolution,
                                 modifier = Modifier.clickable(
                                     onClick = {
                                         if (selectionMode) {
@@ -389,6 +394,8 @@ fun CloudPhotoItem(
     remotePhoto: RemotePhoto?,
     index: Int,
     isSelected: Boolean,
+    isScrollbarDragging: Boolean = false,
+    thumbnailResolution: Int = 150,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -408,15 +415,20 @@ fun CloudPhotoItem(
                 .then(if (isSelected) Modifier.padding(4.dp) else Modifier) // Padding for the content
         ) {
             if (remotePhoto != null) {
-                val imageRequest = ImageRequest.Builder(context)
+                val targetSize = if (isScrollbarDragging) 50 else thumbnailResolution
+                
+                val imageRequestBuilder = ImageRequest.Builder(context)
                     .data(remotePhoto)
-                    .size(Size(150, 150)) // Even smaller for faster loading
+                    .size(Size(targetSize, targetSize))
                     .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
                     .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
-                    .crossfade(100) // Faster transition
-                    .allowHardware(true) // Use hardware acceleration
-                    .allowRgb565(true) // Use less memory
-                    .build()
+                    .allowRgb565(true)
+                
+                if (!isScrollbarDragging) {
+                    imageRequestBuilder.crossfade(100)
+                }
+                
+                val imageRequest = imageRequestBuilder.build()
 
                 SubcomposeAsyncImage(
                     imageLoader = ImageLoaderModule.thumbnailImageLoader,

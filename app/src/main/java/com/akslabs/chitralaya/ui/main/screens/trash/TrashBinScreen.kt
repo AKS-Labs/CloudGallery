@@ -76,6 +76,8 @@ fun TrashBinScreen(
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     
     val glideSelectionBehavior by Preferences.getStringFlow(Preferences.glideSelectionBehaviorKey, "Fixed").collectAsStateWithLifecycle()
+    val thumbnailResolution = Preferences.getInt(Preferences.thumbnailResolutionKey, Preferences.defaultThumbnailResolution)
+    var isScrollbarDragging by remember { mutableStateOf(false) }
 
     // Helper to toggle selection
     fun toggleSelection(photoId: String) {
@@ -126,7 +128,8 @@ fun TrashBinScreen(
                 lazyGridState = lazyGridState,
                 totalItemsCount = deletedPhotos.itemCount,
                 columnCount = columns,
-                modifier = Modifier.align(Alignment.CenterEnd)
+                modifier = Modifier.align(Alignment.CenterEnd),
+                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging }
             )
             
             DragSelectableLazyVerticalGrid(
@@ -184,7 +187,9 @@ fun TrashBinScreen(
                         TrashPhotoItem(
                             remotePhoto = remotePhoto,
                             isSelected = isSelected,
-                            modifier = Modifier.clickable {
+                            isScrollbarDragging = isScrollbarDragging,
+                                thumbnailResolution = thumbnailResolution,
+                                modifier = Modifier.clickable {
                                 if (selectionMode) {
                                     toggleSelection(photo.remoteId)
                                 } else {
@@ -234,6 +239,8 @@ fun TrashBinScreen(
 fun TrashPhotoItem(
     remotePhoto: RemotePhoto,
     isSelected: Boolean,
+    isScrollbarDragging: Boolean = false,
+    thumbnailResolution: Int = 150,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -251,11 +258,17 @@ fun TrashPhotoItem(
                 .fillMaxSize()
                 .then(if (isSelected) Modifier.padding(4.dp) else Modifier)
         ) {
-            val imageRequest = ImageRequest.Builder(context)
+            val targetSize = if (isScrollbarDragging) 50 else thumbnailResolution
+            
+            val imageRequestBuilder = ImageRequest.Builder(context)
                 .data(remotePhoto)
-                .size(Size(150, 150))
-                .crossfade(100)
-                .build()
+                .size(Size(targetSize, targetSize))
+            
+            if (!isScrollbarDragging) {
+                imageRequestBuilder.crossfade(100)
+            }
+            
+            val imageRequest = imageRequestBuilder.build()
 
             SubcomposeAsyncImage(
                 imageLoader = ImageLoaderModule.thumbnailImageLoader,
