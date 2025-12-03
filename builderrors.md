@@ -1,39 +1,31 @@
-﻿> Task :app:compileDebugKotlin FAILED
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:145:11 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:161:11 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:227:28 Unresolved reference 'findActivity'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:276:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:277:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:278:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:279:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:280:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:281:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:282:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:311:17 No value passed for parameter 'columns'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:311:17 No value passed for parameter 'contentPadding'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:311:17 No value passed for parameter 'verticalArrangement'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:311:17 No value passed for parameter 'horizontalArrangement'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:311:17 No value passed for parameter 'content'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:356:13 Only expressions are allowed here.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:356:13 Mixing named and positional arguments is not allowed unless the order of the arguments matches the order of the parameters.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:359:30 Unresolved reference 'index'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:360:25 Unresolved reference 'targetIndex'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:360:39 Unresolved reference 'loadedPhotos'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:363:21 Unresolved reference 'loadedPhotos'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:372:14 Syntax error: Expecting ','.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:374:13 Mixing named and positional arguments is not allowed unless the order of the arguments matches the order of the parameters.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:374:17 Unresolved reference 'loadedPhotos'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:376:33 Unresolved reference 'targetIndex'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:376:57 Unresolved reference 'loadedPhotos'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:378:23 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:378:66 Unresolved reference 'index'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:378:111 Unresolved reference 'loadedPhotos'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:380:17 'if' must have both main and 'else' branches when used as an expression.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:384:34 Unresolved reference 'loadedPhotos'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:385:34 Argument type mismatch: actual type is 'Any', but 'Window' was expected.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:394:14 Syntax error: Expecting ')'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:513:1 Modifier 'private' is not applicable to 'local variable'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:513:9 Modifier 'const' is not applicable to 'local variable'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:516:1 Modifier 'private' is not applicable to 'local function'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:523:2 Syntax error: Expecting '}'.
+﻿> Task :app:compileDebugKotlin
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:284:33 Unresolved reference 'SelectionTopAppBar'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:482:57 Unresolved reference 'HorizontalDivider'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:482:75 Unresolved reference 'modifier'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:482:75 Only expressions are allowed in this context.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:484:61 Unresolved reference 'text'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:484:61 Only expressions are allowed in this context.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:485:65 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:487:91 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:489:62 Syntax error: Expecting ')'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:490:61 Argument already passed for this parameter.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:511:42 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:512:41 Unresolved reference 'windowInsets'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:512:80 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:513:41 'val' cannot be reassigned.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:513:72 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:514:41 Unresolved reference 'colors'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:515:37 Syntax error: Expecting an element.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:517:34 Syntax error: Expecting ')'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:521:18 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:522:17 Unresolved reference 'contentWindowInsets'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:523:13 Syntax error: Expecting an element.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:523:17 An explicit type is required on a value parameter.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:524:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:540:11 Syntax error: Expecting ')'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:623:41 Function invocation 'context(...)' expected.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:880:2 Syntax error: Expecting '}'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:420:41 No parameter with name 'thumbnailResolution' found.
+
+> Task :app:compileDebugKotlin FAILED
 

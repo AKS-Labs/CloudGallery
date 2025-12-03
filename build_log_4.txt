@@ -35,7 +35,7 @@
 > Task :app:writeDebugAppMetadata UP-TO-DATE
 > Task :app:writeDebugSigningConfigVersions UP-TO-DATE
 > Task :app:compileDebugKotlin
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:625:41 Function invocation 'context(...)' expected.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:626:41 Function invocation 'context(...)' expected.
 
 > Task :app:compileDebugKotlin FAILED
 
@@ -52,5 +52,5 @@ Execution failed for task ':app:compileDebugKotlin'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 1m 24s
+BUILD FAILED in 1m 33s
 31 actionable tasks: 1 executed, 30 up-to-date

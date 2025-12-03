@@ -1,4 +1,5 @@
-package com.akslabs.cloudgallery.ui.main.screens.local
+
+content = r"""package com.akslabs.cloudgallery.ui.main.screens.local
 
 import android.app.Activity
 import android.content.ContentUris
@@ -615,3 +616,6 @@ fun LocalPhotoItem(
         }
     }
 }
+"""
+with open(r'c:\Users\ashin\StudioProjects\CloudGallery\app\src\main\java\com\akslabs\chitralaya\ui\main\screens\local\LocalPhotoGrid.kt', 'w', encoding='utf-8') as f:
+    f.write(content)

@@ -34,34 +34,60 @@
 > Task :app:validateSigningDebug UP-TO-DATE
 > Task :app:writeDebugAppMetadata UP-TO-DATE
 > Task :app:writeDebugSigningConfigVersions UP-TO-DATE
-
 > Task :app:compileDebugKotlin
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:145:11 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:161:11 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:227:28 Unresolved reference 'findActivity'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:276:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:277:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:278:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:279:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:280:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:281:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:282:19 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:311:17 No value passed for parameter 'verticalArrangement'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:311:17 No value passed for parameter 'horizontalArrangement'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:311:17 No value passed for parameter 'content'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:357:38 Inapplicable candidate(s): fun PaddingValues(start: Dp = ..., top: Dp = ..., end: Dp = ..., bottom: Dp = ...): PaddingValues
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:362:9 Unresolved reference 'selectedIndex'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:362:22 Syntax error: Expecting an element.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:362:24 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:362:24 Cannot infer type for type parameter 'R'. Specify it explicitly.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:362:30 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:390:23 Unresolved reference 'TAG'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:397:34 Argument type mismatch: actual type is 'Any', but 'Window' was expected.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:407:10 Syntax error: Expecting ')'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:525:1 Modifier 'private' is not applicable to 'local variable'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:525:9 Modifier 'const' is not applicable to 'local variable'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:528:1 Modifier 'private' is not applicable to 'local function'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:535:2 Syntax error: Expecting '}'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:625:41 Function invocation 'context(...)' expected.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:337:21 No parameter with name 'onDraggingChange' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:337:42 Cannot infer type for value parameter 'isDragging'. Specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:428:37 Overload resolution ambiguity between candidates:
+fun LocalPhotoItem(photo: LocalUiPhoto, index: Int, isSelected: Boolean, isDeleted: Boolean, isScrollbarDragging: Boolean = ..., thumbnailResolution: Int = ..., modifier: Modifier = ...): Unit
+fun LocalPhotoItem(photo: LocalUiPhoto, index: Int, isSelected: Boolean, isDeleted: Boolean, isScrollbarDragging: Boolean = ..., thumbnailResolution: Int = ..., modifier: Modifier = ...): Unit
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:501:1 Conflicting overloads:
+fun LocalPhotoItem(photo: LocalUiPhoto, index: Int, isSelected: Boolean, isDeleted: Boolean, isScrollbarDragging: Boolean = ..., thumbnailResolution: Int = ..., modifier: Modifier = ...): Unit
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:615:46 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun Modifier.fillMaxWidth(fraction: Float = ...): Modifier
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:617:37 Syntax error: Expecting an element.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:619:33 Syntax error: Expecting an element.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:619:50 Classifier 'data class PhotoItem : LocalGridItem' does not have a companion object, so it cannot be used as an expression.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:619:60 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:620:45 Unresolved reference 'item'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:621:54 Unresolved reference 'selectedPhotos'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:622:53 Unresolved reference 'deletedPhotoIds'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:625:49 Unresolved reference 'item'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:632:53 Unresolved reference 'selectionMode'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:633:53 Unresolved reference 'toggleSelection'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:635:53 Unresolved reference 'selectedIndex'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:635:69 Unresolved reference 'item'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:636:53 Unresolved reference 'selectedPhoto'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:645:17 Syntax error: Expecting a top level declaration.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:646:13 Syntax error: Expecting a top level declaration.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:647:9 Syntax error: Expecting a top level declaration.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:649:9 Syntax error: Expecting a top level declaration.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:649:22 Syntax error: Expecting a top level declaration.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:649:24 Syntax error: Expecting a top level declaration.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:649:28 Syntax error: Expecting a top level declaration.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:649:28 Functions which invoke @Composable functions must be marked with the @Composable annotation
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:649:28 Function declaration must have a name.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:649:30 Unresolved reference 'index'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:649:36 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:656:13 Unresolved reference 'allPhotos'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:656:40 Cannot infer type for value parameter 'i'. Specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:656:43 Cannot infer type for value parameter 'photo'. Specify it explicitly.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:657:26 Unresolved reference 'index'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:662:41 Unresolved reference 'localId'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:664:43 Unresolved reference 'mimeType'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:665:41 Unresolved reference 'pathUri'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:674:66 Unresolved reference 'index'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:676:21 Unresolved reference 'window'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:677:21 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:681:34 Unresolved reference 'window'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:683:25 Unresolved reference 'selectedIndex'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:684:25 Unresolved reference 'selectedPhoto'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:688:17 Unresolved reference 'selectedIndex'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:689:17 Unresolved reference 'selectedPhoto'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:692:5 Syntax error: Expecting a top level declaration.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:693:1 Syntax error: Expecting a top level declaration.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:696:1 Conflicting overloads:
+fun LocalPhotoItem(photo: LocalUiPhoto, index: Int, isSelected: Boolean, isDeleted: Boolean, isScrollbarDragging: Boolean = ..., thumbnailResolution: Int = ..., modifier: Modifier = ...): Unit
 
 > Task :app:compileDebugKotlin FAILED
 
@@ -78,5 +104,5 @@ Execution failed for task ':app:compileDebugKotlin'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 20s
+BUILD FAILED in 2m 15s
 31 actionable tasks: 1 executed, 30 up-to-date

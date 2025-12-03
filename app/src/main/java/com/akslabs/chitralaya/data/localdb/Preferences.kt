@@ -30,6 +30,8 @@ object Preferences {
     const val defaultAutoBackupInterval: Long = 7
     const val defaultGridColumnCount: Int = 4
     const val glideSelectionBehaviorKey: String = "glideSelectionBehavior"
+    const val thumbnailResolutionKey: String = "thumbnailResolution"
+    const val defaultThumbnailResolution: Int = 150
 
     private const val prefFile: String = "preferences"
     private const val encryptedPrefFile: String = "encryptedPreferences"

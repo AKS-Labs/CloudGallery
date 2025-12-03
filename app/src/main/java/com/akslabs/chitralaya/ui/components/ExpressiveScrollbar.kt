@@ -62,7 +62,8 @@ fun ExpressiveScrollbar(
     thumbHeight: Dp = 48.dp,
     thumbCornerRadius: Dp = 10.dp,
     paddingEnd: Dp = 4.dp,
-    gridContentPadding: PaddingValues = PaddingValues(0.dp)
+    gridContentPadding: PaddingValues = PaddingValues(0.dp),
+    onDraggingChange: (Boolean) -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
     val isScrolling by remember { derivedStateOf { lazyGridState.isScrollInProgress } }
@@ -88,6 +89,11 @@ fun ExpressiveScrollbar(
             delay(1000)
             showScrollbar.targetState = ScrollbarVisibilityState.Hidden
         }
+    }
+    
+    // Notify dragging change
+    LaunchedEffect(isDragging) {
+        onDraggingChange(isDragging)
     }
 
     if (totalItemsCount == 0) return

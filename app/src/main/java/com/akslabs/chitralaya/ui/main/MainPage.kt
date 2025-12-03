@@ -1,4 +1,8 @@
 package com.akslabs.cloudgallery.ui.main
+import androidx.compose.ui.text.input.KeyboardType
+import com.akslabs.cloudgallery.utils.toastFromMainThread
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
 
 
 import android.content.Context
@@ -125,6 +129,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val navController = rememberNavController()
     val syncState by viewModel.syncState.collectAsStateWithLifecycle()
 
@@ -151,6 +156,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
 
     // State for grid customization menu
     var showGridOptionsDropdown by remember { mutableStateOf(false) }
+    var showThumbnailResolutionDialog by remember { mutableStateOf(false) }
 
     // State to track if settings is being navigated to
     var isNavigatingToSettings by remember { mutableStateOf(false) }
@@ -477,6 +483,19 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                                 }
                                                             )
                                                         }
+                                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(
+                                                                    text = "Grid Thumbnail Resolution",
+                                                                    color = MaterialTheme.colorScheme.onSurface
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                showThumbnailResolutionDialog = true
+                                                                showGridOptionsDropdown = false
+                                                            }
+                                                        )
                                                     }
                                                 }
 
@@ -551,6 +570,75 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
+        }
+
+
+        // Thumbnail Resolution Dialog
+        if (showThumbnailResolutionDialog) {
+            var inputValue by remember { 
+                mutableStateOf(Preferences.getInt(Preferences.thumbnailResolutionKey, Preferences.defaultThumbnailResolution).toString()) 
+            }
+            var errorMessage by remember { mutableStateOf<String?>(null) }
+
+            AlertDialog(
+                onDismissRequest = { showThumbnailResolutionDialog = false },
+                title = { Text("Grid Thumbnail Resolution") },
+                text = {
+                    Column {
+                        Text(
+                            text = "Set the resolution (in pixels) for image thumbnails in the grid. Lower values load faster but with less quality. Higher values provide better quality but may load slower.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = inputValue,
+                            onValueChange = { 
+                                inputValue = it
+                                errorMessage = null
+                            },
+                            label = { Text("Resolution (px)") },
+                            placeholder = { Text("150") },
+                            isError = errorMessage != null,
+                            supportingText = errorMessage?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+                        Text(
+                            text = "Recommended: 100-300px",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val value = inputValue.toIntOrNull()
+                            when {
+                                value == null -> errorMessage = "Please enter a valid number"
+                                value < 10 -> errorMessage = "Minimum resolution is 50px"
+                                value > 500 -> errorMessage = "Maximum resolution is 500px"
+                                else -> {
+                                    Preferences.edit { putInt(Preferences.thumbnailResolutionKey, value) }
+                                    showThumbnailResolutionDialog = false
+                                    scope.launch {
+                                        context.toastFromMainThread("Thumbnail resolution set to ${value}px")
+                                    }
+                                }
+                            }
+                        }
+                    ) {
+                        Text("Set")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showThumbnailResolutionDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
 
         AnimatedVisibility(visible = syncState == SyncState.SYNCING && currentRoute == Screens.RemotePhotos.route) {
