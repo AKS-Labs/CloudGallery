@@ -124,6 +124,8 @@ private suspend fun fetchAllLocalPhotos(context: Context): List<LocalUiPhoto> = 
         val mimeIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.MIME_TYPE)
         val sizeIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.SIZE)
 
+        Log.d(TAG, "fetchAllLocalPhotos: Cursor count: ${cursor.count}")
+
         while (cursor.moveToNext()) {
             val id = cursor.getLong(idIdx).toString()
             val taken = runCatching { cursor.getLong(takenIdx) }.getOrDefault(0L)
@@ -151,6 +153,7 @@ private suspend fun fetchAllLocalPhotos(context: Context): List<LocalUiPhoto> = 
             ))
         }
     }
+    Log.d(TAG, "fetchAllLocalPhotos: Fetched ${photos.size} photos")
     photos
 }
 
@@ -287,11 +290,12 @@ fun LocalPhotoGrid(
     }
 
     // Debug logging (guarded)
-    LaunchedEffect(localPhotos.loadState, totalCount, localPhotos.itemCount) {
+    LaunchedEffect(localPhotos.loadState, totalCount, localPhotos.itemCount, allPhotos.size) {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "=== LOCAL PHOTO GRID DEBUG ===")
             Log.d(TAG, "Total count from ViewModel: $totalCount")
-            Log.d(TAG, "LocalPhotos itemCount: ${localPhotos.itemCount}")
+            Log.d(TAG, "LocalPhotos (Paging) itemCount: ${localPhotos.itemCount}")
+            Log.d(TAG, "AllPhotos (Custom) size: ${allPhotos.size}")
             Log.d(TAG, "LoadState.refresh: ${localPhotos.loadState.refresh}")
             Log.d(TAG, "LoadState.append: ${localPhotos.loadState.append}")
             Log.d(TAG, "LoadState.prepend: ${localPhotos.loadState.prepend}")

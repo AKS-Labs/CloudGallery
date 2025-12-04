@@ -46,4 +46,7 @@ interface RemotePhotoDao {
         "SELECT p.* FROM photos p INNER JOIN remote_photos rp ON p.remoteId = rp.remoteId WHERE p.remoteId IS NOT NULL"
     )
     suspend fun getBackedUpPhotosOnDevice(): List<Photo>
+
+    @Query("SELECT remoteId FROM remote_photos")
+    suspend fun getAllRemoteIds(): List<String>
 }

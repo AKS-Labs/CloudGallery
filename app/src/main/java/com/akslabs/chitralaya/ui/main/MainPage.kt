@@ -177,11 +177,11 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
     val localPhotos = viewModel.localPhotosFlow.collectAsLazyPagingItems()
     val allCloudPhotos = viewModel.allCloudPhotosFlow.collectAsLazyPagingItems()
 
-    val areAllSelected = remember(selectedPhotos, currentRoute, localPhotos.itemCount, allCloudPhotos.itemCount, deletedPhotosCount) {
+    val areAllSelected = remember(selectedPhotos, currentRoute, localPhotosCount, cloudPhotosCount, deletedPhotosCount) {
         val totalCount = when (currentRoute) {
-            Screens.LocalPhotos.route -> localPhotos.itemCount
+            Screens.LocalPhotos.route -> localPhotosCount
             Screens.TrashBin.route -> deletedPhotosCount
-            else -> allCloudPhotos.itemCount
+            else -> cloudPhotosCount
         }
         totalCount > 0 && selectedPhotos.size == totalCount
     }
@@ -191,7 +191,12 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             clearSelection()
         } else {
             if (currentRoute == Screens.LocalPhotos.route) {
-                selectedPhotos = (0 until localPhotos.itemCount).mapNotNull { localPhotos.peek(it)?.localId }.toSet()
+                scope.launch(Dispatchers.IO) {
+                    val allLocalIds = DbHolder.database.photoDao().getAllLocalIds()
+                    withContext(Dispatchers.Main) {
+                        selectedPhotos = allLocalIds.toSet()
+                    }
+                }
             } else if (currentRoute == Screens.TrashBin.route) {
                 scope.launch(Dispatchers.IO) {
                     val allDeleted = DbHolder.database.deletedPhotoDao().getAll()
@@ -201,7 +206,13 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                     }
                 }
             } else {
-                selectedPhotos = (0 until allCloudPhotos.itemCount).mapNotNull { allCloudPhotos.peek(it)?.remoteId }.toSet()
+                // Remote photos
+                scope.launch(Dispatchers.IO) {
+                    val allRemoteIds = DbHolder.database.remotePhotoDao().getAllRemoteIds()
+                    withContext(Dispatchers.Main) {
+                        selectedPhotos = allRemoteIds.toSet()
+                    }
+                }
             }
         }
     }
@@ -618,7 +629,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                             val value = inputValue.toIntOrNull()
                             when {
                                 value == null -> errorMessage = "Please enter a valid number"
-                                value < 10 -> errorMessage = "Minimum resolution is 50px"
+                                value < 10 -> errorMessage = "Minimum resolution is 10px"
                                 value > 500 -> errorMessage = "Maximum resolution is 500px"
                                 else -> {
                                     Preferences.edit { putInt(Preferences.thumbnailResolutionKey, value) }
@@ -726,7 +737,10 @@ fun SelectionTopAppBar(
             )
         },
         actions = {
-            IconButton(onClick = onToggleSelectAll) {
+            IconButton(
+                onClick = onToggleSelectAll,
+                enabled = !areAllSelected
+            ) {
                 Icon(
                     imageVector = Icons.Default.ChecklistRtl,
                     contentDescription = if (areAllSelected) "Deselect All" else "Select All",

@@ -82,16 +82,29 @@ object Preferences {
         return try {
             preferences.getLong(key, defValue)
         } catch (e: ClassCastException) {
-            Log.e("Preferences", "Error getting long for key $key", e)
-            edit { remove(key) }
-            defValue
+            try {
+                val stringValue = preferences.getString(key, null)
+                val longValue = stringValue?.toLongOrNull()
+                if (longValue != null) {
+                    // Fix the preference type
+                    edit { putLong(key, longValue) }
+                    longValue
+                } else {
+                    Log.e("Preferences", "Error getting long for key $key", e)
+                    edit { remove(key) }
+                    defValue
+                }
+            } catch (e2: Exception) {
+                Log.e("Preferences", "Error recovering long for key $key", e2)
+                edit { remove(key) }
+                defValue
+            }
         }
     }
     fun getInt(key: String, defValue: Int) = preferences.getInt(key, defValue)
     fun getStringSet(key: String, defValue: Set<String>) =
         preferences.getStringSet(key, defValue) ?: defValue
 
-    // New method to get an observable StateFlow for a string preference
     fun getStringFlow(key: String, defValue: String): StateFlow<String> {
         // Ensure the flow is initialized. If not, create it and populate with current value.
         // This handles cases where a flow might be requested before init() or for a new key.
