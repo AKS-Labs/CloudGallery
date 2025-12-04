@@ -183,7 +183,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             Screens.TrashBin.route -> deletedPhotosCount
             else -> cloudPhotosCount
         }
-        totalCount > 0 && selectedPhotos.size == totalCount
+        if (com.akslabs.cloudgallery.BuildConfig.DEBUG) {
+             Log.d("MainPage", "Selection Debug: selected=${selectedPhotos.size}, total=$totalCount, route=$currentRoute")
+        }
+        totalCount > 0 && selectedPhotos.size >= totalCount
     }
 
     fun toggleSelectAll() {

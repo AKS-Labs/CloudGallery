@@ -28,8 +28,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.BrokenImage
 import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 import androidx.compose.material3.Icon
@@ -154,6 +156,8 @@ private suspend fun fetchAllLocalPhotos(context: Context): List<LocalUiPhoto> = 
         }
     }
     Log.d(TAG, "fetchAllLocalPhotos: Fetched ${photos.size} photos")
+    // Ensure photos are sorted by the actual display date (handling the fallback logic)
+    photos.sortByDescending { it.displayDateMillis }
     photos
 }
 
@@ -590,7 +594,7 @@ fun LocalPhotoItem(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Check,
+                        imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(16.dp)
@@ -609,10 +613,10 @@ fun LocalPhotoItem(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Cloud,
+                        imageVector = Icons.Rounded.CloudDone,
                         contentDescription = "Backed up",
                         tint = Color(0xFF4CAF50), // Green color
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(12.dp)
                     )
                 }
             }
