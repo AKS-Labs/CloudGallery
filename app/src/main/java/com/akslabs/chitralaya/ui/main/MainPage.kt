@@ -186,6 +186,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         if (com.akslabs.cloudgallery.BuildConfig.DEBUG) {
              Log.d("MainPage", "Selection Debug: selected=${selectedPhotos.size}, total=$totalCount, route=$currentRoute")
         }
+        // Use strict equality for areAllSelected to ensure toggle behavior is consistent
+        // If selected count >= total count, we consider it all selected.
+        // However, for the toggle to work "select all -> deselect all", we need to ensure
+        // that if it returns true, the next click clears selection.
         totalCount > 0 && selectedPhotos.size >= totalCount
     }
 

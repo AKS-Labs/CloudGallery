@@ -63,11 +63,14 @@ import com.akslabs.chitralaya.ui.components.DragSelectableLazyVerticalGrid
 import com.akslabs.chitralaya.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.BuildConfig
 import com.akslabs.cloudgallery.R
+import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
+import com.akslabs.cloudgallery.data.localdb.dao.SyncedPhotoTuple
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
+import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -155,6 +158,19 @@ private suspend fun fetchAllLocalPhotos(context: Context): List<LocalUiPhoto> = 
             ))
         }
     }
+
+    
+    // Fetch synced status from DB
+    val syncedMap = DbHolder.database.photoDao().getSyncedPhotoMap().associate { it.localId to it.remoteId }
+    
+    // Update remoteId for photos that are synced
+    photos.forEachIndexed { index, photo ->
+        val remoteId = syncedMap[photo.localId]
+        if (remoteId != null) {
+            photos[index] = photo.copy(remoteId = remoteId)
+        }
+    }
+
     Log.d(TAG, "fetchAllLocalPhotos: Fetched ${photos.size} photos")
     // Ensure photos are sorted by the actual display date (handling the fallback logic)
     photos.sortByDescending { it.displayDateMillis }

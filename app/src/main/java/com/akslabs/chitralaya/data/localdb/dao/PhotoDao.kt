@@ -65,4 +65,12 @@ interface PhotoDao {
 
     @Query("SELECT localId FROM photos")
     suspend fun getAllLocalIds(): List<String>
+
+    @Query("SELECT localId, remoteId FROM photos WHERE remoteId IS NOT NULL")
+    suspend fun getSyncedPhotoMap(): List<SyncedPhotoTuple>
 }
+
+data class SyncedPhotoTuple(
+    val localId: String,
+    val remoteId: String
+)
