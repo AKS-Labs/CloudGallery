@@ -260,14 +260,17 @@ fun SettingsItem(
                     imageVector = icon,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = Color.Unspecified
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
                 )
             }
             iconPainter != null -> {
                 Image(
                     painter = iconPainter,
                     contentDescription = null,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+                    )
                 )
             }
         }
