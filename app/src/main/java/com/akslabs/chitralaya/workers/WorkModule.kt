@@ -26,35 +26,30 @@ object WorkModule {
 
     object PeriodicBackup {
 
-        private val constraints = Constraints.Builder()
-            .setRequiredNetworkType(
-                NetworkType.valueOf(
-                    Preferences.getString(
-                        Preferences.autoBackupNetworkTypeKey,
-                        NetworkType.CONNECTED.name
+        private fun getConstraints(): Constraints {
+            return Constraints.Builder()
+                .setRequiredNetworkType(
+                    NetworkType.valueOf(
+                        Preferences.getString(
+                            Preferences.autoBackupNetworkTypeKey,
+                            NetworkType.CONNECTED.name
+                        )
                     )
                 )
-            )
-            .build()
-        private val repeatIntervalDays = Preferences.getString(
-            Preferences.autoBackupIntervalKey,
-            Preferences.defaultAutoBackupInterval.toString()
-        ).toLong()
-
-        private val periodicUploadWorkRequest =
-            PeriodicWorkRequestBuilder<PeriodicPhotoBackupWorker>(Duration.ofDays(repeatIntervalDays))
-                .setInputData(
-                    workDataOf(PeriodicPhotoBackupWorker.KEY_COMPRESSION_THRESHOLD to 1024 * 50L)
-                )
-                .setConstraints(constraints)
-                .setInitialDelay(Duration.ofDays(1))
-                .setBackoffCriteria(
-                    backoffPolicy = BackoffPolicy.LINEAR,
-                    duration = Duration.ofMinutes(40)
-                )
                 .build()
+        }
+
+        private fun getRepeatIntervalDays(): Long {
+            return Preferences.getString(
+                Preferences.autoBackupIntervalKey,
+                Preferences.defaultAutoBackupInterval.toString()
+            ).toLong()
+        }
 
         fun enqueue(forceUpdate: Boolean = false) {
+            val constraints = getConstraints()
+            val repeatIntervalDays = getRepeatIntervalDays()
+
             // 1️⃣ Immediate one-time backup
             val instantBackupRequest =
                 OneTimeWorkRequestBuilder<PeriodicPhotoBackupWorker>()
@@ -63,6 +58,20 @@ object WorkModule {
                     )
                     .setConstraints(constraints)
                     .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .build()
+
+            // 2️⃣ Periodic backup with current preferences
+            val periodicUploadWorkRequest =
+                PeriodicWorkRequestBuilder<PeriodicPhotoBackupWorker>(Duration.ofDays(repeatIntervalDays))
+                    .setInputData(
+                        workDataOf(PeriodicPhotoBackupWorker.KEY_COMPRESSION_THRESHOLD to 1024 * 50L)
+                    )
+                    .setConstraints(constraints)
+                    .setInitialDelay(Duration.ofDays(1))
+                    .setBackoffCriteria(
+                        backoffPolicy = BackoffPolicy.LINEAR,
+                        duration = Duration.ofMinutes(40)
+                    )
                     .build()
 
             manager.enqueueUniqueWork(

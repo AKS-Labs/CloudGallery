@@ -1,7 +1,6 @@
 package com.akslabs.cloudgallery.workers
 
 import android.content.Context
-import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.ui.util.fastForEach
@@ -100,11 +99,20 @@ class PeriodicPhotoBackupWorker(
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        return ForegroundInfo(
-            NOTIFICATION_ID,
-            makeStatusNotification(appContext.getString(R.string.backing_up_photos), appContext),
-            FOREGROUND_SERVICE_TYPE_DATA_SYNC
-        )
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            // Android 12+ requires foreground service type
+            ForegroundInfo(
+                NOTIFICATION_ID,
+                makeStatusNotification(appContext.getString(R.string.backing_up_photos), appContext),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            // For Android 10-11, use constructor without service type
+            ForegroundInfo(
+                NOTIFICATION_ID,
+                makeStatusNotification(appContext.getString(R.string.backing_up_photos), appContext)
+            )
+        }
     }
 
     companion object {
