@@ -173,10 +173,10 @@ fun ExpressiveScrollbar(
                     }.coerceIn(0f, (scrollbarTrackHeight - thumbHeightPx).coerceAtLeast(0f))
                     IntOffset(0, yOffset.toInt())
                 }
-                .shadow(
-                    elevation = if (isDragging) 8.dp else 2.dp,
-                    shape = RoundedCornerShape(thumbCornerRadius)
-                )
+//                .shadow(
+//                    elevation = if (isDragging) 8.dp else 2.dp,
+//                    shape = RoundedCornerShape(thumbCornerRadius)
+//                )
                 .semantics { contentDescription = "Scrollbar" }
         ) {
             Canvas(

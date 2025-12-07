@@ -100,14 +100,19 @@ import com.akslabs.cloudgallery.workers.WorkModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.graphics.Color
+import com.akslabs.chitralaya.ui.components.SupportSheet
 /**
  * Section header component for grouping settings
  */
+
+
 @Composable
-private fun SettingsSection(
+fun SettingsSection(
     title: String,
     modifier: Modifier = Modifier
+
 ) {
     Text(
         text = title,
@@ -122,7 +127,7 @@ private fun SettingsSection(
  * Settings item with switch toggle
  */
 @Composable
-private fun SettingsSwitchItem(
+fun SettingsSwitchItem(
     icon: ImageVector,
     title: String,
     subtitle: String,
@@ -174,7 +179,7 @@ private fun SettingsSwitchItem(
  * Settings item with dialog selection
  */
 @Composable
-private fun SettingsDialogItem(
+ fun SettingsDialogItem(
     icon: ImageVector,
     title: String,
     subtitle: String,
@@ -231,7 +236,7 @@ private fun SettingsDialogItem(
  * Simple settings item component matching the target design
  */
 @Composable
-private fun SettingsItem(
+fun SettingsItem(
     icon: ImageVector? = null,       // Built-in icon
     iconPainter: Painter? = null,          // Custom drawable / SVG
     title: String,
@@ -255,7 +260,7 @@ private fun SettingsItem(
                     imageVector = icon,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+                    tint = Color.Unspecified
                 )
             }
             iconPainter != null -> {
@@ -294,6 +299,16 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
     var showDialog by remember { mutableStateOf(false) }
     var dialogMessage by remember { mutableStateOf("") }
 
+    // SupportSheet State
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showSupportSheet by remember { mutableStateOf(false) }
+
+    if (showSupportSheet) {
+        SupportSheet(
+            sheetState = sheetState,
+            onDismissRequest = { showSupportSheet = false }
+        )
+    }
 
     fun openLinkFromHref(href: String) {
         context.startActivity(
@@ -799,11 +814,12 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
         )
 
         SettingsItem(
-            icon = Icons.Rounded.ThumbUp,
+            iconPainter = painterResource(id = com.akslabs.cloudgallery.R.drawable.donation),
             title = "Donate",
             subtitle = "Help me keep the app alive",
             onClick = {
-                openLinkFromHref(Constants.Donate)
+//                openLinkFromHref(Constants.Donate)
+                showSupportSheet = true
             }
         )
 
