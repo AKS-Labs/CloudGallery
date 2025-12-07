@@ -287,6 +287,8 @@ fun RemotePhotosGrid(
                 },
                 modifier = Modifier
                     .fillMaxSize()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.background)
                     .floatingToolbarVerticalNestedScroll(
                         expanded = expanded,
                         onExpand = { onExpandedChange(true) },

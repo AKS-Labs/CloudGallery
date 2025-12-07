@@ -59,7 +59,7 @@ fun AppNavHost(
         popEnterTransition = { EnterTransition.None },
         popExitTransition = {
             scaleOut(
-                targetScale = 0.7F,
+                targetScale = 0.9F,
                 transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 0.5f)
             )
         },
