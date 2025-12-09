@@ -585,6 +585,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                     expanded = expanded,
                     onExpandedChange = { expanded = it },
                     navController = navController,
+                    viewModel = viewModel,
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
@@ -746,7 +747,7 @@ fun SelectionTopAppBar(
         actions = {
             IconButton(
                 onClick = onToggleSelectAll,
-                enabled = !areAllSelected
+                enabled = true
             ) {
                 Icon(
                     imageVector = Icons.Default.ChecklistRtl,

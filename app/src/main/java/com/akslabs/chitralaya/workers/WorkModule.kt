@@ -340,6 +340,9 @@ object WorkModule {
     fun observeWorkerByName(name: String) = manager.getWorkInfosForUniqueWorkFlow(name)
         .flowOn(Dispatchers.IO)
 
+    fun observeWorkerByTag(tag: String) = manager.getWorkInfosByTagFlow(tag)
+        .flowOn(Dispatchers.IO)
+
     const val PERIODIC_PHOTO_BACKUP_WORK = "PeriodicPhotoBackupWork"
     const val SYNC_MEDIA_STORE_WORK = "SyncMediaStoreWork"
     const val RESTORE_ALL_PHOTOS_WORK = "RestoreAllPhotosWork"

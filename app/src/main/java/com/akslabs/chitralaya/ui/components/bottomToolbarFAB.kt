@@ -43,7 +43,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.akslabs.cloudgallery.ui.main.nav.Screens
+import com.akslabs.cloudgallery.ui.main.MainViewModel
 import com.akslabs.cloudgallery.utils.NotificationHelper
 import com.akslabs.cloudgallery.workers.PeriodicPhotoBackupWorker
 
@@ -53,10 +55,11 @@ fun BottomToolbarFAB(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     navController: NavHostController,
+    viewModel: MainViewModel,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
-    var isUploading by remember { mutableStateOf(false) }
+    val isUploading by viewModel.isUploading.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val workManager = WorkManager.getInstance(context)
     val backupWorkRequest = OneTimeWorkRequestBuilder<PeriodicPhotoBackupWorker>()
@@ -96,16 +99,28 @@ fun BottomToolbarFAB(
             FilledIconButton(
                 modifier = Modifier.width(66.dp),
                 onClick = {
-                    isUploading = !isUploading
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (isUploading) {
-                        workManager.enqueue(backupWorkRequest)
-                        Toast.makeText(context, "Backup started", Toast.LENGTH_SHORT).show()
-                        NotificationHelper.showBackupStartedNotification(context)
+                        // Stop all uploads (manual, instant, and current periodic if running)
+                        try {
+                            workManager.cancelAllWorkByTag("manual_backup")
+                            workManager.cancelAllWorkByTag("instant_upload")
+                            // Also cancel the instant periodic backup worker if it's running
+                            workManager.cancelUniqueWork("InstantPhotoBackupWork")
+                            Toast.makeText(context, "Upload stopped. Auto backup will resume on next interval", Toast.LENGTH_SHORT).show()
+                            NotificationHelper.showBackupStoppedNotification(context)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error stopping upload", Toast.LENGTH_SHORT).show()
+                        }
                     } else {
-                        workManager.cancelAllWorkByTag("manual_backup")
-                        Toast.makeText(context, "Backup stopped by user", Toast.LENGTH_SHORT).show()
-                        NotificationHelper.showBackupStoppedNotification(context)
+                        // Start manual backup
+                        try {
+                            workManager.enqueue(backupWorkRequest)
+                            Toast.makeText(context, "Backup started", Toast.LENGTH_SHORT).show()
+                            NotificationHelper.showBackupStartedNotification(context)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error starting backup", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             ) {

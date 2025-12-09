@@ -11,17 +11,22 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.work.WorkManager
+import androidx.work.WorkInfo
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import com.akslabs.cloudgallery.data.mediastore.LocalPhotoSource
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.ui.main.nav.Screens
+import com.akslabs.cloudgallery.workers.WorkModule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     var currentDestination by mutableStateOf<Screens>(Screens.LocalPhotos)
@@ -36,6 +41,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateSyncState(newState: SyncState) {
         _syncState.value = newState
+    }
+
+    // Upload/Backup state tracking
+    private val _isUploading = MutableStateFlow(false)
+    val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
+
+    init {
+        // Combine observations of manual_backup and instant_upload tags
+        viewModelScope.launch {
+            try {
+                combine(
+                    WorkModule.observeWorkerByTag("manual_backup"),
+                    WorkModule.observeWorkerByTag("instant_upload")
+                ) { manualWorkList, instantWorkList ->
+                    val manualActive = manualWorkList.any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING }
+                    val instantActive = instantWorkList.any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING }
+                    manualActive || instantActive
+                }.collect { isActive ->
+                    _isUploading.value = isActive
+                    Log.d("MainViewModel", "Upload state: $isActive")
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error observing upload work", e)
+            }
+        }
     }
 
     val localPhotosFlow: Flow<PagingData<LocalUiPhoto>> by lazy {

@@ -63,6 +63,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.work.NetworkType
+import androidx.work.WorkManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -416,9 +417,17 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                         context.toastFromMainThread("Periodic backup enabled")
                     }
                 } else {
+                    // Cancel ongoing uploads when disabling auto backup
+                    try {
+                        val workManager = WorkManager.getInstance(context)
+                        workManager.cancelAllWorkByTag("manual_backup")
+                        workManager.cancelAllWorkByTag("instant_upload")
+                    } catch (e: Exception) {
+                        android.util.Log.e("SettingsScreen", "Error cancelling uploads", e)
+                    }
                     WorkModule.PeriodicBackup.cancel()
                     scope.launch {
-                        context.toastFromMainThread("Periodic backup cancelled")
+                        context.toastFromMainThread("Periodic backup cancelled and active uploads stopped")
                     }
                 }
             }
@@ -495,7 +504,21 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     "Not Roaming" to NetworkType.NOT_ROAMING.name
                 ).find { it.second == value }?.first ?: "All networks"
                 currentNetwork = selectedLabel
+                
+                // Cancel ongoing uploads when changing network type
+                try {
+                    val workManager = WorkManager.getInstance(context)
+                    workManager.cancelAllWorkByTag("manual_backup")
+                    workManager.cancelAllWorkByTag("instant_upload")
+                    workManager.cancelUniqueWork("InstantPhotoBackupWork")
+                } catch (e: Exception) {
+                    android.util.Log.e("SettingsScreen", "Error cancelling uploads on network change", e)
+                }
+                
                 WorkModule.PeriodicBackup.enqueue(forceUpdate = true)
+                scope.launch {
+                    context.toastFromMainThread("Network type changed. Active uploads stopped. Auto backup will resume on next interval")
+                }
             }
         )
 
