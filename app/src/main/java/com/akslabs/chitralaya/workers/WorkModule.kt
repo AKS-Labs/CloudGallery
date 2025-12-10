@@ -46,19 +46,27 @@ object WorkModule {
             ).toLong()
         }
 
-        fun enqueue(forceUpdate: Boolean = false) {
+        fun enqueue(forceUpdate: Boolean = false, onlySchedule: Boolean = false) {
             val constraints = getConstraints()
             val repeatIntervalDays = getRepeatIntervalDays()
 
             // 1️⃣ Immediate one-time backup
-            val instantBackupRequest =
-                OneTimeWorkRequestBuilder<PeriodicPhotoBackupWorker>()
-                    .setInputData(
-                        workDataOf(PeriodicPhotoBackupWorker.KEY_COMPRESSION_THRESHOLD to 1024 * 50L)
-                    )
-                    .setConstraints(constraints)
-                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                    .build()
+            if (!onlySchedule) {
+                val instantBackupRequest =
+                    OneTimeWorkRequestBuilder<PeriodicPhotoBackupWorker>()
+                        .setInputData(
+                            workDataOf(PeriodicPhotoBackupWorker.KEY_COMPRESSION_THRESHOLD to 1024 * 50L)
+                        )
+                        .setConstraints(constraints)
+                        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                        .build()
+
+                manager.enqueueUniqueWork(
+                    "InstantPhotoBackupWork",
+                    ExistingWorkPolicy.REPLACE,
+                    instantBackupRequest
+                )
+            }
 
             // 2️⃣ Periodic backup with current preferences
             val periodicUploadWorkRequest =
@@ -73,12 +81,6 @@ object WorkModule {
                         duration = Duration.ofMinutes(40)
                     )
                     .build()
-
-            manager.enqueueUniqueWork(
-                "InstantPhotoBackupWork",
-                ExistingWorkPolicy.REPLACE,
-                instantBackupRequest
-            )
 
             manager.enqueueUniquePeriodicWork(
                 PERIODIC_PHOTO_BACKUP_WORK,
@@ -142,6 +144,7 @@ object WorkModule {
                     workDataOf(InstantPhotoUploadWorker.KEY_PHOTO_URI to uri.toString())
                 )
                 .setConstraints(constraints)
+                .addTag("instant_upload")
                 .build()
 
         fun enqueue() {

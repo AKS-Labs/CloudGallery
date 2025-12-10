@@ -38,15 +38,28 @@ class InstantPhotoUploadWorker(
                 
                 sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext)
 
-                setForeground(
-                    ForegroundInfo(
-                        NOTIFICATION_ID,
-                        makeStatusNotification(
-                            appContext.getString(R.string.photo_upload_successful),
-                            appContext
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    setForeground(
+                        ForegroundInfo(
+                            NOTIFICATION_ID,
+                            makeStatusNotification(
+                                appContext.getString(R.string.photo_upload_successful),
+                                appContext
+                            ),
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                         )
                     )
-                )
+                } else {
+                    setForeground(
+                        ForegroundInfo(
+                            NOTIFICATION_ID,
+                            makeStatusNotification(
+                                appContext.getString(R.string.photo_upload_successful),
+                                appContext
+                            )
+                        )
+                    )
+                }
                 Result.success()
             } catch (e: Throwable) {
                 Log.d("PhotoUpload", "FAILED: ${e.localizedMessage}")

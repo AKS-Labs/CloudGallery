@@ -3,7 +3,9 @@ package com.akslabs.cloudgallery.workers
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.compose.ui.util.fastForEach
+import androidx.compose.ui.util.fastForEachIndexed
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -40,8 +42,10 @@ class PeriodicPhotoBackupWorker(
         val imageList = DbHolder.database.photoDao().getAllNotUploaded()
         return withContext(Dispatchers.IO) {
             try {
+                Log.d("PeriodicBackup", "Found ${imageList.size} photos not uploaded")
                 lateinit var tempFile: File
-                imageList.fastForEach { photo ->
+                imageList.fastForEachIndexed { index, photo ->
+                    Log.d("PeriodicBackup", "Processing ${index + 1}/${imageList.size}: ${photo.pathUri}")
                     val uri = photo.pathUri.toUri()
                     try {
                         val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri)

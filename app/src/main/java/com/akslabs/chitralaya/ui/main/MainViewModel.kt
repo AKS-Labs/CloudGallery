@@ -53,11 +53,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 combine(
                     WorkModule.observeWorkerByTag("manual_backup"),
-                    WorkModule.observeWorkerByTag("instant_upload")
-                ) { manualWorkList, instantWorkList ->
+                    WorkModule.observeWorkerByTag("instant_upload"),
+                    WorkModule.observeWorkerByName("InstantPhotoBackupWork"),
+                    WorkModule.observeWorkerByName(WorkModule.PERIODIC_PHOTO_BACKUP_WORK)
+                ) { manualWorkList, instantWorkList, instantPeriodicList, periodicWorkList ->
                     val manualActive = manualWorkList.any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING }
                     val instantActive = instantWorkList.any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING }
-                    manualActive || instantActive
+                    val instantPeriodicActive = instantPeriodicList.any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING }
+                    
+                    // periodicWork is always ENQUEUED, so we only check for RUNNING state
+                    val periodicActive = periodicWorkList.any { it.state == WorkInfo.State.RUNNING }
+                    
+                    manualActive || instantActive || instantPeriodicActive || periodicActive
                 }.collect { isActive ->
                     _isUploading.value = isActive
                     Log.d("MainViewModel", "Upload state: $isActive")

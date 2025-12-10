@@ -45,9 +45,12 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.akslabs.cloudgallery.ui.main.nav.Screens
+import com.akslabs.cloudgallery.workers.PeriodicPhotoBackupWorker
+import androidx.compose.material3.LocalContentColor
 import com.akslabs.cloudgallery.ui.main.MainViewModel
 import com.akslabs.cloudgallery.utils.NotificationHelper
-import com.akslabs.cloudgallery.workers.PeriodicPhotoBackupWorker
+import com.akslabs.cloudgallery.workers.WorkModule
+import com.akslabs.cloudgallery.data.localdb.Preferences
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -107,7 +110,17 @@ fun BottomToolbarFAB(
                             workManager.cancelAllWorkByTag("instant_upload")
                             // Also cancel the instant periodic backup worker if it's running
                             workManager.cancelUniqueWork("InstantPhotoBackupWork")
-                            Toast.makeText(context, "Upload stopped. Auto backup will resume on next interval", Toast.LENGTH_SHORT).show()
+                            // Cancel periodic worker if it's currently running
+                            workManager.cancelUniqueWork(WorkModule.PERIODIC_PHOTO_BACKUP_WORK)
+                            
+                            // If auto-backup is enabled, we must re-schedule the periodic worker
+                            // so it runs again at the next interval (without triggering immediate work now)
+                            val isAutoBackupEnabled = Preferences.getBoolean(Preferences.isAutoBackupEnabledKey, false)
+                            if (isAutoBackupEnabled) {
+                                WorkModule.PeriodicBackup.enqueue(onlySchedule = true)
+                            }
+
+                            Toast.makeText(context, "Upload stopped", Toast.LENGTH_SHORT).show()
                             NotificationHelper.showBackupStoppedNotification(context)
                         } catch (e: Exception) {
                             Toast.makeText(context, "Error stopping upload", Toast.LENGTH_SHORT).show()
@@ -130,6 +143,8 @@ fun BottomToolbarFAB(
                         contentDescription = "Uploading",
                         modifier = Modifier
                             .offset(y = offsetY.dp)
+                            .zIndex(1f),
+                        tint = LocalContentColor.current.copy(alpha = alpha)
                     )
                 } else {
                     Icon(

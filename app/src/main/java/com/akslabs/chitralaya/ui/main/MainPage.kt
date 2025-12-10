@@ -776,33 +776,16 @@ fun SelectionTopAppBar(
                                         return@launch
                                     }
 
-                                    val successfulUploads = withContext(Dispatchers.IO) {
-                                        var count = 0
+                                    withContext(Dispatchers.IO) {
                                         selectedPhotos.forEach { localId ->
                                             val photo = DbHolder.database.photoDao().getPhotoByLocalId(localId)
-                                            if (photo?.pathUri != null) {
-                                                try {
-                                                    sendFileViaUri(
-                                                        photo.pathUri.toUri(),
-                                                        context.contentResolver,
-                                                        channelId,
-                                                        BotApi,
-                                                        context
-                                                    )
-                                                    count++
-                                                } catch (e: Exception) {
-                                                    Log.e("Upload", "Failed to upload photo $localId: ${e.message}")
-                                                }
+                                            photo?.pathUri?.toUri()?.let { uri ->
+                                                WorkModule.InstantUpload(uri).enqueue()
                                             }
                                         }
-                                        count
                                     }
+                                    context.toastFromMainThread("Photos queued for upload")
 
-                                    if (successfulUploads > 0) {
-                                        context.toastFromMainThread("$successfulUploads images uploaded to Cloud.")
-                                    } else {
-                                        context.toastFromMainThread("No images uploaded or failed to find selected images.")
-                                    }
                                     onClearSelection()
                                 }
                             }
