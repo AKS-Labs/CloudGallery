@@ -252,9 +252,21 @@ fun RemotePhotosGrid(
                 )
             }
         } else {
+            // Calculate effective total items for scrollbar (accounting for headers)
+            val effectiveTotalItems = remember(layoutCache, columns) {
+                if (isDateGroupedLayout) {
+                    val headers = layoutCache.dateGroupedItems.count { it is RemoteGridItem.HeaderItem }
+                    val photos = layoutCache.dateGroupedItems.count { it is RemoteGridItem.PhotoItem }
+                    val totalRows = headers + kotlin.math.ceil(photos.toFloat() / columns).toInt()
+                    totalRows * columns
+                } else {
+                    layoutCache.normalGridItems.size
+                }
+            }
+
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
-                totalItemsCount = cloudPhotos.itemCount,
+                totalItemsCount = effectiveTotalItems,
                 columnCount = columns,
                 modifier = Modifier.align(Alignment.CenterEnd),
                 onDraggingChange = { isDragging -> isScrollbarDragging = isDragging }

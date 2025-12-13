@@ -45,45 +45,57 @@ fun PhotoGridDialog(
                     .height(400.dp)
                     .width(225.dp)
             ) {
-                LazyVerticalGrid(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(2.dp),
-                    columns = GridCells.Fixed(4),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    items(idList) { id ->
-                        Box(
-                            modifier = Modifier
-                                .height(50.dp)
-                                .background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            SubcomposeAsyncImage(
-                                imageLoader = ImageLoaderModule.remoteImageLoader,
-                                model = ImageRequest.Builder(context)
-                                    .data(id)
-                                    .placeholderMemoryCacheKey(id)
-                                    .memoryCacheKey(id)
-                                    .build(),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                                contentDescription = context.getString(R.string.photo),
-                                loading = {
-                                    LoadAnimation()
-                                },
-                                error = {
-                                    Icon(
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        imageVector = Icons.Rounded.CloudOff,
-                                        contentDescription = stringResource(R.string.load_error),
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                    )
-                                }
-                            )
+                val state = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+                
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyVerticalGrid(
+                        state = state,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(2.dp),
+                        columns = GridCells.Fixed(4),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        items(idList) { id ->
+                            Box(
+                                modifier = Modifier
+                                    .height(50.dp)
+                                    .background(MaterialTheme.colorScheme.surface)
+                            ) {
+                                SubcomposeAsyncImage(
+                                    imageLoader = ImageLoaderModule.remoteImageLoader,
+                                    model = ImageRequest.Builder(context)
+                                        .data(id)
+                                        .placeholderMemoryCacheKey(id)
+                                        .memoryCacheKey(id)
+                                        .build(),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentDescription = context.getString(R.string.photo),
+                                    loading = {
+                                        LoadAnimation()
+                                    },
+                                    error = {
+                                        Icon(
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            imageVector = Icons.Rounded.CloudOff,
+                                            contentDescription = stringResource(R.string.load_error),
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
+                    
+                    com.akslabs.chitralaya.ui.components.ExpressiveScrollbar(
+                        lazyGridState = state,
+                        totalItemsCount = idList.size,
+                        columnCount = 4,
+                        modifier = Modifier.align(androidx.compose.ui.Alignment.CenterEnd)
+                    )
                 }
             }
         }

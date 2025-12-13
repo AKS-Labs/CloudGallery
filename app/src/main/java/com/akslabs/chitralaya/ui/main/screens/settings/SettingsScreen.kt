@@ -517,7 +517,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                 
                 WorkModule.PeriodicBackup.enqueue(forceUpdate = true)
                 scope.launch {
-                    context.toastFromMainThread("Network type changed. Active uploads stopped. Auto backup will resume on next interval")
+                    context.toastFromMainThread("Network type changed")
                 }
             }
         )
