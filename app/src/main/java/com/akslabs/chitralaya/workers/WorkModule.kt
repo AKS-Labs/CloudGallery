@@ -356,9 +356,20 @@ object WorkModule {
     const val DAILY_DATABASE_BACKUP_WORK = "DailyDatabaseBackupWork"
     const val UPLOADING_ID = "UploadingId"
     const val DOWNLOADING_ID = "DownloadingId"
+    
     val VERBOSE_NOTIFICATION_CHANNEL_NAME: CharSequence = "Verbose WorkManager Notifications"
     const val VERBOSE_NOTIFICATION_CHANNEL_DESCRIPTION = "Shows notifications whenever work starts"
     val NOTIFICATION_TITLE: CharSequence = "Chitralaya"
     const val CHANNEL_ID = "VERBOSE_WHITE_HOLE_APP_NOTIFICATION"
+
+    // Unique Notification IDs
+    const val NOTIFICATION_ID_BACKUP = 101
+    const val NOTIFICATION_ID_SYNC = 102
+    const val NOTIFICATION_ID_DOWNLOAD = 103
+    const val NOTIFICATION_ID_UPLOAD = 104
+    const val NOTIFICATION_ID_EXPORT = 105
+    const val NOTIFICATION_ID_GENERIC = 100
+    
+    @Deprecated("Use unique IDs instead")
     const val NOTIFICATION_ID = 1
 }

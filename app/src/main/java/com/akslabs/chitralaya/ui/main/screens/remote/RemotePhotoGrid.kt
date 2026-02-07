@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudOff
@@ -417,16 +418,22 @@ fun CloudPhotoItem(
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp)) // Clip the whole item to rounded shape
-            .background(MaterialTheme.colorScheme.surfaceVariant) // Base background
-            .then(if (isSelected) Modifier.border(8.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else Modifier), // Thicker border
+            .clip(RoundedCornerShape(28.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .then(
+                if (isSelected) Modifier.border(
+                    6.dp, 
+                    MaterialTheme.colorScheme.primary, 
+                    RoundedCornerShape(28.dp)
+                ) else Modifier
+            ),
         contentAlignment = Alignment.Center
     ) {
-        // Content Wrapper for padding
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isSelected) Modifier.padding(4.dp) else Modifier) // Padding for the content
+                .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
+                .clip(RoundedCornerShape(if (isSelected) 22.dp else 28.dp))
         ) {
             if (remotePhoto != null) {
                 val targetSize = if (isScrollbarDragging) 50 else thumbnailResolution
@@ -451,49 +458,64 @@ fun CloudPhotoItem(
                     modifier = Modifier.fillMaxSize(),
                     contentDescription = stringResource(id = R.string.photo),
                     loading = {
-                        // Use the same loading animation as full-screen image loader
-                        LoadAnimation()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LoadAnimation()
+                        }
                     },
                     error = { error ->
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                 imageVector = Icons.Rounded.CloudOff,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
                 )
+
+                // Selection Tonal Overlay
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                    )
+                }
             } else {
-                // Simplified placeholder for null items during loading - just background color
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 )
             }
         }
+        
         if (isSelected) {
-            // Solid checkmark icon
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(7.dp) // Padding from the edge of the photo item
-                    .background(MaterialTheme.colorScheme.primary, CircleShape) // Solid primary circle background
-                    .size(24.dp), // Size of the icon container
+                    .padding(10.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .size(28.dp)
+                    .border(2.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.CheckCircle, // Just the checkmark
+                    imageVector = Icons.Default.Check,
                     contentDescription = "Selected",
-                    tint = MaterialTheme.colorScheme.onPrimary, // Contrasting checkmark color
-                    modifier = Modifier.size(20.dp) // Checkmark size
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

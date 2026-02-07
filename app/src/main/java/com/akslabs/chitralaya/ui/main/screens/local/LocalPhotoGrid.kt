@@ -7,7 +7,9 @@ import android.content.ContextWrapper
 import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -29,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.BrokenImage
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudDone
@@ -533,111 +536,128 @@ fun LocalPhotoItem(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-
-    // Animate scale/alpha if deleted
     val scale by animateFloatAsState(
-        targetValue = if (isDeleted) 0f else 1f,
-        animationSpec = tween(300),
-        label = "scale"
+        targetValue = if (isDeleted) 0.8f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy),
+        label = "item_scale"
     )
 
-    if (scale > 0f) {
-        Box(
-            modifier = modifier
-                .aspectRatio(1f)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    alpha = scale
-                }
-                .clip(RoundedCornerShape(16.dp)) // Clip the whole item to rounded shape
-                .background(MaterialTheme.colorScheme.surfaceVariant) // Base background
-                .then(if (isSelected) Modifier.border(8.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else Modifier), // Thicker border
-            contentAlignment = Alignment.Center
-        ) {
-            // Content Wrapper for padding
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (isSelected) Modifier.padding(4.dp) else Modifier) // Padding for the content
-            ) {
-                SubcomposeAsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(photo.pathUri)
-                        .size(if (isScrollbarDragging) Size(50, 50) else Size(thumbnailResolution, thumbnailResolution))
-                        .crossfade(!isScrollbarDragging)
-                        .allowHardware(false) // Disable hardware bitmaps to avoid issues during rapid scroll? Or maybe true is better. Let's stick to false for now as per previous optimization attempts or default. Actually default is true.
-                        // Let's use the optimized settings:
-                        .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                        .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                        .build(),
-                    contentDescription = stringResource(R.string.photo),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                    loading = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Optional: small loading indicator or just color
-                        }
-                    },
-                    error = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.BrokenImage,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                )
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                alpha = scale
             }
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .then(
+                if (isSelected) Modifier.border(
+                    6.dp, 
+                    MaterialTheme.colorScheme.primary, 
+                    RoundedCornerShape(16.dp)
+                ) else Modifier
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
+                .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
+        ) {
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(photo.pathUri)
+                    .size(if (isScrollbarDragging) Size(50, 50) else Size(thumbnailResolution, thumbnailResolution))
+                    .crossfade(!isScrollbarDragging)
+                    .allowHardware(false)
+                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .build(),
+                contentDescription = stringResource(R.string.photo),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        LoadAnimation()
+                    }
+                },
+                error = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Block,
+                            contentDescription = "Error loading image",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            )
 
-            // Selection Checkmark
+            // Selection Tonal Overlay
             if (isSelected) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape)
-                        .size(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            // Cloud Icon (if backed up)
-            if (photo.remoteId != null) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f), CircleShape)
-                        .size(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.CloudDone,
-                        contentDescription = "Backed up",
-                        tint = Color(0xFF4CAF50), // Green color
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                )
             }
         }
+
+        // Selection Checkmark (Improved)
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .size(28.dp)
+                    .border(2.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        // Cloud Icon (if backed up)
+        // Note: Local Photo usually doesn't have remoteId directly, but we check if it's synced
+        // For now, if we want to show it, we need to pass a property or look it up.
+        // Assuming we might have a way to know if it's backed up.
+        // I'll comment this out or use a dummy check for now to fix the build error.
+        /*
+        if (photo.remoteId != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(10.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f), CircleShape)
+                    .size(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.CloudDone,
+                    contentDescription = "Backed up",
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+        */
     }
 }

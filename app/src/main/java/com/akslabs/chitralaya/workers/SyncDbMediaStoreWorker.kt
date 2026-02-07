@@ -68,10 +68,10 @@ class SyncDbMediaStoreWorker(
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        return ForegroundInfo(
-            WorkModule.NOTIFICATION_ID,
-            makeStatusNotification(context.getString(R.string.syncing_all_photos), context),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        return createForegroundInfo(
+            context,
+            WorkModule.NOTIFICATION_ID_SYNC,
+            context.getString(R.string.syncing_all_photos)
         )
     }
 }

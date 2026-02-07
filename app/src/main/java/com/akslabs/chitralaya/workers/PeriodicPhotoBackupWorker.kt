@@ -103,20 +103,11 @@ class PeriodicPhotoBackupWorker(
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            // Android 12+ requires foreground service type
-            ForegroundInfo(
-                NOTIFICATION_ID,
-                makeStatusNotification(appContext.getString(R.string.backing_up_photos), appContext),
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            )
-        } else {
-            // For Android 10-11, use constructor without service type
-            ForegroundInfo(
-                NOTIFICATION_ID,
-                makeStatusNotification(appContext.getString(R.string.backing_up_photos), appContext)
-            )
-        }
+        return createForegroundInfo(
+            appContext,
+            WorkModule.NOTIFICATION_ID_BACKUP,
+            appContext.getString(R.string.backing_up_photos)
+        )
     }
 
     companion object {

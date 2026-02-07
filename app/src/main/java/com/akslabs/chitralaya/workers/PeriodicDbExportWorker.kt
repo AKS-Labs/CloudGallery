@@ -34,10 +34,10 @@ class PeriodicDbExportWorker(
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        return ForegroundInfo(
-            NOTIFICATION_ID,
-            makeStatusNotification(appContext.getString(R.string.exporting_database), appContext),
-            FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        return createForegroundInfo(
+            appContext,
+            WorkModule.NOTIFICATION_ID_EXPORT,
+            appContext.getString(R.string.exporting_database)
         )
     }
 

@@ -39,7 +39,7 @@ object Preferences {
     private lateinit var encryptedPreferences: SharedPreferences
 
     private val observableStringPreferences = mutableMapOf<String, MutableStateFlow<String>>()
-    // Add other types of observable preferences here if needed (e.g., for Boolean, Int, etc.)
+    private lateinit var preferenceChangeListener: SharedPreferences.OnSharedPreferenceChangeListener
 
     fun init(context: Context) {
         try {
@@ -59,7 +59,8 @@ object Preferences {
             observableStringPreferences[glideSelectionBehaviorKey] = MutableStateFlow(getString(glideSelectionBehaviorKey, "Fixed"))
 
             // Register a listener for SharedPreferences changes to update StateFlows
-            preferences.registerOnSharedPreferenceChangeListener { sharedPreferences, key ->
+            // Store the listener reference to prevent garbage collection
+            preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
                 when (key) {
                     glideSelectionBehaviorKey -> {
                         // Use the correct default value when updating the flow
@@ -69,6 +70,7 @@ object Preferences {
                     // Handle other observable keys here if needed
                 }
             }
+            preferences.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
 
         } catch (e: Exception) {
             e.printStackTrace()

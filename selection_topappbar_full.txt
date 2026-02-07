@@ -1,0 +1,250 @@
+﻿                                    onClearSelection = { clearSelection() },
+                                    onToggleSelectAll = { toggleSelectAll() },
+                                    areAllSelected = areAllSelected,
+                                    scope = scope,
+                                    context = ctx,
+                                    selectedPhotos = selectedPhotos,
+                                    currentRoute = currentRoute,
+                                    onDeletionComplete = {
+                                        val idsToDelete = selectedPhotos.toList()
+                                        deletedPhotoIds.addAll(idsToDelete)
+                                        scope.launch {
+                                            Log.d("MainPage", "≡ƒùæ∩╕Å Deletion animation started for ${idsToDelete.size} items")
+                                            // Wait for animation (300ms) + buffer for MediaStore update
+                                            kotlinx.coroutines.delay(1000) 
+                                            // Remove from local database immediately
+                                            withContext(Dispatchers.IO) {
+                                                idsToDelete.forEach { localId ->
+                                                    DbHolder.database.photoDao().deleteById(localId)
+                                                }
+                                            }
+                                            Log.d("MainPage", "≡ƒöä Refreshing local photos after deletion")
+                                            localPhotos.refresh()
+                                        }
+                                    },
+                                    onRestore = {
+                                        scope.launch(Dispatchers.IO) {
+                                            val dao = DbHolder.database.deletedPhotoDao()
+                                            val remoteDao = DbHolder.database.remotePhotoDao()
+                                            selectedPhotos.forEach { id ->
+                                                val photo = dao.getById(id)
+                                                if (photo != null) {
+                                                    remoteDao.insertAll(com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto(
+                                                        remoteId = photo.remoteId,
+                                                        photoType = photo.photoType,
+                                                        fileName = photo.fileName,
+                                                        fileSize = photo.fileSize,
+                                                        uploadedAt = photo.uploadedAt,
+                                                        messageId = photo.messageId
+                                                    ))
+                                                    dao.delete(photo)
+                                                }
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                ctx.toastFromMainThread("Restored ${selectedPhotos.size} photos")
+                                                clearSelection()
+                                            }
+                                        }
+                                    },
+                                    onPermanentlyDelete = {
+                                        scope.launch(Dispatchers.IO) {
+                                            val dao = DbHolder.database.deletedPhotoDao()
+                                            selectedPhotos.forEach { id ->
+                                                dao.deleteById(id)
+                                            }
+                                            withContext(Dispatchers.Main) {
+                                                ctx.toastFromMainThread("Deleted ${selectedPhotos.size} photos permanently")
+                                                clearSelection()
+                                            }
+                                        }
+                                    }
+                                )
+                            } else {
+                                Column {
+                                    TopAppBar(
+                                        title = {
+                                            Column(modifier = Modifier.padding(top = 30.dp)) {
+                                                val titleText = when (currentRoute) {
+                                                    Screens.LocalPhotos.route -> "Device Photos"
+                                                    Screens.RemotePhotos.route -> "Cloud Gallery"
+                                                    Screens.TrashBin.route -> "Trash Bin"
+                                                    else -> "Cloud Gallery"
+                                                }
+                                                Text(
+                                                    text = titleText,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                )
+                                                // Show total size if available
+                                                val context = LocalContext.current
+                                                val localViewModel: com.akslabs.cloudgallery.ui.main.screens.local.LocalViewModel = screenScopedViewModel()
+                                                val remoteViewModel: com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel = screenScopedViewModel()
+                                                val trashViewModel: com.akslabs.cloudgallery.ui.main.screens.trash.TrashViewModel = screenScopedViewModel()
+                                                
+                                                val totalSize = when (currentRoute) {
+                                                    Screens.LocalPhotos.route -> localViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
+                                                    Screens.RemotePhotos.route -> remoteViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
+                                                    Screens.TrashBin.route -> trashViewModel.totalSize.collectAsStateWithLifecycle().value ?: 0L
+                                                    else -> 0L
+                                                }
+                                                
+                                                if (totalSize > 0) {
+                                                    val count = when (currentRoute) {
+                                                        Screens.LocalPhotos.route -> localPhotosCount
+                                                        Screens.RemotePhotos.route -> cloudPhotosCount
+                                                        Screens.TrashBin.route -> trashViewModel.deletedPhotosFlow.collectAsLazyPagingItems().itemCount
+                                                        else -> 0
+                                                    }
+                                                    Text(
+                                                        text = "${android.text.format.Formatter.formatFileSize(context, totalSize)} ΓÇó $count photos",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        navigationIcon = {
+                                            if (currentRoute == Screens.TrashBin.route) {
+                                                IconButton(
+                                                    onClick = { navController.popBackStack() },
+                                                    modifier = Modifier.padding(top = 30.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.ArrowBack,
+                                                        contentDescription = "Back",
+                                                        tint = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        expandedHeight = 95.dp,
+                                        actions = {
+                                            Row(
+                                                modifier = Modifier.padding(top = 30.dp)
+                                            ) {
+                                                if (currentRoute == Screens.RemotePhotos.route) {
+                                                    IconButton(onClick = { navController.navigate(Screens.TrashBin.route) }) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.DeleteOutline,
+                                                            contentDescription = "Trash Bin",
+                                                            tint = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    }
+                                                }
+                                                // Grid options menu button
+                                                Box {
+                                                    IconButton(onClick = { showGridOptionsDropdown = true }) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Dashboard,
+                                                            contentDescription = "Grid options",
+                                                            tint = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    }
+
+                                                    DropdownMenu(
+                                                        expanded = showGridOptionsDropdown,
+                                                        onDismissRequest = { showGridOptionsDropdown = false }
+                                                    ) {
+                                                        Text(
+                                                            text = "Layout",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                                        )
+
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(
+                                                                    text = "Grid View",
+                                                                    color = if (!gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                gridState.updateDateGroupedLayout(false)
+                                                                showGridOptionsDropdown = false
+                                                            }
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(
+                                                                    text = "Date Grouped",
+                                                                    color = if (gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                gridState.updateDateGroupedLayout(true)
+                                                                showGridOptionsDropdown = false
+                                                            }
+                                                        )
+                                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                                        Text(
+                                                            text = "Columns",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                                        )
+                                                        listOf(3, 4, 5, 6).forEach { columnCount ->
+                                                            DropdownMenuItem(
+                                                                text = {
+                                                                    Text(
+                                                                        text = "$columnCount columns",
+                                                                        color = if (columnCount == gridState.columnCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                                    )
+                                                                },
+                                                                onClick = {
+                                                                    gridState.updateColumnCount(columnCount)
+                                                                    showGridOptionsDropdown = false
+                                                                }
+                                                            )
+                                                        }
+                                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(
+                                                                    text = "Grid Thumbnail Resolution",
+                                                                    color = MaterialTheme.colorScheme.onSurface
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                showThumbnailResolutionDialog = true
+                                                                showGridOptionsDropdown = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
+
+                                                // Settings button
+                                                IconButton(onClick = {
+                                                    scrollBehavior.state.heightOffset = 0f
+                                                    scrollBehavior.state.heightOffsetLimit = 0f
+                                                    navController.navigate(Screens.Settings.route)
+                                                }) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Settings,
+                                                        contentDescription = "Settings",
+                                                        tint = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        windowInsets = WindowInsets(0, 0, 0, 0),
+                                        scrollBehavior = scrollBehavior,
+                                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                                    )
+                                    ConnectivityStatusPopup()
+                                }
+                            }
+                        }
+                    }
+                },
+                contentWindowInsets = WindowInsets.navigationBars
+            ) { paddingValues ->
+                CompositionLocalProvider(LocalGridState provides gridState) {
+                    AppNavHost(
+                        modifier = Modifier
+                            .padding(paddingValues)
+                            .fillMaxSize(),
+                        navController = navController,
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it },
+                        selectionMode = selectionMode,
+                        selectedPhotos = selectedPhotos,

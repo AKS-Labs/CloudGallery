@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -250,15 +251,22 @@ fun TrashPhotoItem(
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .then(if (isSelected) Modifier.border(8.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else Modifier),
+            .clip(RoundedCornerShape(28.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .then(
+                if (isSelected) Modifier.border(
+                    6.dp, 
+                    MaterialTheme.colorScheme.primary, 
+                    RoundedCornerShape(28.dp)
+                ) else Modifier
+            ),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isSelected) Modifier.padding(4.dp) else Modifier)
+                .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
+                .clip(RoundedCornerShape(if (isSelected) 22.dp else 28.dp))
         ) {
             val targetSize = if (isScrollbarDragging) 50 else thumbnailResolution
             
@@ -278,35 +286,58 @@ fun TrashPhotoItem(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
                 contentDescription = null,
-                loading = { LoadAnimation() },
+                loading = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        LoadAnimation()
+                    }
+                },
                 error = {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Rounded.CloudOff,
-                            null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = Icons.Rounded.CloudOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
             )
+
+            // Selection Tonal Overlay
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                )
+            }
         }
+        
         if (isSelected) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(7.dp)
+                    .padding(10.dp)
                     .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    .size(24.dp),
+                    .size(28.dp)
+                    .border(2.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Filled.CheckCircle,
-                    null,
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Selected",
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

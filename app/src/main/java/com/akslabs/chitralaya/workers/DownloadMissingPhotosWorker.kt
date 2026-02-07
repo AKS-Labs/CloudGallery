@@ -97,10 +97,10 @@ class DownloadMissingPhotosWorker(
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        return ForegroundInfo(
-            WorkModule.NOTIFICATION_ID,
-            makeStatusNotification("Downloading photos", context),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        return createForegroundInfo(
+            context,
+            WorkModule.NOTIFICATION_ID_DOWNLOAD,
+            context.getString(R.string.downloading_photos)
         )
     }
 }

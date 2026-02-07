@@ -23,6 +23,12 @@ class DailyDatabaseBackupWorker(
     override suspend fun doWork(): Result {
         Log.d(TAG, "Daily database backup worker started")
         
+        try {
+            setForeground(getForegroundInfo())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set foreground", e)
+        }
+
         return try {
             // Check if backup is needed
             if (!BackupHelper.shouldCreateDailyBackup()) {
@@ -54,5 +60,13 @@ class DailyDatabaseBackupWorker(
             Log.e(TAG, "Exception in DailyDatabaseBackupWorker", e)
             Result.retry()
         }
+    }
+
+    override suspend fun getForegroundInfo(): androidx.work.ForegroundInfo {
+        return createForegroundInfo(
+            context,
+            WorkModule.NOTIFICATION_ID_BACKUP,
+            "Daily Database Backup"
+        )
     }
 }

@@ -39,26 +39,7 @@ class InstantPhotoUploadWorker(
                 sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext)
 
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                    setForeground(
-                        ForegroundInfo(
-                            NOTIFICATION_ID,
-                            makeStatusNotification(
-                                appContext.getString(R.string.photo_upload_successful),
-                                appContext
-                            ),
-                            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                        )
-                    )
-                } else {
-                    setForeground(
-                        ForegroundInfo(
-                            NOTIFICATION_ID,
-                            makeStatusNotification(
-                                appContext.getString(R.string.photo_upload_successful),
-                                appContext
-                            )
-                        )
-                    )
+                    setForeground(getForegroundInfo())
                 }
                 Result.success()
             } catch (e: Throwable) {
@@ -69,10 +50,10 @@ class InstantPhotoUploadWorker(
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        return ForegroundInfo(
-            NOTIFICATION_ID,
-            makeStatusNotification(appContext.getString(R.string.uploading_photo), appContext),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        return createForegroundInfo(
+            appContext,
+            WorkModule.NOTIFICATION_ID_UPLOAD,
+            appContext.getString(R.string.uploading_photo)
         )
     }
 

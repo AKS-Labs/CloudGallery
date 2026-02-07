@@ -1,0 +1,228 @@
+﻿
+                  // Reset flag when navigating away from 
+settings
+                  isNavigatingToSettings = false
+              }
+          }
+          var expanded by rememberSaveable { 
+mutableStateOf(true) }
+          if (showAppLayout) {
+  
+  
+              Scaffold(
+                  modifier = if (!isSettingsScreen) 
+Modifier.nestedScroll(scrollBehavior.nestedScrollConnection) 
+else Modifier,
+                  topBar = {
+                      if (!isSettingsScreen) {
+                          AnimatedContent(
+                              targetState = selectionMode,
+                              transitionSpec = {
+                                  fadeIn(animationSpec = 
+tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                              }
+                          ) { mode ->
+                               if (mode) {
+                                  val ctx = 
+LocalContext.current
+>                                 SelectionTopAppBar(
+                                      selectedCount = 
+selectedPhotos.size,
+                                      onClearSelection = { 
+clearSelection() },
+                                      onToggleSelectAll = { 
+toggleSelectAll() },
+                                      areAllSelected = 
+areAllSelected,
+                                      scope = scope,
+                                      context = ctx,
+                                      selectedPhotos = 
+selectedPhotos,
+                                      currentRoute = 
+currentRoute,
+                                      onDeletionComplete = {
+                                          val idsToDelete = 
+selectedPhotos.toList()
+                                          
+deletedPhotoIds.addAll(idsToDelete)
+                                          scope.launch {
+                                              
+Log.d("MainPage", "≡ƒùæ∩╕Å Deletion animation started for 
+${idsToDelete.size} items")
+                                              // Wait for 
+animation (300ms) + buffer for MediaStore update
+                                              
+kotlinx.coroutines.delay(1000) 
+                                              // Remove from 
+local database immediately
+                                              
+withContext(Dispatchers.IO) {
+                                                  
+idsToDelete.forEach { localId ->
+                                                      
+DbHolder.database.photoDao().deleteById(localId)
+                                                  }
+                                                  
+ctx.toastFromMainThread("Restored ${selectedPhotos.size} 
+photos")
+                                                  
+clearSelection()
+                                              }
+                                          }
+                                      },
+                                      onPermanentlyDelete = {
+                                          
+scope.launch(Dispatchers.IO) {
+                                              val dao = 
+DbHolder.database.deletedPhotoDao()
+                                              
+selectedPhotos.forEach { id ->
+                                                  
+dao.deleteById(id)
+                                              }
+                                              
+withContext(Dispatchers.Main) {
+                                                  
+ctx.toastFromMainThread("Deleted ${selectedPhotos.size} 
+photos permanently")
+                                                  
+clearSelection()
+                                              }
+                                          }
+                                      }
+                                  )
+                              } else {
+                                  Column {
+>                                     TopAppBar(
+                                          title = {
+                                              
+Column(modifier = Modifier.padding(top = 30.dp)) {
+                                                  val 
+titleText = when (currentRoute) {
+                                                      
+Screens.LocalPhotos.route -> "Device Photos"
+                                                      
+Screens.RemotePhotos.route -> "Cloud Gallery"
+                                                      
+Screens.TrashBin.route -> "Trash Bin"
+                                                      else 
+-> "Cloud Gallery"
+                                                  }
+                                                  Text(
+                                                      text = 
+titleText,
+                                                      color 
+= MaterialTheme.colorScheme.onSurface,
+                                                  )
+                                                  // Show 
+total size if available
+                                                  val 
+context = LocalContext.current
+                                                  val 
+localViewModel: com.akslabs.cloudgallery.ui.main.screens.loca
+l.LocalViewModel = screenScopedViewModel()
+                                                  val 
+remoteViewModel: com.akslabs.cloudgallery.ui.main.screens.rem
+ote.RemoteViewModel = screenScopedViewModel()
+                                                  val 
+trashViewModel: com.akslabs.cloudgallery.ui.main.screens.tras
+h.TrashViewModel = screenScopedViewModel()
+                                                  
+                                                  val 
+totalSize = when (currentRoute) {
+                                                      
+Screens.LocalPhotos.route -> 
+localViewModel.totalSize.collectAsStateWithLifecycle().value 
+?: 0L
+                      horizontalAlignment = 
+Alignment.CenterHorizontally,
+                      verticalArrangement = 
+Arrangement.Center
+                  ) {
+                      CircularProgressIndicator(color = 
+MaterialTheme.colorScheme.primaryContainer, strokeCap = 
+StrokeCap.Square)
+                      Spacer(Modifier.size(16.dp))
+                      Text(
+                          text = 
+stringResource(R.string.syncing_your_photos),
+                          color = 
+MaterialTheme.colorScheme.secondaryContainer,
+                          fontStyle = FontStyle.Italic
+                      )
+                  }
+              }
+          }
+      }
+  }
+  
+  
+  
+  @OptIn(ExperimentalMaterial3Api::class, 
+ExperimentalMaterial3ExpressiveApi::class)
+  @Composable
+> fun SelectionTopAppBar(
+      selectedCount: Int,
+      onClearSelection: () -> Unit,
+      onToggleSelectAll: () -> Unit,
+      areAllSelected: Boolean,
+      scope: CoroutineScope,
+      context: Context,
+      selectedPhotos: Set<String>,
+      currentRoute: String?,
+      onDeletionComplete: () -> Unit,
+      onRestore: () -> Unit = {},
+      onPermanentlyDelete: () -> Unit = {}
+  ) {
+      var showExtraActions by remember { 
+mutableStateOf(false) }
+  
+      val deleteRequestLauncher = 
+rememberLauncherForActivityResult(
+          contract = 
+ActivityResultContracts.StartIntentSenderForResult()
+      ) { result ->
+          if (result.resultCode == Activity.RESULT_OK) {
+              scope.launch {
+                  context.toastFromMainThread("Photos 
+deleted successfully.")
+              }
+              onDeletionComplete()
+          } else {
+              scope.launch {
+                  context.toastFromMainThread("Couldn't get 
+permission to delete photos.")
+              }
+          }
+          onClearSelection()
+      }
+  
+>     TopAppBar(
+          title = {
+              SplitButtonLayout(
+                  leadingButton = {
+                      
+SplitButtonDefaults.LeadingButton(onClick = 
+onClearSelection) {
+                          Icon(
+                              Icons.Default.Close,
+                              contentDescription = "Close 
+selection mode"
+                          )
+                      }
+                  },
+                  trailingButton = {
+                      val endShape = 
+RoundedCornerShape(topStartPercent = 0, bottomStartPercent = 
+0, topEndPercent = 50, bottomEndPercent = 50)
+                      Box(
+                          modifier = Modifier
+                              .fillMaxHeight()
+                              .background(
+                                  color = 
+MaterialTheme.colorScheme.surfaceContainer,
+                                  shape = endShape
+                              )
+                              .padding(horizontal = 12.dp),
+
+

@@ -11,7 +11,7 @@ plugins {
 android {
     namespace = "com.akslabs.cloudgallery"
     compileSdk = 36  // Updated to compile against Android 15
-
+    
     defaultConfig {
         applicationId = "com.akslabs.cloudgallery"
         minSdk = 29  // Keep Android 10 as minimum

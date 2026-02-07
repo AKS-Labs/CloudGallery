@@ -16,6 +16,12 @@ class SyncRemoteSizesWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        try {
+            setForeground(getForegroundInfo())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set foreground", e)
+        }
+
         return withContext(Dispatchers.IO) {
             try {
                 val channelId = Preferences.getEncryptedLong(Preferences.channelId, 0L)
@@ -57,6 +63,14 @@ class SyncRemoteSizesWorker(
                 Result.retry()
             }
         }
+    }
+
+    override suspend fun getForegroundInfo(): androidx.work.ForegroundInfo {
+        return createForegroundInfo(
+            applicationContext,
+            WorkModule.NOTIFICATION_ID_SYNC,
+            "Syncing remote file info..."
+        )
     }
 
     companion object {

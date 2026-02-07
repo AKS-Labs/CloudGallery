@@ -86,20 +86,18 @@ class CloudPhotoSyncWorker(
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        return createForegroundInfo()
+        return createForegroundInfo(
+            applicationContext,
+            WorkModule.NOTIFICATION_ID_SYNC,
+            applicationContext.getString(R.string.syncing_cloud_photos)
+        )
     }
 
     private fun createForegroundInfo(): ForegroundInfo {
-        val notification = NotificationHelper.createCloudSyncNotification(
+        return createForegroundInfo(
             applicationContext,
-            "Syncing cloud photos...",
-            "Discovering historical photos from Telegram"
-        )
-        
-        return ForegroundInfo(
-            NOTIFICATION_ID,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            WorkModule.NOTIFICATION_ID_SYNC,
+            applicationContext.getString(R.string.syncing_cloud_photos)
         )
     }
 
