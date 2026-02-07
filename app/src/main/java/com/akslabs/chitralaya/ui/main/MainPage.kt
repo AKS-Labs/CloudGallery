@@ -373,10 +373,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                         title = {
                                             Column(modifier = Modifier.padding(top = 30.dp)) {
                                                 val titleText = when (currentRoute) {
-                                                    Screens.LocalPhotos.route -> "Device Photos"
-                                                    Screens.RemotePhotos.route -> "Cloud Gallery"
-                                                    Screens.TrashBin.route -> "Trash Bin"
-                                                    else -> "Cloud Gallery"
+                                                    Screens.LocalPhotos.route -> " Device Photos"
+                                                    Screens.RemotePhotos.route -> " Cloud Gallery"
+                                                    Screens.TrashBin.route -> " Trash Bin"
+                                                    else -> " Cloud Gallery"
                                                 }
                                                 Text(
                                                     text = titleText,
@@ -408,7 +408,6 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                         else -> 0
                                                     }
                                                     
-                                                    Spacer(modifier = Modifier.height(8.dp))
                                                     
                                                     Row(
                                                         horizontalArrangement = Arrangement.spacedBy(8.dp),

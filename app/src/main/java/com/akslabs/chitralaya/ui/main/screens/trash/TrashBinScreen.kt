@@ -251,13 +251,13 @@ fun TrashPhotoItem(
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .then(
                 if (isSelected) Modifier.border(
                     6.dp, 
                     MaterialTheme.colorScheme.primary, 
-                    RoundedCornerShape(28.dp)
+                    RoundedCornerShape(16.dp)
                 ) else Modifier
             ),
         contentAlignment = Alignment.Center
@@ -266,7 +266,7 @@ fun TrashPhotoItem(
             modifier = Modifier
                 .fillMaxSize()
                 .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
-                .clip(RoundedCornerShape(if (isSelected) 22.dp else 28.dp))
+                .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
         ) {
             val targetSize = if (isScrollbarDragging) 50 else thumbnailResolution
             
