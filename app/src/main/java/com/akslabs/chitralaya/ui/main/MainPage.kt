@@ -3,6 +3,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.unit.sp
 
 
 import android.content.Context
@@ -323,7 +326,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                     DbHolder.database.photoDao().deleteById(localId)
                                                 }
                                             }
-                                            Log.d("MainPage", "🔄 Refreshing local photos after deletion")
+                                            Log.d("MainPage", "Refresh local photos after deletion")
                                             localPhotos.refresh()
                                         }
                                     },
@@ -377,7 +380,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                 }
                                                 Text(
                                                     text = titleText,
+                                                    style = MaterialTheme.typography.headlineSmall,
+                                                    fontWeight = FontWeight.ExtraBold,
                                                     color = MaterialTheme.colorScheme.onSurface,
+                                                    letterSpacing = (-0.5).sp
                                                 )
                                                 // Show total size if available
                                                 val context = LocalContext.current
@@ -396,13 +402,17 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                     val count = when (currentRoute) {
                                                         Screens.LocalPhotos.route -> localPhotosCount
                                                         Screens.RemotePhotos.route -> cloudPhotosCount
-                                                        Screens.TrashBin.route -> trashViewModel.deletedPhotosFlow.collectAsLazyPagingItems().itemCount
+                                                        Screens.TrashBin.route -> if (currentRoute == Screens.TrashBin.route) {
+                                                            trashViewModel.deletedPhotosFlow.collectAsLazyPagingItems().itemCount
+                                                        } else 0
                                                         else -> 0
                                                     }
                                                     Text(
                                                         text = "${android.text.format.Formatter.formatFileSize(context, totalSize)} • $count photos",
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        letterSpacing = 0.2.sp
                                                     )
                                                 }
                                             }
@@ -727,157 +737,174 @@ fun SelectionTopAppBar(
                     }
                 },
                 trailingButton = {
-                    val endShape = RoundedCornerShape(topStartPercent = 0, bottomStartPercent = 0, topEndPercent = 50, bottomEndPercent = 50)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceContainer,
-                                shape = endShape
-                            )
-                            .padding(horizontal = 12.dp),
-                        contentAlignment = Alignment.Center
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        shape = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 24.dp, bottomEnd = 24.dp),
+                        modifier = Modifier.fillMaxHeight()
                     ) {
-                        Text("$selectedCount Selected  ",
-                        fontWeight = FontWeight.Bold)
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "$selectedCount Selected",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 0.1.sp
+                            )
+                        }
                     }
                 }
             )
         },
         actions = {
-            IconButton(
-                onClick = onToggleSelectAll,
-                enabled = true
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = CircleShape,
+                modifier = Modifier.padding(end = 8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.ChecklistRtl,
-                    contentDescription = if (areAllSelected) "Deselect All" else "Select All",
-                    tint = if (areAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Box {
-                IconButton(onClick = { showExtraActions = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More actions")
-                }
-                DropdownMenu(
-                    expanded = showExtraActions,
-                    onDismissRequest = { showExtraActions = false }
-                ) {
-                    if (currentRoute == Screens.LocalPhotos.route) { // Device photos
-                        DropdownMenuItem(
-                            text = { Text("Upload to Cloud") },
-                            onClick = {
-                                showExtraActions = false
-                                scope.launch {
-                                    context.toastFromMainThread("Uploading selected images to Cloud...")
-                                    val channelId = Preferences.getEncryptedLong(Preferences.channelId, 0L)
-                                    if (channelId == 0L) {
-                                        context.toastFromMainThread("Please configure Telegram channel in settings first.")
-                                        return@launch
-                                    }
-
-                                    withContext(Dispatchers.IO) {
-                                        selectedPhotos.forEach { localId ->
-                                            val photo = DbHolder.database.photoDao().getPhotoByLocalId(localId)
-                                            photo?.pathUri?.toUri()?.let { uri ->
-                                                WorkModule.InstantUpload(uri).enqueue()
-                                            }
-                                        }
-                                    }
-                                    context.toastFromMainThread("Photos queued for upload")
-
-                                    onClearSelection()
-                                }
-                            }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onToggleSelectAll,
+                        enabled = true
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChecklistRtl,
+                            contentDescription = if (areAllSelected) "Deselect All" else "Select All",
+                            tint = if (areAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
-                        DropdownMenuItem(
-                            text = { Text("Delete From Device") },
-                            onClick = {
-                                showExtraActions = false
-                                scope.launch(Dispatchers.IO) {
-                                    val urisToDelete = selectedPhotos.map { id ->
-                                        ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toLong())
-                                    }
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) { // Android 11+
-                                        val pendingIntent = MediaStore.createDeleteRequest(context.contentResolver, urisToDelete)
-                                        val intentSenderRequest = IntentSenderRequest.Builder(pendingIntent.intentSender).build()
-                                        deleteRequestLauncher.launch(intentSenderRequest)
-                                    } else {
-                                        // Fallback for older Android versions
-                                        try {
-                                            var deletedCount = 0
-                                            urisToDelete.forEach { uri ->
-                                                if (context.contentResolver.delete(uri, null, null) > 0) {
-                                                    deletedCount++
+                    }
+                    Box {
+                        IconButton(onClick = { showExtraActions = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More actions",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showExtraActions,
+                            onDismissRequest = { showExtraActions = false }
+                        ) {
+                            if (currentRoute == Screens.LocalPhotos.route) { // Device photos
+                                DropdownMenuItem(
+                                    text = { Text("Upload to Cloud") },
+                                    onClick = {
+                                        showExtraActions = false
+                                        scope.launch {
+                                            context.toastFromMainThread("Uploading selected images to Cloud...")
+                                            val channelId = Preferences.getEncryptedLong(Preferences.channelId, 0L)
+                                            if (channelId == 0L) {
+                                                context.toastFromMainThread("Please configure Telegram channel in settings first.")
+                                                return@launch
+                                            }
+
+                                            withContext(Dispatchers.IO) {
+                                                selectedPhotos.forEach { localId ->
+                                                    val photo = DbHolder.database.photoDao().getPhotoByLocalId(localId)
+                                                    photo?.pathUri?.toUri()?.let { uri ->
+                                                        WorkModule.InstantUpload(uri).enqueue()
+                                                    }
                                                 }
                                             }
-                                            withContext(Dispatchers.Main) {
-                                                context.toastFromMainThread("$deletedCount photos deleted.")
-                                                onDeletionComplete()
-                                                onClearSelection()
-                                            }
-                                        } catch (e: SecurityException) {
-                                            withContext(Dispatchers.Main) {
-                                                context.toastFromMainThread("Permission denied. Could not delete photos.")
-                                            }
-                                            Log.e("Delete", "SecurityException while deleting photos.", e)
-                                        } catch (e: Exception) {
-                                             withContext(Dispatchers.Main) {
-                                                context.toastFromMainThread("Error deleting photos.")
-                                            }
-                                            Log.e("Delete", "Error while deleting photos.", e)
+                                            context.toastFromMainThread("Photos queued for upload")
+
+                                            onClearSelection()
                                         }
                                     }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Delete From Device") },
+                                    onClick = {
+                                        showExtraActions = false
+                                        scope.launch(Dispatchers.IO) {
+                                            val urisToDelete = selectedPhotos.map { id ->
+                                                ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toLong())
+                                            }
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) { // Android 11+
+                                                val pendingIntent = MediaStore.createDeleteRequest(context.contentResolver, urisToDelete)
+                                                val intentSenderRequest = IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+                                                deleteRequestLauncher.launch(intentSenderRequest)
+                                            } else {
+                                                // Fallback for older Android versions
+                                                try {
+                                                    var deletedCount = 0
+                                                    urisToDelete.forEach { uri ->
+                                                        if (context.contentResolver.delete(uri, null, null) > 0) {
+                                                            deletedCount++
+                                                        }
+                                                    }
+                                                    withContext(Dispatchers.Main) {
+                                                        context.toastFromMainThread("$deletedCount photos deleted.")
+                                                        onDeletionComplete()
+                                                        onClearSelection()
+                                                    }
+                                                } catch (e: SecurityException) {
+                                                    withContext(Dispatchers.Main) {
+                                                        context.toastFromMainThread("Permission denied. Could not delete photos.")
+                                                    }
+                                                    Log.e("Delete", "SecurityException while deleting photos.", e)
+                                                } catch (e: Exception) {
+                                                     withContext(Dispatchers.Main) {
+                                                        context.toastFromMainThread("Error deleting photos.")
+                                                    }
+                                                    Log.e("Delete", "Error while deleting photos.", e)
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                            } else if (currentRoute == Screens.RemotePhotos.route) { // Cloud photos
+                                val viewModel: com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel = screenScopedViewModel()
+                                DropdownMenuItem(
+                                    text = { Text("Move to Trash Bin") },
+                                    onClick = {
+                                        showExtraActions = false
+                                        scope.launch {
+                                            viewModel.moveToTrash(selectedPhotos)
+                                            context.toastFromMainThread("Moved ${selectedPhotos.size} photos to Trash Bin")
+                                            onClearSelection()
+                                        }
+                                    }
+                                )
+                            } else if (currentRoute == Screens.TrashBin.route) { // Trash Bin
+                                DropdownMenuItem(
+                                    text = { Text("Restore") },
+                                    onClick = {
+                                        showExtraActions = false
+                                        onRestore()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Delete Permanently") },
+                                    onClick = {
+                                        showExtraActions = false
+                                        onPermanentlyDelete()
+                                    }
+                                )
+                            }
+                            HorizontalDivider()
+                            // Glide Selection Behavior
+                            var currentGlideBehavior by remember {
+                                mutableStateOf(Preferences.getString(Preferences.glideSelectionBehaviorKey, "Fixed"))
+                            }
+                            val onGlideBehaviorChange: (String) -> Unit = { value ->
+                                Preferences.edit {
+                                    putString(Preferences.glideSelectionBehaviorKey, value)
                                 }
+                                currentGlideBehavior = value
                             }
-                        )
-                    } else if (currentRoute == Screens.RemotePhotos.route) { // Cloud photos
-                        val viewModel: com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel = screenScopedViewModel()
-                        DropdownMenuItem(
-                            text = { Text("Move to Trash Bin") },
-                            onClick = {
-                                showExtraActions = false
-                                scope.launch {
-                                    viewModel.moveToTrash(selectedPhotos)
-                                    context.toastFromMainThread("Moved ${selectedPhotos.size} photos to Trash Bin")
-                                    onClearSelection()
+                            DropdownMenuItem(
+                                text = { Text("Glide: ${if (currentGlideBehavior == "Toggle") "Toggle Selection" else "Select Only"}") },
+                                onClick = {
+                                    onGlideBehaviorChange(if (currentGlideBehavior == "Toggle") "Fixed" else "Toggle")
+                                    showExtraActions = false
                                 }
-                            }
-                        )
-                    } else if (currentRoute == Screens.TrashBin.route) { // Trash Bin
-                        DropdownMenuItem(
-                            text = { Text("Restore") },
-                            onClick = {
-                                showExtraActions = false
-                                onRestore()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete Permanently") },
-                            onClick = {
-                                showExtraActions = false
-                                onPermanentlyDelete()
-                            }
-                        )
-                    }
-                    HorizontalDivider()
-                    // Glide Selection Behavior
-                    var currentGlideBehavior by remember {
-                        mutableStateOf(Preferences.getString(Preferences.glideSelectionBehaviorKey, "Fixed"))
-                    }
-                    val onGlideBehaviorChange: (String) -> Unit = { value ->
-                        Preferences.edit {
-                            putString(Preferences.glideSelectionBehaviorKey, value)
+                            )
                         }
-                        currentGlideBehavior = value
                     }
-                    DropdownMenuItem(
-                        text = { Text("Glide: ${if (currentGlideBehavior == "Toggle") "Toggle Selection" else "Select Only)"}") },
-                        onClick = {
-                            onGlideBehaviorChange(if (currentGlideBehavior == "Toggle") "Fixed" else "Toggle")
-                            showExtraActions = false
-                        }
-                    )
                 }
             }
         },

@@ -1,25 +1,30 @@
-﻿> Task :app:compileDebugKotlin FAILED
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:867:9 Mixing named and positional arguments is not allowed unless the order of the arguments matches the order of the parameters.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:867:9 Syntax error: Expecting an expression.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:867:10 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:868:9 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:868:16 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:868:18 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:868:35 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:868:36 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:868:51 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:869:13 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:869:28 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:869:30 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:869:43 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:869:44 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:869:55 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:869:56 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:870:9 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:871:5 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:872:1 Syntax error: Expecting a top level declaration.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:528:53 Unresolved reference 'Photo'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:539:25 Unresolved reference 'spring'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:539:47 Unresolved reference 'Spring'.
-e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/screens/local/LocalPhotoGrid.kt:570:33 Unresolved reference 'pathUri'.
+﻿> Task :app:compileDebugKotlin
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:378:49 None of the following candidates is applicable:
+fun Text(text: String, modifier: Modifier = ..., color: Color = ..., autoSize: TextAutoSize? = ..., fontSize: TextUnit = ..., fontStyle: FontStyle? = ..., fontWeight: FontWeight? = ..., fontFamily: FontFamily? = ..., letterSpacing: TextUnit = ..., textDecoration: TextDecoration? = ..., textAlign: TextAlign? = ..., lineHeight: TextUnit = ..., overflow: TextOverflow = ..., softWrap: Boolean = ..., maxLines: Int = ..., minLines: Int = ..., onTextLayout: ((TextLayoutResult) -> Unit)? = ..., style: TextStyle = ...): Unit
+fun Text(text: String, color: ColorProducer, modifier: Modifier = ..., autoSize: TextAutoSize? = ..., fontSize: TextUnit = ..., fontStyle: FontStyle? = ..., fontWeight: FontWeight? = ..., fontFamily: FontFamily? = ..., letterSpacing: TextUnit = ..., textDecoration: TextDecoration? = ..., textAlign: TextAlign? = ..., lineHeight: TextUnit = ..., overflow: TextOverflow = ..., softWrap: Boolean = ..., maxLines: Int = ..., minLines: Int = ..., onTextLayout: ((TextLayoutResult) -> Unit)? = ..., style: TextStyle = ...): Unit
+fun Text(text: AnnotatedString, modifier: Modifier = ..., color: Color = ..., autoSize: TextAutoSize? = ..., fontSize: TextUnit = ..., fontStyle: FontStyle? = ..., fontWeight: FontWeight? = ..., fontFamily: FontFamily? = ..., letterSpacing: TextUnit = ..., textDecoration: TextDecoration? = ..., textAlign: TextAlign? = ..., lineHeight: TextUnit = ..., overflow: TextOverflow = ..., softWrap: Boolean = ..., maxLines: Int = ..., minLines: Int = ..., inlineContent: Map<String, InlineTextContent> = ..., onTextLayout: (TextLayoutResult) -> Unit = ..., style: TextStyle = ...): Unit
+fun Text(text: AnnotatedString, color: ColorProducer, modifier: Modifier = ..., autoSize: TextAutoSize? = ..., fontSize: TextUnit = ..., fontStyle: FontStyle? = ..., fontWeight: FontWeight? = ..., fontFamily: FontFamily? = ..., letterSpacing: TextUnit = ..., textDecoration: TextDecoration? = ..., textAlign: TextAlign? = ..., lineHeight: TextUnit = ..., overflow: TextOverflow = ..., softWrap: Boolean = ..., maxLines: Int = ..., minLines: Int = ..., inlineContent: Map<String, InlineTextContent> = ..., onTextLayout: (TextLayoutResult) -> Unit = ..., style: TextStyle = ...): Unit
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:385:76 Unresolved reference 'sp'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:388:49 Syntax error: Expecting ')'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:388:53 Unresolved reference 'context'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:388:61 Syntax error: Expecting an element.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:388:75 Syntax error: Expecting an element.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:388:83 Syntax error: Expecting an element.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:414:77 Unresolved reference 'sp'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:739:21 Unresolved reference 'Surface'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:744:25 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:754:53 Unresolved reference 'sp'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:762:13 Unresolved reference 'Surface'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:764:25 Unresolved reference 'CircleShape'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:767:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:907:10 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:908:9 Unresolved reference 'navigationIcon'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:908:28 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:909:9 Unresolved reference 'colors'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:909:36 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:910:44 @Composable invocations can only happen from the context of a @Composable function
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:912:5 Syntax error: Expecting an element.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/chitralaya/ui/main/MainPage.kt:913:2 Syntax error: Expecting '}'.
+
+> Task :app:compileDebugKotlin FAILED
 
