@@ -136,7 +136,7 @@ fun SettingsSwitchItem(
 }
 
 /**
- * Settings item with dialog selection
+ * Settings item with expressive selection layout
  */
 @Composable
  fun SettingsDialogItem(
@@ -154,7 +154,7 @@ fun SettingsSwitchItem(
     SettingsItem(
         icon = icon,
         title = title,
-        subtitle = "$subtitle: $currentValue",
+        subtitle = if (enabled) "$subtitle: $currentValue" else subtitle,
         onClick = { if (enabled) showDialog = true },
         enabled = enabled,
         modifier = modifier
@@ -163,29 +163,56 @@ fun SettingsSwitchItem(
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text(title) },
+            title = { 
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                ) 
+            },
             text = {
-                Column {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
                     options.forEach { (displayName, value) ->
-                        TextButton(
+                        val isSelected = currentValue == displayName
+                        Surface(
                             onClick = {
                                 onValueChange(value)
                                 showDialog = false
                             },
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = displayName,
-                                modifier = Modifier.fillMaxWidth(),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = displayName,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (isSelected) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showDialog = false }) {
-                    Text("Cancel")
+                    Text("Close")
                 }
             }
         )
@@ -367,7 +394,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
@@ -606,18 +633,8 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                         onClick = {
                             scope.launch {
                                 val stats = BackupHelper.getBackupStats()
-                                val message = buildString {
-                                    appendLine("📊 Database Status :")
-                                    appendLine("• Device: ${stats.currentPhotos}")
-                                    appendLine("• Cloud : ${stats.currentRemotePhotos}")
-                                    if (stats.lastBackupTime > 0) {
-                                        appendLine("\n☁️ Last Backup :")
-                                        appendLine("• Time : ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(stats.lastBackupTime))}")
-                                        appendLine("• Status: ${if (stats.isUpToDate) "✅ OK" else "⚠️ Pending"}")
-                                    }
-                                }
                                 withContext(Dispatchers.Main) {
-                                    dialogMessage = message
+                                    backupStats = stats
                                     showDialog = true
                                 }
                             }
@@ -687,34 +704,123 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
         if (showDialog) {
             Dialog(onDismissRequest = { showDialog = false }) {
                 Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    tonalElevation = 8.dp,
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier
                         .padding(16.dp)
                         .fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier
-                            .padding(20.dp)
-                            .verticalScroll(rememberScrollState())
+                            .padding(24.dp)
                     ) {
-                        Text(
-                            text = "📊 Status",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(text = dialogMessage)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Storage,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = "Database Status",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        val stats = backupStats
+                        if (stats != null) {
+                            StatusRow(
+                                icon = Icons.Rounded.Android,
+                                label = "Device Photos",
+                                value = stats.currentPhotos.toString(),
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            StatusRow(
+                                icon = Icons.Rounded.Cloud,
+                                label = "Cloud Photos",
+                                value = stats.currentRemotePhotos.toString(),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            
+                            if (stats.lastBackupTime > 0) {
+                                Spacer(modifier = Modifier.height(20.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                Spacer(modifier = Modifier.height(20.dp))
+                                
+                                StatusRow(
+                                    icon = Icons.Rounded.History,
+                                    label = "Last Backup",
+                                    value = java.text.SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(stats.lastBackupTime)),
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                StatusRow(
+                                    icon = if (stats.isUpToDate) Icons.Rounded.CheckCircle else Icons.Rounded.Error,
+                                    label = "Sync Status",
+                                    value = if (stats.isUpToDate) "Up to date" else "Sync pending",
+                                    color = if (stats.isUpToDate) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(32.dp))
+                        
                         Button(
                             onClick = { showDialog = false },
-                            modifier = Modifier.align(Alignment.End)
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            Text("OK")
+                            Text("Dismiss")
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StatusRow(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    color: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
