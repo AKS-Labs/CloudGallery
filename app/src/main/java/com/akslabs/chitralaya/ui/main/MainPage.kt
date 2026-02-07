@@ -407,13 +407,41 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                         } else 0
                                                         else -> 0
                                                     }
-                                                    Text(
-                                                        text = "${android.text.format.Formatter.formatFileSize(context, totalSize)} • $count photos",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        fontWeight = FontWeight.Medium,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        letterSpacing = 0.2.sp
-                                                    )
+                                                    
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    
+                                                    Row(
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Surface(
+                                                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            shape = CircleShape
+                                                        ) {
+                                                            Text(
+                                                                text = android.text.format.Formatter.formatFileSize(context, totalSize),
+                                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                                                style = MaterialTheme.typography.labelMedium,
+                                                                fontWeight = FontWeight.ExtraBold,
+                                                                letterSpacing = 0.2.sp
+                                                            )
+                                                        }
+                                                        
+                                                        Surface(
+                                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                            shape = CircleShape
+                                                        ) {
+                                                            Text(
+                                                                text = "$count photos",
+                                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                                                style = MaterialTheme.typography.labelMedium,
+                                                                fontWeight = FontWeight.ExtraBold,
+                                                                letterSpacing = 0.2.sp
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                         },
@@ -726,71 +754,92 @@ fun SelectionTopAppBar(
     }
 
     TopAppBar(
+        expandedHeight = 95.dp,
+        windowInsets = WindowInsets(0, 0, 0, 0),
         title = {
-            SplitButtonLayout(
-                leadingButton = {
-                    SplitButtonDefaults.LeadingButton(onClick = onClearSelection) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Close selection mode"
-                        )
+            Box(modifier = Modifier.padding(top = 30.dp)) {
+                SplitButtonLayout(
+                    leadingButton = {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp, topEnd = 4.dp, bottomEnd = 4.dp),
+                            onClick = onClearSelection,
+                            modifier = Modifier.height(40.dp)
+                        ) {
+                        Box(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Close selection mode",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 },
                 trailingButton = {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        contentColor = MaterialTheme.colorScheme.primary,
                         shape = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 24.dp, bottomEnd = 24.dp),
-                        modifier = Modifier.fillMaxHeight()
+                        modifier = Modifier.height(40.dp)
                     ) {
                         Box(
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "$selectedCount Selected",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.primary,
                                 letterSpacing = 0.1.sp
                             )
                         }
                     }
                 }
             )
-        },
+        }
+    },
         actions = {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = CircleShape,
-                modifier = Modifier.padding(end = 8.dp)
+            Row(
+                modifier = Modifier.padding(top = 30.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onToggleSelectAll,
-                        enabled = true
+                    Surface(
+                        color = if (areAllSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = if (areAllSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                        shape = CircleShape
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ChecklistRtl,
-                            contentDescription = if (areAllSelected) "Deselect All" else "Select All",
-                            tint = if (areAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Box {
-                        IconButton(onClick = { showExtraActions = true }) {
+                        IconButton(onClick = onToggleSelectAll) {
                             Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More actions",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                imageVector = Icons.Default.ChecklistRtl,
+                                contentDescription = if (areAllSelected) "Deselect All" else "Select All"
                             )
                         }
+                    }
+                    
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        shape = CircleShape
+                    ) {
+                        Box {
+                            IconButton(onClick = { showExtraActions = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More actions"
+                                )
+                            }
                         DropdownMenu(
                             expanded = showExtraActions,
                             onDismissRequest = { showExtraActions = false }
                         ) {
                             if (currentRoute == Screens.LocalPhotos.route) { // Device photos
                                 DropdownMenuItem(
-                                    text = { Text("Upload to Cloud") },
+                                    text = { Text("Upload to Cloud", fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                     onClick = {
                                         showExtraActions = false
                                         scope.launch {
@@ -816,7 +865,8 @@ fun SelectionTopAppBar(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Delete From Device") },
+                                    text = { Text("Delete From Device", fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                                     onClick = {
                                         showExtraActions = false
                                         scope.launch(Dispatchers.IO) {
@@ -859,7 +909,8 @@ fun SelectionTopAppBar(
                             } else if (currentRoute == Screens.RemotePhotos.route) { // Cloud photos
                                 val viewModel: com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel = screenScopedViewModel()
                                 DropdownMenuItem(
-                                    text = { Text("Move to Trash Bin") },
+                                    text = { Text("Move to Trash Bin", fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                                     onClick = {
                                         showExtraActions = false
                                         scope.launch {
@@ -871,14 +922,16 @@ fun SelectionTopAppBar(
                                 )
                             } else if (currentRoute == Screens.TrashBin.route) { // Trash Bin
                                 DropdownMenuItem(
-                                    text = { Text("Restore") },
+                                    text = { Text("Restore", fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                     onClick = {
                                         showExtraActions = false
                                         onRestore()
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Delete Permanently") },
+                                    text = { Text("Delete Permanently", fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                                     onClick = {
                                         showExtraActions = false
                                         onPermanentlyDelete()
@@ -897,7 +950,8 @@ fun SelectionTopAppBar(
                                 currentGlideBehavior = value
                             }
                             DropdownMenuItem(
-                                text = { Text("Glide: ${if (currentGlideBehavior == "Toggle") "Toggle Selection" else "Select Only"}") },
+                                text = { Text("Glide: ${if (currentGlideBehavior == "Toggle") "Toggle Selection" else "Select Only"}", fontWeight = FontWeight.SemiBold) },
+                                leadingIcon = { Icon(Icons.Default.Smartphone, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                 onClick = {
                                     onGlideBehaviorChange(if (currentGlideBehavior == "Toggle") "Fixed" else "Toggle")
                                     showExtraActions = false
