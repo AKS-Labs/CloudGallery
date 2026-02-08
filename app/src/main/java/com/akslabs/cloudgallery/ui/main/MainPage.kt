@@ -328,7 +328,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                     style = MaterialTheme.typography.headlineSmall,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     color = MaterialTheme.colorScheme.onSurface,
-                                                    letterSpacing = (-0.5).sp
+                                                    letterSpacing = (-0.5).sp,
+//                                                    modifier = Modifier.padding(bottom = 2.dp)
+
+
                                                 )
                                                 // Show total size if available
                                                 val context = LocalContext.current
@@ -356,7 +359,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                     
                                                     Row(
                                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.padding(start = 2.dp).offset(y = (-2).dp)
+
+
                                                     ) {
                                                         Surface(
                                                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
@@ -364,27 +370,28 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                             shape = CircleShape
                                                         ) {
                                                             Text(
+                                                                text = "$count photos",
+                                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                                style = MaterialTheme.typography.labelMedium,
+                                                                fontWeight = FontWeight.ExtraBold,
+                                                                letterSpacing = 0.2.sp
+                                                            )
+                                                        }
+                                                        Surface(
+                                                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            shape = CircleShape
+                                                        ) {
+                                                            Text(
                                                                 text = android.text.format.Formatter.formatFileSize(context, totalSize),
-                                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
                                                                 style = MaterialTheme.typography.labelMedium,
                                                                 fontWeight = FontWeight.ExtraBold,
                                                                 letterSpacing = 0.2.sp
                                                             )
                                                         }
                                                         
-                                                        Surface(
-                                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                                            shape = CircleShape
-                                                        ) {
-                                                            Text(
-                                                                text = "$count photos",
-                                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                                                style = MaterialTheme.typography.labelMedium,
-                                                                fontWeight = FontWeight.ExtraBold,
-                                                                letterSpacing = 0.2.sp
-                                                            )
-                                                        }
+
                                                     }
                                                 }
                                             }
