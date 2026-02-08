@@ -1,0 +1,93 @@
+﻿> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kaptGenerateStubsDebugKotlin UP-TO-DATE
+> Task :app:kaptDebugKotlin UP-TO-DATE
+
+> Task :app:compileDebugKotlin FAILED
+./gradlew : e: file:///C:/Users/ashin/StudioProjects/CloudGal
+lery/app/src/main/java/com/akslabs/chitralaya/ui/main/nav/App
+NavHost.kt:139:17 Conflicting declarations:
+At line:1 char:1
++ ./gradlew :app:compileDebugKotlin > build_errors.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (e: file:///C:/U 
+   ...g declarations::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+local val index: Int
+local val index: Int
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/nav/AppNavHost.kt:1
+48:17 Conflicting declarations:
+local val index: Int
+local val index: Int
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:228:21 This is an experimental shared 
+transition API.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:229:25 No parameter with name 'initialPage' 
+found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:230:25 No parameter with name 'photos' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:231:25 No parameter with name 
+'onlyRemotePhotos' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:233:25 No value passed for parameter 'index'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:233:25 No value passed for parameter 
+'localPhotos'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:233:25 No value passed for parameter 
+'cloudPhotos'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:233:25 No value passed for parameter 'isRemote'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:233:25 No value passed for parameter 
+'sharedTransitionScope'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src
+/main/java/com/akslabs/chitralaya/ui/main/screens/trash/Trash
+BinScreen.kt:233:25 No value passed for parameter 
+'animatedVisibilityScope'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.com
+pilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompi
+lerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 14s
+17 actionable tasks: 1 executed, 16 up-to-date
