@@ -2,8 +2,10 @@ package com.akslabs.chitralaya.ui.components
 
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,16 +14,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,11 +32,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -58,6 +61,8 @@ fun SupportSheet(
     data class OptionItem(
         val text: String,
         val summary: String? = null,
+        val icon: ImageVector,
+        val color: androidx.compose.ui.graphics.Color,
         val onClick: (String) -> Unit
     )
 
@@ -65,18 +70,27 @@ fun SupportSheet(
         listOf(
             OptionItem(
                 text = "PayPal",
+                summary = "Fast and secure checkout",
+                icon = Icons.Rounded.Payments,
+                color = androidx.compose.ui.graphics.Color(0xFF003087),
                 onClick = {
                     uriHandler.openUri("https://paypal.me/AKSLabsOfficial")
                 }
             ),
             OptionItem(
                 text = "Github Sponsor",
+                summary = "Support open source",
+                icon = Icons.Rounded.Favorite,
+                color = androidx.compose.ui.graphics.Color(0xFFEA4AAA),
                 onClick = {
                     uriHandler.openUri("https://github.com/sponsors/AKS-Labs")
                 }
             ),
             OptionItem(
                 text = "UPI",
+                summary = "One-click local transfer",
+                icon = Icons.Rounded.AccountBalanceWallet,
+                color = androidx.compose.ui.graphics.Color(0xFF6200EE),
                 onClick = {
                     showCryptoOptions = true
                 }
@@ -86,19 +100,21 @@ fun SupportSheet(
 
     val cryptoOnClick: (String) -> Unit = {
         clipboard.setText(AnnotatedString(it))
+        scope.launch {
+            // Optional: Show a subtle confirmation if needed, but clipboard copy is primary
+        }
     }
 
     val cryptoOptions = remember {
-        mapOf(
-            "UPI" to "AKSLabs@upi",
-
-            ).map { (coin, address) ->
+        listOf(
             OptionItem(
-                text = coin,
-                summary = address,
+                text = "UPI ID",
+                summary = "AKSLabs@upi",
+                icon = Icons.Rounded.Payments,
+                color = androidx.compose.ui.graphics.Color(0xFF6200EE),
                 onClick = cryptoOnClick
             )
-        }
+        )
     }
 
     if (showCryptoOptions) {
@@ -171,14 +187,62 @@ fun SupportSheet(
 //                modifier = Modifier.fillMaxWidth(),
 //                optionList = options
 //            )
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 options.forEach { option ->
-                    ListItem(
-                        headlineContent = { Text(option.text) },
-                        supportingContent = option.summary?.let { { Text(it) } },
-                        modifier = Modifier.clickable { option.onClick(option.summary ?: "") }
-                    )
-                    HorizontalDivider()
+                    Surface(
+                        onClick = { option.onClick(option.summary ?: "") },
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(option.color.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = option.icon,
+                                    contentDescription = null,
+                                    tint = option.color,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = option.text,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                option.summary?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            
+                            Icon(
+                                imageVector = if (showCryptoOptions && option.text == "UPI ID") Icons.Rounded.ContentCopy else Icons.Rounded.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
