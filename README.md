@@ -316,6 +316,12 @@ Join the community → [t.me/AKSLabs](https://t.me/AKSLabs)
 - 👨‍💻 **Contribute:** Fork and submit pull requests
 - ⭐ **Show support:** Star the repository!
 
+Please help to translate using [Weblate](https://toolate.othing.xyz/projects/cloudgallery/).
+
+<a href="https://toolate.othing.xyz/projects/cloudgallery/">
+<img src="https://toolate.othing.xyz/widget/pixelscreenshots/svg-badge.svg" alt="Translation status" />
+</a>
+
 ---
 
 ## 🙏 **Credits**
