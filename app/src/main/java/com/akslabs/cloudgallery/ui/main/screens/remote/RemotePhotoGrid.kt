@@ -182,7 +182,9 @@ fun RemotePhotosGrid(
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
     sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    lastViewedPhotoId: String? = null,
+    onLastViewedPhotoConsumed: () -> Unit = {}
 ) {
     Log.e(TAG, "🎯 === REMOTE PHOTO GRID COMPOSING ===")
     val context = LocalContext.current
@@ -210,8 +212,6 @@ fun RemotePhotosGrid(
         }
     }
 
-    // Preserve scroll
-    val lazyGridState = rememberLazyGridState()
     // Responsive grid configuration (3-6 columns, default 4)
     val gridState = rememberGridState()
     val columns = gridState.columnCount.coerceIn(3, 6)
@@ -221,16 +221,50 @@ fun RemotePhotosGrid(
     // Layout mode configuration
     val isDateGroupedLayout = gridState.isDateGroupedLayout
 
-    // Create layout cache
+    // Create layout cache FIRST
     val layoutCache = remember(cloudPhotos.itemCount, isDateGroupedLayout) {
         createRemoteLayoutCache(cloudPhotos)
     }
 
     val currentLayoutItems = if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
+
+    // Initialize scroll state with correct position
+    val initialIndex = remember(lastViewedPhotoId, layoutCache) {
+       if (!lastViewedPhotoId.isNullOrEmpty() && layoutCache.totalPhotos > 0) {
+           val index = currentLayoutItems.indexOfFirst { 
+               it is RemoteGridItem.PhotoItem && it.photo.remoteId == lastViewedPhotoId 
+           }
+           if (index != -1) index else 0
+       } else 0
+    }
+
+    // Preserve scroll with initial index
+    val lazyGridState = rememberLazyGridState(initialFirstVisibleItemIndex = initialIndex)
+
+    // Sync scroll to last viewed photo (backup)
+    LaunchedEffect(lastViewedPhotoId, layoutCache) {
+        if (!lastViewedPhotoId.isNullOrEmpty() && layoutCache.totalPhotos > 0) {
+            // Wait for layout to settle
+            kotlinx.coroutines.delay(100)
+            
+            val index = currentLayoutItems.indexOfFirst { 
+                it is RemoteGridItem.PhotoItem && it.photo.remoteId == lastViewedPhotoId 
+            }
+            if (index != -1) {
+                // FORCE SCROLL
+                // Check visibility just for logging/debugging if needed, but we force scroll
+                // val visibleItems = lazyGridState.layoutInfo.visibleItemsInfo
+                // val isVisible = visibleItems.any { it.index == index }
+                
+                lazyGridState.scrollToItem(index)
+                // onLastViewedPhotoConsumed()
+            }
+        }
+    }
     val maxLineSpan = columns
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (cloudPhotos.loadState.refresh == LoadState.Loading) {
+        if (cloudPhotos.loadState.refresh == LoadState.Loading && cloudPhotos.itemCount == 0) {
             LoadAnimation(modifier = Modifier.align(Alignment.Center))
         } else if (cloudPhotos.itemCount == 0 && cloudPhotos.loadState.refresh is LoadState.NotLoading) {
              // Empty state
@@ -388,7 +422,8 @@ fun CloudPhotoItem(
             modifier = modifier
                 .sharedElement(
                     rememberSharedContentState(key = "photo_${remotePhoto?.remoteId}"),
-                    animatedVisibilityScope = animatedVisibilityScope
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
                 )
                 .aspectRatio(1f)
             .clip(RoundedCornerShape(16.dp))
@@ -418,8 +453,10 @@ fun CloudPhotoItem(
                     .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
                     .allowRgb565(true)
                 
-                if (!isScrollbarDragging) {
-                    imageRequestBuilder.crossfade(100)
+                if (isScrollbarDragging) {
+                    imageRequestBuilder.crossfade(false)
+                } else {
+                    imageRequestBuilder.crossfade(500)
                 }
                 
                 val imageRequest = imageRequestBuilder.build()

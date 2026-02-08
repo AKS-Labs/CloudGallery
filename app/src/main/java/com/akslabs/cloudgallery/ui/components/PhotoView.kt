@@ -191,7 +191,7 @@ fun PhotoView(
                 imageLoader = if (isOnlyRemote) ImageLoaderModule.remoteImageLoader else ImageLoaderModule.defaultImageLoader,
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(if (isOnlyRemote) photo.toRemotePhoto() else photo.pathUri)
-                    .crossfade(true)
+                    .crossfade(500)
                     .build(),
                 contentDescription = "Photo",
                 contentScale = ContentScale.Fit,
@@ -203,7 +203,8 @@ fun PhotoView(
                 modifier = Modifier
                     .sharedElement(
                         rememberSharedContentState(key = if (isOnlyRemote) "photo_${photo.remoteId}" else "photo_${photo.localId}"),
-                        animatedVisibilityScope = animatedVisibilityScope
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
                     )
                     .fillMaxSize()
                     .pointerInput(Unit) {

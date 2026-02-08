@@ -539,7 +539,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                             onSelectedPhotosChange = { selectedPhotos = it },
                             deletedPhotoIds = deletedPhotoIds,
                             sharedTransitionScope = this@SharedTransitionLayout,
-                            animatedVisibilityScope = null
+                            animatedVisibilityScope = null,
+                            viewModel = viewModel
                         )
                     }
                 }
@@ -560,7 +561,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                         onSelectedPhotosChange = { selectedPhotos = it },
                         deletedPhotoIds = deletedPhotoIds,
                         sharedTransitionScope = this@SharedTransitionLayout,
-                        animatedVisibilityScope = null
+                        animatedVisibilityScope = null,
+                        viewModel = viewModel
                     )
                 }
             }

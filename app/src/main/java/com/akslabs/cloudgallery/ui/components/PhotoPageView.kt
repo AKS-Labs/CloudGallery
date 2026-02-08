@@ -23,7 +23,8 @@ fun PhotoPageView(
     window: android.view.Window,
     onDismissRequest: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    onPhotoChanged: (String) -> Unit = {}
 ) {
     val showUiState = remember { androidx.compose.runtime.mutableStateOf(true) }
     
@@ -63,6 +64,17 @@ fun PhotoPageView(
             state = pagerState,
             beyondViewportPageCount = 1
         ) { pageIndex ->
+            // Notify when page changes
+            androidx.compose.runtime.LaunchedEffect(pagerState.currentPage) {
+                if (pagerState.currentPage == pageIndex && pageIndex < activePhotos.size) {
+                    val photo = activePhotos[pageIndex]
+                    val id = if (isRemote) photo.remoteId else photo.localId
+                    if (id != null) {
+                        onPhotoChanged(id)
+                        // android.widget.Toast.makeText(context, "Viewed: $id", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
             if (pageIndex < activePhotos.size) {
                 PhotoView(
                     photo = activePhotos[pageIndex],

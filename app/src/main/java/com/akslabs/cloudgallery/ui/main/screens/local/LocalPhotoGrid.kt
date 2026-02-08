@@ -112,73 +112,7 @@ data class LayoutCache(
 // Avoid heavy per-item resolver calls in UI thread
 private fun safeTimestampFromLocalId(localId: String): Long = localId.toLongOrNull()?.times(1000L) ?: 0L
 
-private suspend fun fetchAllLocalPhotos(context: Context): List<LocalUiPhoto> = withContext(Dispatchers.IO) {
-    val resolver = context.contentResolver
-    val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-    val projection = arrayOf(
-        MediaStore.Images.ImageColumns._ID,
-        MediaStore.Images.ImageColumns.DATE_TAKEN,
-        MediaStore.Images.ImageColumns.DATE_ADDED,
-        MediaStore.Images.ImageColumns.DATE_MODIFIED,
-        MediaStore.Images.ImageColumns.MIME_TYPE,
-        MediaStore.Images.ImageColumns.SIZE
-    )
-    val photos = ArrayList<LocalUiPhoto>(4096)
-    resolver.query(collection, projection, null, null, "${MediaStore.Images.ImageColumns.DATE_TAKEN} DESC")?.use { cursor ->
-        val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns._ID)
-        val takenIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_TAKEN)
-        val addedIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_ADDED)
-        val modIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATE_MODIFIED)
-        val mimeIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.MIME_TYPE)
-        val sizeIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.SIZE)
 
-        Log.d(TAG, "fetchAllLocalPhotos: Cursor count: ${cursor.count}")
-
-        while (cursor.moveToNext()) {
-            val id = cursor.getLong(idIdx).toString()
-            val taken = runCatching { cursor.getLong(takenIdx) }.getOrDefault(0L)
-            val added = runCatching { cursor.getLong(addedIdx) }.getOrDefault(0L)
-            val modified = runCatching { cursor.getLong(modIdx) }.getOrDefault(0L)
-            val mimeType = cursor.getString(mimeIdx) ?: "image/jpeg"
-            val size = cursor.getLong(sizeIdx)
-
-            val tsMillis = when {
-                taken > 0L -> taken
-                added > 0L -> added * 1000L
-                modified > 0L -> modified * 1000L
-                else -> 0L
-            }
-            
-            val uri = ContentUris.withAppendedId(collection, id.toLong()).toString()
-
-            photos.add(LocalUiPhoto(
-                localId = id,
-                pathUri = uri,
-                mimeType = mimeType,
-                displayDateMillis = tsMillis,
-                size = size,
-                remoteId = null
-            ))
-        }
-    }
-
-    
-    // Fetch synced status from DB
-    val syncedMap = DbHolder.database.photoDao().getSyncedPhotoMap().associate { it.localId to it.remoteId }
-    
-    // Update remoteId for photos that are synced
-    photos.forEachIndexed { index, photo ->
-        val remoteId = syncedMap[photo.localId]
-        if (remoteId != null) {
-            photos[index] = photo.copy(remoteId = remoteId)
-        }
-    }
-
-    Log.d(TAG, "fetchAllLocalPhotos: Fetched ${photos.size} photos")
-    // Ensure photos are sorted by the actual display date (handling the fallback logic)
-    photos.sortByDescending { it.displayDateMillis }
-    photos
-}
 
 // Function to format date with fallback
 private fun formatPhotoDate(timestamp: Long): String {
@@ -255,6 +189,7 @@ private fun createLayoutCache(
 fun LocalPhotoGrid(
     localPhotos: LazyPagingItems<LocalUiPhoto>,
     totalCount: Int,
+    allPhotos: List<LocalUiPhoto>,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     selectionMode: Boolean,
@@ -264,7 +199,9 @@ fun LocalPhotoGrid(
     deletedPhotoIds: List<String> = emptyList(),
     navController: NavController,
     sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    lastViewedPhotoId: String? = null,
+    onLastViewedPhotoConsumed: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -291,45 +228,65 @@ fun LocalPhotoGrid(
         }
     }
 
-    // Preserve scroll
-    val lazyGridState = rememberLazyGridState()
-    // Responsive grid configuration (3-6 columns, default 4)
     val gridState = rememberGridState()
-    val columns = gridState.columnCount.coerceIn(3, 6)
-    val horizontalSpacing = 12.dp
-    val verticalSpacing = 12.dp
-
-    // Layout mode configuration
     val isDateGroupedLayout = gridState.isDateGroupedLayout
-
-    // Load all photos in background
-    var allPhotos by remember { mutableStateOf<List<LocalUiPhoto>>(emptyList()) }
-    LaunchedEffect(Unit) {
-        if (allPhotos.isEmpty()) {
-            allPhotos = fetchAllLocalPhotos(context)
-        }
-    }
-
-    // Debug logging (guarded)
-    LaunchedEffect(localPhotos.loadState, totalCount, localPhotos.itemCount, allPhotos.size) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "=== LOCAL PHOTO GRID DEBUG ===")
-            Log.d(TAG, "Total count from ViewModel: $totalCount")
-            Log.d(TAG, "LocalPhotos (Paging) itemCount: ${localPhotos.itemCount}")
-            Log.d(TAG, "AllPhotos (Custom) size: ${allPhotos.size}")
-            Log.d(TAG, "LoadState.refresh: ${localPhotos.loadState.refresh}")
-            Log.d(TAG, "LoadState.append: ${localPhotos.loadState.append}")
-            Log.d(TAG, "LoadState.prepend: ${localPhotos.loadState.prepend}")
-            Log.d(TAG, "=== END LOCAL PHOTO GRID DEBUG ===")
-        }
-    }
-
-    // Create layout cache
+    
+    // Create layout cache first so we can determine initial index
     val layoutCache = remember(allPhotos, isDateGroupedLayout, deletedPhotoIds.toList()) {
         createLayoutCache(allPhotos, deletedPhotoIds)
     }
 
     val currentLayoutItems = if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
+
+    // Initialize scroll state with correct position
+    val initialIndex = remember(lastViewedPhotoId, layoutCache) {
+       if (!lastViewedPhotoId.isNullOrEmpty() && layoutCache.totalPhotos > 0) {
+           val index = currentLayoutItems.indexOfFirst { 
+               it is LocalGridItem.PhotoItem && it.photo.localId == lastViewedPhotoId 
+           }
+           if (index != -1) index else 0
+       } else 0
+    }
+    
+    val lazyGridState = rememberLazyGridState(initialFirstVisibleItemIndex = initialIndex)
+
+    // Responsive grid configuration (3-6 columns, default 4)
+    val columns = gridState.columnCount.coerceIn(3, 6)
+    val horizontalSpacing = 12.dp
+    val verticalSpacing = 12.dp
+
+    // Sync scroll to last viewed photo (backup for re-entry or updates)
+    LaunchedEffect(lastViewedPhotoId, layoutCache) {
+        if (!lastViewedPhotoId.isNullOrEmpty() && layoutCache.totalPhotos > 0) {
+            // Wait for layout to settle (in case of restoration race condition)
+            kotlinx.coroutines.delay(100)
+            
+            val index = currentLayoutItems.indexOfFirst { 
+                it is LocalGridItem.PhotoItem && it.photo.localId == lastViewedPhotoId 
+            }
+            Log.d(TAG, "Syncing scroll: id=$lastViewedPhotoId, foundIndex=$index")
+            if (index != -1) {
+                // FORCE SCROLL - ignore visibility check to be sure
+                // val visibleItems = lazyGridState.layoutInfo.visibleItemsInfo
+                // val isVisible = visibleItems.any { it.index == index }
+                // Log.d(TAG, "Item visibility: isVisible=$isVisible")
+                
+                // Debug Toast
+                // android.widget.Toast.makeText(context, "Force scrolling to index $index", android.widget.Toast.LENGTH_SHORT).show()
+                
+                Log.d(TAG, "Scrolling to item $index")
+                lazyGridState.scrollToItem(index)
+                
+                // Do NOT consume the ID immediately. Keep it so if the grid recomposes (e.g. back nav),
+                // it initializes at the correct index.
+                // onLastViewedPhotoConsumed()
+            } else {
+                Log.d(TAG, "Photo ID $lastViewedPhotoId not found in grid items")
+            }
+        } else {
+            Log.d(TAG, "Skipping sync: lastViewed=$lastViewedPhotoId, totalPhotos=${layoutCache.totalPhotos}")
+        }
+    }
     val maxLineSpan = columns
 
     fun getDateLabel(localId: String): String? {
@@ -340,7 +297,8 @@ fun LocalPhotoGrid(
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
-        if (localPhotos.loadState.refresh == LoadState.Loading) {
+        // Only show loading if we don't have cached photos
+        if (localPhotos.loadState.refresh == LoadState.Loading && allPhotos.isEmpty()) {
             LoadAnimation(modifier = Modifier.align(Alignment.Center))
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -505,7 +463,8 @@ fun LocalPhotoItem(
             modifier = modifier
                 .sharedElement(
                     rememberSharedContentState(key = "photo_${photo.localId}"),
-                    animatedVisibilityScope = animatedVisibilityScope
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
                 )
                 .aspectRatio(1f)
             .graphicsLayer {
@@ -534,7 +493,7 @@ fun LocalPhotoItem(
                 model = ImageRequest.Builder(context)
                     .data(photo.pathUri)
                     .size(if (isScrollbarDragging) Size(50, 50) else Size(thumbnailResolution, thumbnailResolution))
-                    .crossfade(!isScrollbarDragging)
+                    .crossfade(if (isScrollbarDragging) 0 else 500)
                     .allowHardware(false)
                     .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
                     .diskCachePolicy(coil.request.CachePolicy.ENABLED)

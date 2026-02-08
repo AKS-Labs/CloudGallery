@@ -42,17 +42,29 @@ fun AppNavHost(
     onSelectedPhotosChange: (Set<String>) -> Unit,
     deletedPhotoIds: List<String> = emptyList(),
     sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope? = null
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    viewModel: MainViewModel
 ) {
     val currentSelectionMode by rememberUpdatedState(selectionMode)
     val currentOnSelectionModeChange by rememberUpdatedState(onSelectionModeChange)
     val currentOnSelectedPhotosChange by rememberUpdatedState(onSelectedPhotosChange)
 
     LaunchedEffect(navController) {
-        navController.addOnDestinationChangedListener { _, _, _ ->
+        navController.addOnDestinationChangedListener { _, destination, _ ->
             if (currentSelectionMode) {
                 currentOnSelectionModeChange(false)
                 currentOnSelectedPhotosChange(emptySet())
+            }
+            
+            // Clear lastViewedPhotoId if we are navigating to something that is NOT the viewer or the grids
+            // This prevents stale scroll jumps if we come back from Settings etc.
+            val route = destination.route
+            val isPhotoRoute = route == Screens.PhotoViewer.route || 
+                             route == Screens.LocalPhotos.route || 
+                             route == Screens.RemotePhotos.route
+            
+            if (!isPhotoRoute) {
+                 viewModel.updateLastViewedPhotoId("")
             }
         }
     }
@@ -64,36 +76,40 @@ fun AppNavHost(
         enterTransition = {
             slideInHorizontally(
                 initialOffsetX = { it },
-                animationSpec = tween(durationMillis = 400, easing = EaseOutQuart)
-            ) + fadeIn(animationSpec = tween(300))
+                animationSpec = tween(durationMillis = com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration, easing = com.akslabs.cloudgallery.ui.theme.AnimationConstants.EmphasizedEasing)
+            ) + fadeIn(animationSpec = tween(com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration))
         },
         exitTransition = {
             slideOutHorizontally(
                 targetOffsetX = { -it / 3 },
-                animationSpec = tween(durationMillis = 400, easing = EaseInQuart)
-            ) + fadeOut(animationSpec = tween(300))
+                animationSpec = tween(durationMillis = com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration, easing = com.akslabs.cloudgallery.ui.theme.AnimationConstants.EmphasizedEasing)
+            ) + fadeOut(animationSpec = tween(com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration))
         },
         popEnterTransition = {
             slideInHorizontally(
                 initialOffsetX = { -it / 3 },
-                animationSpec = tween(durationMillis = 400, easing = EaseOutQuart)
-            ) + fadeIn(animationSpec = tween(300))
+                animationSpec = tween(durationMillis = com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration, easing = com.akslabs.cloudgallery.ui.theme.AnimationConstants.EmphasizedEasing)
+            ) + fadeIn(animationSpec = tween(com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration))
         },
         popExitTransition = {
             slideOutHorizontally(
                 targetOffsetX = { it },
-                animationSpec = tween(durationMillis = 400, easing = EaseInQuart)
-            ) + fadeOut(animationSpec = tween(300))
+                animationSpec = tween(durationMillis = com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration, easing = com.akslabs.cloudgallery.ui.theme.AnimationConstants.EmphasizedEasing)
+            ) + fadeOut(animationSpec = tween(com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration))
         }
     ) {
         composable(route = Screens.LocalPhotos.route) {
-            val viewModel: MainViewModel = screenScopedViewModel()
             val localPhotos = viewModel.localPhotosFlow.collectAsLazyPagingItems()
             val localPhotosCount by viewModel.localPhotosCount.collectAsStateWithLifecycle()
+            
+            // Sync grid position if returning from viewer
+            val lastViewedId by viewModel.lastViewedPhotoId.collectAsStateWithLifecycle()
+            val allMediaStorePhotos by viewModel.mediaStorePhotos.collectAsStateWithLifecycle()
 
             LocalPhotoGrid(
                 localPhotos = localPhotos,
                 totalCount = localPhotosCount,
+                allPhotos = allMediaStorePhotos,
                 expanded = expanded,
                 onExpandedChange = onExpandedChange,
                 selectionMode = selectionMode,
@@ -103,19 +119,24 @@ fun AppNavHost(
                 deletedPhotoIds = deletedPhotoIds,
                 navController = navController,
                 sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = this@composable
+                animatedVisibilityScope = this@composable,
+                lastViewedPhotoId = lastViewedId,
+                onLastViewedPhotoConsumed = { viewModel.updateLastViewedPhotoId("") }
             )
         }
 
         composable(route = Screens.RemotePhotos.route) {
-            val viewModel: MainViewModel = screenScopedViewModel()
             val allCloudPhotos = viewModel.allCloudPhotosFlow.collectAsLazyPagingItems()
             val totalCloudPhotosCount by viewModel.totalCloudPhotosCount.collectAsStateWithLifecycle()
+            val lastViewedId by viewModel.lastViewedPhotoId.collectAsStateWithLifecycle()
 
             RemotePhotosGrid(
                 cloudPhotos = allCloudPhotos,
                 onPhotoClick = { _, photo -> 
-                    photo?.let { navController.navigate("photo_viewer/${it.remoteId}/true") }
+                    photo?.let { 
+                        viewModel.updateLastViewedPhotoId(it.remoteId)
+                        navController.navigate("photo_viewer/${it.remoteId}/true") 
+                    }
                 },
                 expanded = expanded,
                 onExpandedChange = onExpandedChange,
@@ -124,7 +145,9 @@ fun AppNavHost(
                 onSelectionModeChange = onSelectionModeChange,
                 onSelectedPhotosChange = onSelectedPhotosChange,
                 sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = this@composable
+                animatedVisibilityScope = this@composable,
+                lastViewedPhotoId = lastViewedId,
+                onLastViewedPhotoConsumed = { viewModel.updateLastViewedPhotoId("") }
             )
 
         }
@@ -134,11 +157,42 @@ fun AppNavHost(
             arguments = listOf(
                 navArgument("id") { type = NavType.StringType },
                 navArgument("isRemote") { type = NavType.BoolType }
-            )
+            ),
+            enterTransition = {
+                fadeIn(
+                    animationSpec = tween(
+                        durationMillis = com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration,
+                        easing = com.akslabs.cloudgallery.ui.theme.AnimationConstants.EmphasizedDecelerateEasing
+                    )
+                )
+            },
+            exitTransition = {
+                fadeOut(
+                    animationSpec = tween(
+                        durationMillis = com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration,
+                        easing = com.akslabs.cloudgallery.ui.theme.AnimationConstants.EmphasizedAccelerateEasing
+                    )
+                )
+            },
+            popEnterTransition = {
+                fadeIn(
+                    animationSpec = tween(
+                        durationMillis = com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration,
+                        easing = com.akslabs.cloudgallery.ui.theme.AnimationConstants.EmphasizedDecelerateEasing
+                    )
+                )
+            },
+            popExitTransition = {
+                fadeOut(
+                    animationSpec = tween(
+                        durationMillis = com.akslabs.cloudgallery.ui.theme.AnimationConstants.NavTransitionDuration,
+                        easing = com.akslabs.cloudgallery.ui.theme.AnimationConstants.EmphasizedAccelerateEasing
+                    )
+                )
+            }
         ) { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id") ?: ""
             val isRemote = backStackEntry.arguments?.getBoolean("isRemote") ?: false
-            val viewModel: MainViewModel = screenScopedViewModel()
             val context = LocalContext.current
             
             // Collect the appropriate list of photos
@@ -146,6 +200,11 @@ fun AppNavHost(
             val allRemotePhotos by viewModel.allRemotePhotos.collectAsStateWithLifecycle()
             
             val activity = context as Activity
+            
+            // Keep track of which photo we are viewing to sync grid on return
+            LaunchedEffect(id) {
+                viewModel.updateLastViewedPhotoId(id)
+            }
             
             PhotoPageView(
                 initialPhotoId = id,
@@ -155,7 +214,8 @@ fun AppNavHost(
                 window = activity.window,
                 onDismissRequest = { navController.popBackStack() },
                 sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = this@composable
+                animatedVisibilityScope = this@composable,
+                onPhotoChanged = { newId -> viewModel.updateLastViewedPhotoId(newId) }
             )
         }
 

@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -74,6 +75,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Log.e("MainViewModel", "Error observing upload work", e)
             }
         }
+        loadMediaStorePhotos()
     }
 
     val localPhotosFlow: Flow<PagingData<LocalUiPhoto>> by lazy {
@@ -124,5 +126,88 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         DbHolder.database.remotePhotoDao().getAllFlow()
             .map { list -> list.map { it.toPhoto() } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }
+    // Track the last viewed photo ID to sync grid position on return
+    private val _lastViewedPhotoId = MutableStateFlow<String?>(null)
+    val lastViewedPhotoId: StateFlow<String?> = _lastViewedPhotoId.asStateFlow()
+
+    fun updateLastViewedPhotoId(id: String) {
+        _lastViewedPhotoId.value = id
+    }
+
+    // Cache MediaStore photos for immediate grid access
+    private val _mediaStorePhotos = MutableStateFlow<List<LocalUiPhoto>>(emptyList())
+    val mediaStorePhotos: StateFlow<List<LocalUiPhoto>> = _mediaStorePhotos.asStateFlow()
+
+    private fun loadMediaStorePhotos() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val resolver = context.contentResolver
+            val collection = android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL)
+            val projection = arrayOf(
+                android.provider.MediaStore.Images.ImageColumns._ID,
+                android.provider.MediaStore.Images.ImageColumns.DATE_TAKEN,
+                android.provider.MediaStore.Images.ImageColumns.DATE_ADDED,
+                android.provider.MediaStore.Images.ImageColumns.DATE_MODIFIED,
+                android.provider.MediaStore.Images.ImageColumns.MIME_TYPE,
+                android.provider.MediaStore.Images.ImageColumns.SIZE
+            )
+            val photos = ArrayList<LocalUiPhoto>(4096)
+            try {
+                resolver.query(collection, projection, null, null, "${android.provider.MediaStore.Images.ImageColumns.DATE_TAKEN} DESC")?.use { cursor ->
+                    val idIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns._ID)
+                    val takenIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.DATE_TAKEN)
+                    val addedIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.DATE_ADDED)
+                    val modIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.DATE_MODIFIED)
+                    val mimeIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.MIME_TYPE)
+                    val sizeIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.SIZE)
+
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idIdx).toString()
+                        val taken = runCatching { cursor.getLong(takenIdx) }.getOrDefault(0L)
+                        val added = runCatching { cursor.getLong(addedIdx) }.getOrDefault(0L)
+                        val modified = runCatching { cursor.getLong(modIdx) }.getOrDefault(0L)
+                        val mimeType = cursor.getString(mimeIdx) ?: "image/jpeg"
+                        val size = cursor.getLong(sizeIdx)
+
+                        val tsMillis = when {
+                            taken > 0L -> taken
+                            added > 0L -> added * 1000L
+                            modified > 0L -> modified * 1000L
+                            else -> 0L
+                        }
+                        
+                        val uri = android.content.ContentUris.withAppendedId(collection, id.toLong()).toString()
+
+                        photos.add(LocalUiPhoto(
+                            localId = id,
+                            pathUri = uri,
+                            mimeType = mimeType,
+                            displayDateMillis = tsMillis,
+                            size = size,
+                            remoteId = null
+                        ))
+                    }
+                }
+                
+                // Fetch synced status from DB
+                val syncedMap = DbHolder.database.photoDao().getSyncedPhotoMap().associate { it.localId to it.remoteId }
+                
+                // Update remoteId for photos that are synced
+                photos.forEachIndexed { index, photo ->
+                    val remoteId = syncedMap[photo.localId]
+                    if (remoteId != null) {
+                        photos[index] = photo.copy(remoteId = remoteId)
+                    }
+                }
+
+                // Ensure photos are sorted by the actual display date
+                photos.sortByDescending { it.displayDateMillis }
+                
+                _mediaStorePhotos.value = photos
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error loading MediaStore photos", e)
+            }
+        }
     }
 }
