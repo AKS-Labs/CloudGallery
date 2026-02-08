@@ -135,6 +135,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _lastViewedPhotoId.value = id
     }
 
+    // Explicitly save scroll state to handle exact restoration
+    private var _clickedPhotoId: String? = null
+    val clickedPhotoId: String?
+        get() = _clickedPhotoId
+
+    private var _savedScrollIndex: Int = 0
+    val savedScrollIndex: Int
+        get() = _savedScrollIndex
+
+    private var _savedScrollOffset: Int = 0
+    val savedScrollOffset: Int
+        get() = _savedScrollOffset
+
+    fun saveScrollState(photoId: String, index: Int, offset: Int) {
+        _clickedPhotoId = photoId
+        _savedScrollIndex = index
+        _savedScrollOffset = offset
+        Log.d("MainViewModel", "Saved scroll state: id=$photoId, index=$index, offset=$offset")
+    }
+
     // Cache MediaStore photos for immediate grid access
     private val _mediaStorePhotos = MutableStateFlow<List<LocalUiPhoto>>(emptyList())
     val mediaStorePhotos: StateFlow<List<LocalUiPhoto>> = _mediaStorePhotos.asStateFlow()

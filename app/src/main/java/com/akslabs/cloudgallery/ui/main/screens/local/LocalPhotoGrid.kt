@@ -201,6 +201,10 @@ fun LocalPhotoGrid(
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     lastViewedPhotoId: String? = null,
+    clickedPhotoId: String? = null,
+    savedIndex: Int = 0,
+    savedOffset: Int = 0,
+    onSaveScrollState: (String, Int, Int) -> Unit = { _, _, _ -> },
     onLastViewedPhotoConsumed: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -238,17 +242,31 @@ fun LocalPhotoGrid(
 
     val currentLayoutItems = if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
 
-    // Initialize scroll state with correct position
-    val initialIndex = remember(lastViewedPhotoId, layoutCache) {
-       if (!lastViewedPhotoId.isNullOrEmpty() && layoutCache.totalPhotos > 0) {
-           val index = currentLayoutItems.indexOfFirst { 
-               it is LocalGridItem.PhotoItem && it.photo.localId == lastViewedPhotoId 
-           }
-           if (index != -1) index else 0
-       } else 0
+    // Initialize scroll state with EXACT position if returning to the same photo
+    val (initialIndex, initialOffset) = remember(lastViewedPhotoId, layoutCache, clickedPhotoId, savedIndex, savedOffset) {
+        if (!lastViewedPhotoId.isNullOrEmpty() && layoutCache.totalPhotos > 0) {
+            if (lastViewedPhotoId == clickedPhotoId) {
+                // Return to EXACTLY where we left off
+                Log.d(TAG, "Restoring EXACT state: index=$savedIndex, offset=$savedOffset")
+                savedIndex to savedOffset
+            } else {
+                // User swiped to a new photo, find it and scroll to top
+                val index = currentLayoutItems.indexOfFirst { 
+                    it is LocalGridItem.PhotoItem && it.photo.localId == lastViewedPhotoId 
+                }
+                val newIndex = if (index != -1) index else 0
+                Log.d(TAG, "Restoring to NEW photo: index=$newIndex")
+                newIndex to 0
+            }
+        } else {
+            0 to 0
+        }
     }
-    
-    val lazyGridState = rememberLazyGridState(initialFirstVisibleItemIndex = initialIndex)
+
+    val lazyGridState = rememberLazyGridState(
+        initialFirstVisibleItemIndex = initialIndex,
+        initialFirstVisibleItemScrollOffset = initialOffset
+    )
 
     // Responsive grid configuration (3-6 columns, default 4)
     val columns = gridState.columnCount.coerceIn(3, 6)
@@ -266,16 +284,17 @@ fun LocalPhotoGrid(
             }
             Log.d(TAG, "Syncing scroll: id=$lastViewedPhotoId, foundIndex=$index")
             if (index != -1) {
-                // FORCE SCROLL - ignore visibility check to be sure
-                // val visibleItems = lazyGridState.layoutInfo.visibleItemsInfo
-                // val isVisible = visibleItems.any { it.index == index }
-                // Log.d(TAG, "Item visibility: isVisible=$isVisible")
+                // Check visibility to avoid jumping to top if already visible (e.g. from back nav)
+                val visibleItems = lazyGridState.layoutInfo.visibleItemsInfo
+                val isVisible = visibleItems.any { it.index == index }
+                Log.d(TAG, "Item visibility: isVisible=$isVisible")
                 
-                // Debug Toast
-                // android.widget.Toast.makeText(context, "Force scrolling to index $index", android.widget.Toast.LENGTH_SHORT).show()
-                
-                Log.d(TAG, "Scrolling to item $index")
-                lazyGridState.scrollToItem(index)
+                if (!isVisible) {
+                     Log.d(TAG, "Scrolling to item $index")
+                     lazyGridState.scrollToItem(index)
+                } else {
+                     Log.d(TAG, "Item $index already visible, skipping scroll")
+                }
                 
                 // Do NOT consume the ID immediately. Keep it so if the grid recomposes (e.g. back nav),
                 // it initializes at the correct index.
@@ -423,7 +442,13 @@ fun LocalPhotoGrid(
                                                 if (selectionMode) {
                                                     toggleSelection(p.localId)
                                                 } else {
-                                                navController.navigate("photo_viewer/${p.localId}/false")
+                                                    // Save exact scroll state before navigating
+                                                    onSaveScrollState(
+                                                        p.localId, 
+                                                        lazyGridState.firstVisibleItemIndex, 
+                                                        lazyGridState.firstVisibleItemScrollOffset
+                                                    )
+                                                    navController.navigate("photo_viewer/${p.localId}/false")
                                                 }
                                             }
                                         )

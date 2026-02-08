@@ -184,6 +184,10 @@ fun RemotePhotosGrid(
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     lastViewedPhotoId: String? = null,
+    clickedPhotoId: String? = null,
+    savedIndex: Int = 0,
+    savedOffset: Int = 0,
+    onSaveScrollState: (String, Int, Int) -> Unit = { _, _, _ -> },
     onLastViewedPhotoConsumed: () -> Unit = {}
 ) {
     Log.e(TAG, "🎯 === REMOTE PHOTO GRID COMPOSING ===")
@@ -228,18 +232,29 @@ fun RemotePhotosGrid(
 
     val currentLayoutItems = if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
 
-    // Initialize scroll state with correct position
-    val initialIndex = remember(lastViewedPhotoId, layoutCache) {
-       if (!lastViewedPhotoId.isNullOrEmpty() && layoutCache.totalPhotos > 0) {
-           val index = currentLayoutItems.indexOfFirst { 
-               it is RemoteGridItem.PhotoItem && it.photo.remoteId == lastViewedPhotoId 
-           }
-           if (index != -1) index else 0
-       } else 0
+    // Initialize scroll state with EXACT position if returning to the same photo
+    val (initialIndex, initialOffset) = remember(lastViewedPhotoId, layoutCache, clickedPhotoId, savedIndex, savedOffset) {
+        if (!lastViewedPhotoId.isNullOrEmpty() && layoutCache.totalPhotos > 0) {
+            if (lastViewedPhotoId == clickedPhotoId) {
+                // Return to EXACTLY where we left off
+                savedIndex to savedOffset
+            } else {
+                // User swiped, find new index
+                val index = currentLayoutItems.indexOfFirst { 
+                    it is RemoteGridItem.PhotoItem && it.photo.remoteId == lastViewedPhotoId 
+                }
+                val newIndex = if (index != -1) index else 0
+                newIndex to 0
+            }
+        } else {
+            0 to 0
+        }
     }
 
-    // Preserve scroll with initial index
-    val lazyGridState = rememberLazyGridState(initialFirstVisibleItemIndex = initialIndex)
+    val lazyGridState = rememberLazyGridState(
+        initialFirstVisibleItemIndex = initialIndex, 
+        initialFirstVisibleItemScrollOffset = initialOffset
+    )
 
     // Sync scroll to last viewed photo (backup)
     LaunchedEffect(lastViewedPhotoId, layoutCache) {
@@ -251,12 +266,13 @@ fun RemotePhotosGrid(
                 it is RemoteGridItem.PhotoItem && it.photo.remoteId == lastViewedPhotoId 
             }
             if (index != -1) {
-                // FORCE SCROLL
                 // Check visibility just for logging/debugging if needed, but we force scroll
-                // val visibleItems = lazyGridState.layoutInfo.visibleItemsInfo
-                // val isVisible = visibleItems.any { it.index == index }
+                val visibleItems = lazyGridState.layoutInfo.visibleItemsInfo
+                val isVisible = visibleItems.any { it.index == index }
                 
-                lazyGridState.scrollToItem(index)
+                if (!isVisible) {
+                    lazyGridState.scrollToItem(index)
+                }
                 // onLastViewedPhotoConsumed()
             }
         }
@@ -389,6 +405,11 @@ fun RemotePhotosGrid(
                                         if (selectionMode) {
                                             toggleSelection(item.photo.remoteId)
                                         } else {
+                                            onSaveScrollState(
+                                                item.photo.remoteId,
+                                                lazyGridState.firstVisibleItemIndex,
+                                                lazyGridState.firstVisibleItemScrollOffset
+                                            )
                                             onPhotoClick(item.originalIndex, item.photo)
                                         }
                                     }

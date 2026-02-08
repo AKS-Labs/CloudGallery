@@ -121,6 +121,10 @@ fun AppNavHost(
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this@composable,
                 lastViewedPhotoId = lastViewedId,
+                clickedPhotoId = viewModel.clickedPhotoId,
+                savedIndex = viewModel.savedScrollIndex,
+                savedOffset = viewModel.savedScrollOffset,
+                onSaveScrollState = { id, index, offset -> viewModel.saveScrollState(id, index, offset) },
                 onLastViewedPhotoConsumed = { viewModel.updateLastViewedPhotoId("") }
             )
         }
@@ -147,6 +151,10 @@ fun AppNavHost(
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this@composable,
                 lastViewedPhotoId = lastViewedId,
+                clickedPhotoId = viewModel.clickedPhotoId,
+                savedIndex = viewModel.savedScrollIndex,
+                savedOffset = viewModel.savedScrollOffset,
+                onSaveScrollState = { id, index, offset -> viewModel.saveScrollState(id, index, offset) },
                 onLastViewedPhotoConsumed = { viewModel.updateLastViewedPhotoId("") }
             )
 
