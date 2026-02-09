@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.provider.MediaStore
 import android.content.ContentUris
@@ -57,6 +58,7 @@ import kotlinx.coroutines.withContext
 import com.akslabs.cloudgallery.utils.sendFileViaUri
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalContext
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
@@ -357,147 +359,164 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                     }
                                                     
                                                     
-                                                    Row(
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        modifier = Modifier.padding(start = 2.dp).offset(y = (-2).dp)
-
-
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(start = 2.dp).offset(y = (-2).dp)
+                                                ) {
+                                                    Surface(
+                                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        shape = CircleShape
                                                     ) {
-                                                        Surface(
-                                                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                            shape = CircleShape
-                                                        ) {
-                                                            Text(
-                                                                text = "$count photos",
-                                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                                                style = MaterialTheme.typography.labelMedium,
-                                                                fontWeight = FontWeight.ExtraBold,
-                                                                letterSpacing = 0.2.sp
-                                                            )
-                                                        }
-                                                        Surface(
-                                                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                            shape = CircleShape
-                                                        ) {
-                                                            Text(
-                                                                text = android.text.format.Formatter.formatFileSize(context, totalSize),
-                                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
-                                                                style = MaterialTheme.typography.labelMedium,
-                                                                fontWeight = FontWeight.ExtraBold,
-                                                                letterSpacing = 0.2.sp
-                                                            )
-                                                        }
-                                                        
-
+                                                        Text(
+                                                            text = "$count photos",
+                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            letterSpacing = 0.2.sp
+                                                        )
                                                     }
+                                                    Surface(
+                                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        shape = CircleShape
+                                                    ) {
+                                                        Text(
+                                                            text = android.text.format.Formatter.formatFileSize(context, totalSize),
+                                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            letterSpacing = 0.2.sp
+                                                        )
+                                                    }
+                                                }
                                                 }
                                             }
                                         },
                                         navigationIcon = {
                                             if (currentRoute == Screens.TrashBin.route) {
-                                                IconButton(
+                                                Surface(
                                                     onClick = { navController.popBackStack() },
-                                                    modifier = Modifier.padding(top = 30.dp)
+                                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                    shape = CircleShape,
+                                                    modifier = Modifier.padding(start = 12.dp, top = 30.dp).size(40.dp)
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Filled.ArrowBack,
-                                                        contentDescription = "Back",
-                                                        tint = MaterialTheme.colorScheme.onSurface
-                                                    )
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = Icons.Rounded.ArrowBack,
+                                                            contentDescription = "Back",
+                                                            modifier = Modifier.size(20.dp),
+                                                            tint = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    }
                                                 }
                                             }
                                         },
                                         expandedHeight = 95.dp,
                                         actions = {
                                             Row(
-                                                modifier = Modifier.padding(top = 30.dp)
+                                                modifier = Modifier.padding(top = 30.dp, end = 8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                                             ) {
                                                 if (currentRoute == Screens.RemotePhotos.route) {
-                                                    IconButton(onClick = { navController.navigate(Screens.TrashBin.route) }) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.DeleteOutline,
-                                                            contentDescription = "Trash Bin",
-                                                            tint = MaterialTheme.colorScheme.onSurface
-                                                        )
+                                                    Surface(
+                                                        onClick = { navController.navigate(Screens.TrashBin.route) },
+                                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                        shape = CircleShape,
+                                                        modifier = Modifier.size(40.dp)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Icon(
+                                                                imageVector = Icons.Rounded.DeleteOutline,
+                                                                contentDescription = "Trash Bin",
+                                                                modifier = Modifier.size(20.dp),
+                                                                tint = MaterialTheme.colorScheme.onSurface
+                                                            )
+                                                        }
                                                     }
                                                 }
                                                 // Grid options menu button
                                                 Box {
-                                                    IconButton(onClick = { showGridOptionsDropdown = true }) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Dashboard,
-                                                            contentDescription = "Grid options",
-                                                            tint = MaterialTheme.colorScheme.onSurface
-                                                        )
+                                                    Surface(
+                                                        onClick = { showGridOptionsDropdown = true },
+                                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                        shape = CircleShape,
+                                                        modifier = Modifier.size(40.dp)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Icon(
+                                                                imageVector = Icons.Rounded.Dashboard,
+                                                                contentDescription = "Grid options",
+                                                                modifier = Modifier.size(20.dp),
+                                                                tint = MaterialTheme.colorScheme.onSurface
+                                                            )
+                                                        }
                                                     }
 
                                                     DropdownMenu(
                                                         expanded = showGridOptionsDropdown,
-                                                        onDismissRequest = { showGridOptionsDropdown = false }
+                                                        onDismissRequest = { showGridOptionsDropdown = false },
+                                                        shape = RoundedCornerShape(24.dp),
+                                                        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                                     ) {
                                                         Text(
                                                             text = "Layout",
                                                             style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.Bold,
                                                             color = MaterialTheme.colorScheme.primary,
                                                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                                         )
 
                                                         DropdownMenuItem(
-                                                            text = {
-                                                                Text(
-                                                                    text = "Grid View",
-                                                                    color = if (!gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                                )
-                                                            },
+                                                            text = { Text("Grid View") },
+                                                            leadingIcon = { Icon(Icons.Rounded.GridView, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                                             onClick = {
                                                                 gridState.updateDateGroupedLayout(false)
                                                                 showGridOptionsDropdown = false
-                                                            }
+                                                            },
+                                                            colors = if (!gridState.isDateGroupedLayout) MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.primary, leadingIconColor = MaterialTheme.colorScheme.primary) else MenuDefaults.itemColors()
                                                         )
                                                         DropdownMenuItem(
-                                                            text = {
-                                                                Text(
-                                                                    text = "Date Grouped",
-                                                                    color = if (gridState.isDateGroupedLayout) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                                )
-                                                            },
+                                                            text = { Text("Date Grouped") },
+                                                            leadingIcon = { Icon(Icons.Rounded.CalendarToday, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                                             onClick = {
                                                                 gridState.updateDateGroupedLayout(true)
                                                                 showGridOptionsDropdown = false
-                                                            }
+                                                            },
+                                                            colors = if (gridState.isDateGroupedLayout) MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.primary, leadingIconColor = MaterialTheme.colorScheme.primary) else MenuDefaults.itemColors()
                                                         )
-                                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                                                        
                                                         Text(
                                                             text = "Columns",
                                                             style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.Bold,
                                                             color = MaterialTheme.colorScheme.primary,
                                                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                                         )
                                                         listOf(3, 4, 5, 6).forEach { columnCount ->
                                                             DropdownMenuItem(
-                                                                text = {
-                                                                    Text(
-                                                                        text = "$columnCount columns",
-                                                                        color = if (columnCount == gridState.columnCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                                    )
+                                                                text = { Text("$columnCount columns") },
+                                                                leadingIcon = { 
+                                                                    Icon(
+                                                                        if (columnCount == gridState.columnCount) Icons.Rounded.RadioButtonChecked else Icons.Rounded.RadioButtonUnchecked,
+                                                                        contentDescription = null, 
+                                                                        modifier = Modifier.size(20.dp)
+                                                                    ) 
                                                                 },
                                                                 onClick = {
                                                                     gridState.updateColumnCount(columnCount)
                                                                     showGridOptionsDropdown = false
-                                                                }
+                                                                },
+                                                                colors = if (columnCount == gridState.columnCount) MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.primary, leadingIconColor = MaterialTheme.colorScheme.primary) else MenuDefaults.itemColors()
                                                             )
                                                         }
-                                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                                                        
                                                         DropdownMenuItem(
-                                                            text = {
-                                                                Text(
-                                                                    text = "Grid Thumbnail Resolution",
-                                                                    color = MaterialTheme.colorScheme.onSurface
-                                                                )
-                                                            },
+                                                            text = { Text("Thumbnail Quality") },
+                                                            leadingIcon = { Icon(Icons.Rounded.HighQuality, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                                             onClick = {
                                                                 showThumbnailResolutionDialog = true
                                                                 showGridOptionsDropdown = false
@@ -507,16 +526,24 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                                 }
 
                                                 // Settings button
-                                                IconButton(onClick = {
-                                                    scrollBehavior.state.heightOffset = 0f
-                                                    scrollBehavior.state.heightOffsetLimit = 0f
-                                                    navController.navigate(Screens.Settings.route)
-                                                }) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Settings,
-                                                        contentDescription = "Settings",
-                                                        tint = MaterialTheme.colorScheme.onSurface
-                                                    )
+                                                Surface(
+                                                    onClick = {
+                                                        scrollBehavior.state.heightOffset = 0f
+                                                        scrollBehavior.state.heightOffsetLimit = 0f
+                                                        navController.navigate(Screens.Settings.route)
+                                                    },
+                                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                    shape = CircleShape,
+                                                    modifier = Modifier.size(40.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = Icons.Rounded.Settings,
+                                                            contentDescription = "Settings",
+                                                            modifier = Modifier.size(20.dp),
+                                                            tint = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    }
                                                 }
                                             }
                                         },
@@ -721,28 +748,28 @@ fun SelectionTopAppBar(
                         Surface(
                             color = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp, topEnd = 4.dp, bottomEnd = 4.dp),
+                            shape = CircleShape,
                             onClick = onClearSelection,
                             modifier = Modifier.height(40.dp)
                         ) {
-                        Box(
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Close selection mode",
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Box(
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Close,
+                                    contentDescription = "Close selection mode",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                    }
                 },
                 trailingButton = {
                     Surface(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                         contentColor = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 24.dp, bottomEnd = 24.dp),
-                        modifier = Modifier.height(40.dp)
+                        shape = CircleShape,
+                        modifier = Modifier.height(40.dp).offset(x = (-8).dp)
                     ) {
                         Box(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -752,7 +779,7 @@ fun SelectionTopAppBar(
                                 text = "$selectedCount Selected",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 0.1.sp
+                                letterSpacing = 0.sp
                             )
                         }
                     }
@@ -767,37 +794,44 @@ fun SelectionTopAppBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                     Surface(
-                        color = if (areAllSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        color = if (areAllSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         contentColor = if (areAllSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                        shape = CircleShape
+                        shape = CircleShape,
+                        modifier = Modifier.size(40.dp),
+                        onClick = onToggleSelectAll
                     ) {
-                        IconButton(onClick = onToggleSelectAll) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Default.ChecklistRtl,
-                                contentDescription = if (areAllSelected) "Deselect All" else "Select All"
+                                imageVector = Icons.Rounded.ChecklistRtl,
+                                contentDescription = if (areAllSelected) "Deselect All" else "Select All",
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                     
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        shape = CircleShape
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = CircleShape,
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Box {
                             IconButton(onClick = { showExtraActions = true }) {
                                 Icon(
-                                    imageVector = Icons.Default.MoreVert,
-                                    contentDescription = "More actions"
+                                    imageVector = Icons.Rounded.MoreVert,
+                                    contentDescription = "More actions",
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         DropdownMenu(
                             expanded = showExtraActions,
-                            onDismissRequest = { showExtraActions = false }
+                            onDismissRequest = { showExtraActions = false },
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         ) {
                             if (currentRoute == Screens.LocalPhotos.route) { // Device photos
                                 DropdownMenuItem(
-                                    text = { Text("Upload to Cloud", fontWeight = FontWeight.SemiBold) },
-                                    leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    text = { Text("Upload to Cloud") },
+                                    leadingIcon = { Icon(Icons.Rounded.CloudUpload, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                     onClick = {
                                         showExtraActions = false
                                         scope.launch {
