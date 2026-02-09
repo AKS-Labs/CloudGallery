@@ -59,6 +59,7 @@ import com.akslabs.cloudgallery.utils.sendFileViaUri
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.platform.LocalContext
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
@@ -769,7 +770,7 @@ fun SelectionTopAppBar(
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                         contentColor = MaterialTheme.colorScheme.primary,
                         shape = CircleShape,
-                        modifier = Modifier.height(40.dp).offset(x = (-8).dp)
+                        modifier = Modifier.height(40.dp)
                     ) {
                         Box(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -777,7 +778,7 @@ fun SelectionTopAppBar(
                         ) {
                             Text(
                                 text = "$selectedCount Selected",
-                                style = MaterialTheme.typography.titleSmall,
+                                style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = 0.sp
                             )
