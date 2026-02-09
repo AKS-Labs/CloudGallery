@@ -47,7 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
 import com.akslabs.cloudgallery.ui.components.DragSelectableLazyVerticalGrid
@@ -59,6 +59,14 @@ import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import androidx.compose.animation.*
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.rounded.Block
 import com.akslabs.cloudgallery.ui.components.ExpressiveEmptyState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 import androidx.navigation.NavHostController
@@ -128,7 +136,17 @@ fun TrashBinScreen(
                 totalItemsCount = deletedPhotos.itemCount,
                 columnCount = columns,
                 modifier = Modifier.align(Alignment.CenterEnd),
-                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging }
+                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
+                labelProvider = { index ->
+                    val photo = deletedPhotos.peek(index)
+                    if (photo != null) {
+                        try {
+                            java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(photo.uploadedAt))
+                        } catch (e: Exception) {
+                            "Trash"
+                        }
+                    } else "Trash"
+                }
             )
             
             DragSelectableLazyVerticalGrid(
@@ -187,15 +205,14 @@ fun TrashBinScreen(
                         
                         TrashPhotoItem(
                             remotePhoto = remotePhoto,
+                            index = index,
                             isSelected = isSelected,
                             isScrollbarDragging = isScrollbarDragging,
-                                thumbnailResolution = thumbnailResolution,
-                                modifier = Modifier.clickable {
+                            thumbnailResolution = thumbnailResolution,
+                            modifier = Modifier.clickable {
                                 if (selectionMode) {
                                     toggleSelection(photo.remoteId)
                                 } else {
-                                    // selectedIndex removed
-
                                     selectedPhotoId = photo.remoteId
                                 }
                             }
@@ -242,23 +259,64 @@ fun TrashBinScreen(
 @Composable
 fun TrashPhotoItem(
     remotePhoto: RemotePhoto,
+    index: Int,
     isSelected: Boolean,
     isScrollbarDragging: Boolean = false,
     thumbnailResolution: Int = 150,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    
+    // Entrance animation state
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    val entryScale by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0.85f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "entry_scale"
+    )
+
+    val entryAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 400,
+            delayMillis = (index % 12) * 40,
+            easing = LinearOutSlowInEasing
+        ),
+        label = "entry_alpha"
+    )
+
+    val itemTranslationY by animateFloatAsState(
+        targetValue = if (isVisible) 0f else 40f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "entry_translation"
+    )
 
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
+            .graphicsLayer {
+                scaleX = entryScale
+                scaleY = entryScale
+                alpha = entryAlpha
+                translationY = itemTranslationY
+            }
+            .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .then(
                 if (isSelected) Modifier.border(
                     6.dp, 
                     MaterialTheme.colorScheme.primary, 
-                    RoundedCornerShape(16.dp)
+                    RoundedCornerShape(20.dp)
                 ) else Modifier
             ),
         contentAlignment = Alignment.Center
@@ -267,51 +325,28 @@ fun TrashPhotoItem(
             modifier = Modifier
                 .fillMaxSize()
                 .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
-                .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
+                .clip(RoundedCornerShape(if (isSelected) 14.dp else 20.dp))
         ) {
-            val targetSize = if (isScrollbarDragging) 50 else thumbnailResolution
+            val targetSize = if (isScrollbarDragging) 40 else thumbnailResolution
             
             val imageRequestBuilder = ImageRequest.Builder(context)
                 .data(remotePhoto)
                 .size(Size(targetSize, targetSize))
+                .allowHardware(true)
             
             if (!isScrollbarDragging) {
-                imageRequestBuilder.crossfade(100)
+                imageRequestBuilder.crossfade(200)
             }
+            imageRequestBuilder.allowRgb565(true)
             
             val imageRequest = imageRequestBuilder.build()
 
-            SubcomposeAsyncImage(
+            AsyncImage(
                 imageLoader = ImageLoaderModule.thumbnailImageLoader,
                 model = imageRequest,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-                contentDescription = null,
-                loading = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LoadAnimation()
-                    }
-                },
-                error = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.CloudOff,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
+                contentDescription = null
             )
 
             // Selection Tonal Overlay

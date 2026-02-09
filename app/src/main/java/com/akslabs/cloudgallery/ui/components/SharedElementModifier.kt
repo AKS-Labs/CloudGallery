@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 
 context(SharedTransitionScope)
@@ -20,8 +21,8 @@ fun Modifier.photoSharedElement(
     state: SharedTransitionScope.SharedContentState,
     animatedVisibilityScope: AnimatedVisibilityScope,
     boundsTransform: BoundsTransform = DefaultBoundsTransform,
-    placeHolderSize: SharedTransitionScope.PlaceHolderSize =
-        SharedTransitionScope.PlaceHolderSize.contentSize,
+    placeholderSize: SharedTransitionScope.PlaceholderSize =
+        SharedTransitionScope.PlaceholderSize { _, _ -> IntSize.Zero },
     renderInOverlayDuringTransition: Boolean = true,
     zIndexInOverlay: Float = 0f,
     clipInOverlayDuringTransition: SharedTransitionScope.OverlayClip = ParentClip,
@@ -33,7 +34,7 @@ fun Modifier.photoSharedElement(
             sharedContentState = state,
             animatedVisibilityScope = animatedVisibilityScope,
             boundsTransform = boundsTransform,
-            placeHolderSize = placeHolderSize,
+            placeholderSize = placeholderSize,
             renderInOverlayDuringTransition = renderInOverlayDuringTransition,
             zIndexInOverlay = zIndexInOverlay,
             clipInOverlayDuringTransition = clipInOverlayDuringTransition

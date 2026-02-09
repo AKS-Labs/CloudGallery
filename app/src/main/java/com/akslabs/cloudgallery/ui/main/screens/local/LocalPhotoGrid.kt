@@ -7,6 +7,7 @@ import android.content.ContextWrapper
 import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -60,7 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
 import com.akslabs.cloudgallery.ui.components.DragSelectableLazyVerticalGrid
@@ -333,21 +334,30 @@ fun LocalPhotoGrid(
             )
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
-                // Calculate effective total items for scrollbar (accounting for headers)
-                val totalRows = if (isDateGroupedLayout) {
-                    val headers = layoutCache.dateGroupedItems.count { it is LocalGridItem.HeaderItem }
-                    val photos = layoutCache.dateGroupedItems.count { it is LocalGridItem.PhotoItem }
-                    headers + kotlin.math.ceil(photos.toFloat() / columns).toInt()
-                } else {
-                    kotlin.math.ceil(layoutCache.normalGridItems.size.toFloat() / columns).toInt()
-                }
-                val effectiveTotalItems = totalRows * columns
 
                 ExpressiveScrollbar(
                     lazyGridState = lazyGridState,
-                    totalItemsCount = effectiveTotalItems,
+                    totalItemsCount = currentLayoutItems.size,
                     columnCount = columns,
                     onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
+                    labelProvider = { index ->
+                        val safeIndex = index.coerceIn(0, currentLayoutItems.size - 1)
+                        when (val item = currentLayoutItems[safeIndex]) {
+                            is LocalGridItem.HeaderItem -> item.dateLabel
+                            is LocalGridItem.PhotoItem -> {
+                                // Find nearest header above this item
+                                var foundLabel = "..."
+                                for (i in safeIndex downTo 0) {
+                                    val current = currentLayoutItems[i]
+                                    if (current is LocalGridItem.HeaderItem) {
+                                        foundLabel = current.dateLabel
+                                        break
+                                    }
+                                }
+                                foundLabel
+                            }
+                        }
+                    },
                     modifier = Modifier.align(Alignment.CenterEnd)
                 )
                 // the grid (unchanged except keep the same lazyGridState variable)
@@ -489,9 +499,44 @@ fun LocalPhotoItem(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    
+    // Entrance animation state
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    val entryScale by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0.85f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "entry_scale"
+    )
+
+    val entryAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 400,
+            delayMillis = (index % 12) * 40,
+            easing = LinearOutSlowInEasing
+        ),
+        label = "entry_alpha"
+    )
+
+    val itemTranslationY by animateFloatAsState(
+        targetValue = if (isVisible) 0f else 40f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "entry_translation"
+    )
+
     val scale by animateFloatAsState(
         targetValue = if (isDeleted) 0.8f else 1f,
-        animationSpec = androidx.compose.animation.core.spring(dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "item_scale"
     )
 
@@ -504,65 +549,49 @@ fun LocalPhotoItem(
                     boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
                 )
                 .aspectRatio(1f)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                alpha = scale
-            }
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .then(
-                if (isSelected) Modifier.border(
-                    6.dp, 
-                    MaterialTheme.colorScheme.primary, 
-                    RoundedCornerShape(16.dp)
-                ) else Modifier
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
-                .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
-        ) {
-            SubcomposeAsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(photo.pathUri)
-                    .size(if (isScrollbarDragging) Size(50, 50) else Size(thumbnailResolution, thumbnailResolution))
-                    .crossfade(if (isScrollbarDragging) 0 else 500)
-                    .allowHardware(false)
-                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                    .build(),
-                contentDescription = stringResource(R.string.photo),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                loading = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LoadAnimation()
-                    }
-                },
-                error = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Block,
-                            contentDescription = "Error loading image",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                    }
+                .graphicsLayer {
+                    scaleX = scale * entryScale
+                    scaleY = scale * entryScale
+                    alpha = entryAlpha
+                    translationY = itemTranslationY
                 }
-            )
+                .clip(RoundedCornerShape(20.dp)) // Expressive corner radius
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .then(
+                    if (isSelected) Modifier.border(
+                        6.dp, 
+                        MaterialTheme.colorScheme.primary, 
+                        RoundedCornerShape(20.dp)
+                    ) else Modifier
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
+                    .clip(RoundedCornerShape(if (isSelected) 14.dp else 20.dp))
+            ) {
+                // Optimized loading: using AsyncImage instead of SubcomposeAsyncImage to avoid subcomposition
+                val loadSize = if (isScrollbarDragging) 64 else thumbnailResolution
+                
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(photo.pathUri)
+                        .size(Size(loadSize, loadSize))
+                        .crossfade(if (isScrollbarDragging) 0 else 200)
+                        .allowHardware(true)
+                        .allowRgb565(true)
+                        .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                        .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                        .build(),
+                    contentDescription = stringResource(R.string.photo),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    placeholder = null, // Avoiding subcomposition
+                    error = null // Avoiding subcomposition
+                )
+            }
 
             // Selection Tonal Overlay
             if (isSelected) {
@@ -572,25 +601,25 @@ fun LocalPhotoItem(
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                 )
             }
-        }
 
-        // Selection Checkmark (Improved)
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(10.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    .size(28.dp)
-                    .border(2.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(18.dp)
-                )
+            // Selection Checkmark (Improved)
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .size(28.dp)
+                        .border(2.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
 
@@ -620,4 +649,4 @@ fun LocalPhotoItem(
         */
     }
 }
-}
+

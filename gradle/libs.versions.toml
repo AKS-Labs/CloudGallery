@@ -34,6 +34,7 @@ foundation = "1.9.5"
 material3 = "1.5.0-alpha09"
 graphicsShapes = "1.1.0"
 exifinterface = "1.4.1"
+foundationVersion = "1.10.2"
 
 
 [libraries]
@@ -83,6 +84,7 @@ androidx-compose-foundation = { group = "androidx.compose.foundation", name = "f
 androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 androidx-graphics-shapes = { module = "androidx.graphics:graphics-shapes", version.ref = "graphicsShapes" }
 androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
+foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundationVersion" }
 
 
 [plugins]

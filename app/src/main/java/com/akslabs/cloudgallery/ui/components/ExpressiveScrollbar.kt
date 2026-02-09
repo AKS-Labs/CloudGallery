@@ -1,35 +1,24 @@
 package com.akslabs.cloudgallery.ui.components
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -37,9 +26,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -52,25 +44,20 @@ fun ExpressiveScrollbar(
     totalItemsCount: Int,
     columnCount: Int,
     modifier: Modifier = Modifier,
+    labelProvider: ((Int) -> String)? = null,
     indicatorColor: Color = MaterialTheme.colorScheme.primary,
-    trackColor: Color = Color.Transparent, 
-    thumbWidth: Dp = 8.dp,
-    thumbHeight: Dp = 48.dp,
-    thumbExpandedWidth: Dp = 20.dp,
-    paddingEnd: Dp = 4.dp,
     onDraggingChange: (Boolean) -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
     
-    // State to track if the user is currently dragging the scrollbar
     var isDragging by remember { mutableStateOf(false) }
-    
-    // Helper to detect if the list is scrolling (user fling or drag)
     val isScrolling by remember { derivedStateOf { lazyGridState.isScrollInProgress } }
-    
-    // Visibility state: Show if scrolling OR dragging
     var isVisible by remember { mutableStateOf(false) }
+    
+    // Spring physics for the thumb position
+    val animatedProgress = remember { Animatable(0f) }
     
     // Auto-hide logic
     LaunchedEffect(isScrolling, isDragging) {
@@ -79,84 +66,75 @@ fun ExpressiveScrollbar(
         } else if (isScrolling) {
             isVisible = true
         } else {
-            delay(1500) // Keep visible for 1.5s after stop
+            delay(1500)
             isVisible = false
         }
     }
 
-    // Sync isDragging with callback
     LaunchedEffect(isDragging) {
         onDraggingChange(isDragging)
     }
 
-    // Calculations for scrollbar position
-    val firstVisibleItemIndex by remember { derivedStateOf { lazyGridState.firstVisibleItemIndex } }
-    
-    // Avoid division by zero
     if (totalItemsCount <= 0 || columnCount <= 0) return
+
+    val totalRows = (totalItemsCount + columnCount - 1) / columnCount
+    
+    // Update animated progress based on list state
+    LaunchedEffect(lazyGridState.firstVisibleItemIndex, totalRows) {
+        if (totalRows > 1 && !isDragging) {
+            val currentRow = lazyGridState.firstVisibleItemIndex / columnCount
+            val targetProgress = currentRow.toFloat() / (totalRows - 1).coerceAtLeast(1)
+            animatedProgress.animateTo(
+                targetValue = targetProgress,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
+        }
+    }
+
+    val alpha by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = tween(300),
+        label = "alpha"
+    )
+    
+    val thumbScale by animateFloatAsState(
+        targetValue = if (isDragging) 1.2f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "scale"
+    )
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxHeight()
-            .width(thumbExpandedWidth + 32.dp) // Touch target area wider than visual
-            .zIndex(10f)
-            .padding(end = paddingEnd)
+            .width(96.dp) // Even wider to accommodate the mega-pill
+            .zIndex(100f)
+            .padding(end = 6.dp)
     ) {
-        val density = LocalDensity.current
         val trackHeightPx = constraints.maxHeight.toFloat()
-        val thumbHeightPx = with(density) { thumbHeight.toPx() }
+        val thumbHeightPx = with(density) { 56.dp.toPx() } // Slightly taller
+        val maxOffset = trackHeightPx - thumbHeightPx
         
-        // Effective total rows
-        // Note: We use a simplified row calculation. For perfect mapping with headers, 
-        // passing totalItemsCount as "effective items" (headers + photos) is crucial.
-        val totalRows = (totalItemsCount + columnCount - 1) / columnCount
-        
-        // Calculate the visual offset of the thumb based on List state (Source of Truth)
-        val viewportOffsetPx by remember {
-            derivedStateOf {
-                if (totalRows <= 0) return@derivedStateOf 0f
-                
-                // Current scroll progress (0f..1f)
-                // We use firstVisibleItemIndex as a rough proxy. 
-                // Adding firstVisibleItemScrollOffset / itemHeight would be more precise but requires consistent item heights.
-                val currentRow = firstVisibleItemIndex / columnCount
-                val scrollProgress = currentRow.toFloat() / (totalRows - 1).coerceAtLeast(1)
-                
-                // Map 0..1 to 0..(trackHeight - thumbHeight)
-                scrollProgress * (trackHeightPx - thumbHeightPx)
-            }
-        }
+        // Map progress to offset
+        val thumbOffsetPx = animatedProgress.value * maxOffset
 
-        // Animation states
-        val alpha by animateFloatAsState(
-            targetValue = if (isVisible) 1f else 0f,
-            animationSpec = tween(durationMillis = 300),
-            label = "alpha"
-        )
-        
-        val currentThumbWidth by animateDpAsState(
-            targetValue = if (isDragging) thumbExpandedWidth else thumbWidth,
-            animationSpec = tween(durationMillis = 200),
-            label = "width"
-        )
-
-        // Only show if there's enough content to scroll
         if (trackHeightPx > thumbHeightPx && totalRows > 1) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .alpha(alpha)
-                    // Touch input handling
-                    .pointerInput(totalRows, trackHeightPx, thumbHeightPx) {
+                    .pointerInput(totalRows, trackHeightPx) {
                         detectTapGestures(
                             onPress = { offset ->
                                 isDragging = true
-                                // Calculate target index immediately on tap
                                 val progress = (offset.y / trackHeightPx).coerceIn(0f, 1f)
                                 val targetRow = (progress * (totalRows - 1)).roundToInt()
                                 val targetIndex = (targetRow * columnCount).coerceIn(0, totalItemsCount - 1)
                                 
                                 coroutineScope.launch {
+                                    animatedProgress.snapTo(progress)
                                     lazyGridState.scrollToItem(targetIndex)
                                 }
                                 tryAwaitRelease()
@@ -164,43 +142,72 @@ fun ExpressiveScrollbar(
                             }
                         )
                     }
-                    .pointerInput(totalRows, trackHeightPx, thumbHeightPx) {
+                    .pointerInput(totalRows, trackHeightPx) {
                         detectDragGestures(
                             onDragStart = { isDragging = true },
                             onDragEnd = { isDragging = false },
                             onDragCancel = { isDragging = false },
                             onDrag = { change, _ ->
                                 change.consume()
-                                val y = change.position.y
-                                val progress = (y / trackHeightPx).coerceIn(0f, 1f)
-                                
+                                val progress = (change.position.y / trackHeightPx).coerceIn(0f, 1f)
                                 val targetRow = (progress * (totalRows - 1)).roundToInt()
                                 val targetIndex = (targetRow * columnCount).coerceIn(0, totalItemsCount - 1)
                                 
                                 coroutineScope.launch {
+                                    animatedProgress.snapTo(progress)
                                     lazyGridState.scrollToItem(targetIndex)
+                                    
+                                    if (targetIndex % 50 == 0) {
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    }
                                 }
                             }
                         )
                     }
             ) {
+                // Label Bubble (Date etc)
+                if (isDragging && labelProvider != null) {
+                    val label = labelProvider((animatedProgress.value * (totalItemsCount - 1)).roundToInt())
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset { 
+                                IntOffset(
+                                    x = (-90.dp).toPx().roundToInt(), 
+                                    y = (thumbOffsetPx + thumbHeightPx / 2 - 24.dp.toPx()).roundToInt()
+                                ) 
+                            }
+                            .alpha(alpha)
+                            .wrapContentWidth(), // Ensure it can expand horizontally
+                        shape = RoundedCornerShape(24.dp), // More pill-like
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        tonalElevation = 6.dp,
+                        shadowElevation = 8.dp // More depth
+                    ) {
+                        Text(
+                            text = label,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp), // Even wider padding
+                            style = MaterialTheme.typography.titleMedium, // Larger text for premium feel
+                            fontWeight = FontWeight.Black, // Super bold
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+
                 // The Thumb
-                // We use Modifier.offset to position it.
-                // When dragging, we could use the raw touch Y for "stick to finger" feel, 
-                // but relying on the List state (viewportOffsetPx) ensures the thumb 
-                // always represents the REAL list position, preventing desync.
-                // Since we scrollToItem instantly, usage of viewportOffsetPx feels responsive 
-                // AND keeps the thumb effectively under the finger (modulo list quantization).
-                
                 Canvas(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .width(currentThumbWidth)
-                        .offset { IntOffset(0, viewportOffsetPx.roundToInt()) }
+                        .width(if (isDragging) 20.dp else 10.dp) // Mega-pill thickness
+                        .height(56.dp)
+                        .offset { IntOffset(0, thumbOffsetPx.roundToInt()) }
+                        .clip(CircleShape)
                 ) {
                     drawRoundRect(
                         color = indicatorColor,
-                        size = Size(size.width, thumbHeightPx),
+                        size = Size(size.width * thumbScale, size.height),
                         cornerRadius = CornerRadius(size.width / 2f)
                     )
                 }
