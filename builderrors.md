@@ -1,14 +1,19 @@
-﻿
-2026-02-08 13:44:16.010 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Skipping sync: lastViewed=null, totalPhotos=1541
-2026-02-08 13:44:36.031 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Syncing scroll: id=1000007404, foundIndex=59
-2026-02-08 13:44:36.031 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Scrolling to item 59
-2026-02-08 13:44:36.155 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Skipping sync: lastViewed=, totalPhotos=1541
-2026-02-08 13:44:42.811 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Skipping sync: lastViewed=, totalPhotos=1541
-2026-02-08 13:45:29.877 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Syncing scroll: id=1000007503, foundIndex=42
-2026-02-08 13:45:29.877 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Scrolling to item 42
-2026-02-08 13:45:29.939 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Skipping sync: lastViewed=, totalPhotos=1541
-2026-02-08 13:45:35.588 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Skipping sync: lastViewed=, totalPhotos=1541
-2026-02-08 13:46:06.055 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Syncing scroll: id=1000006258, foundIndex=111
-2026-02-08 13:46:06.055 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Scrolling to item 111
-2026-02-08 13:46:06.152 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Skipping sync: lastViewed=, totalPhotos=1541
-2026-02-08 13:46:11.379 24857-24857 LocalPhotoGrid          com.akslabs.cloudgallery             D  Skipping sync: lastViewed=, totalPhotos=1541
+﻿> Task :app:compileDebugKotlin
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:159:9 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:242:45 Unresolved reference 'onClick'.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:262:32 Argument type mismatch: actual type is 'Color?', but 'Color' was expected.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:567:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:583:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:599:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:637:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:644:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:651:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:677:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:684:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:691:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:700:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:707:25 No parameter with name 'onClick' found.
+e: file:///C:/Users/ashin/StudioProjects/CloudGallery/app/src/main/java/com/akslabs/cloudgallery/ui/main/screens/settings/SettingsScreen.kt:715:25 No parameter with name 'onClick' found.
+
+> Task :app:compileDebugKotlin FAILED
+

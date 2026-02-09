@@ -43,7 +43,8 @@ import com.akslabs.cloudgallery.utils.Constants
 import com.akslabs.cloudgallery.utils.MetadataConfig
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import com.akslabs.cloudgallery.workers.WorkModule
-import com.akslabs.cloudgallery.ui.components.SupportSheet
+import com.akslabs.cloudgallery.ui.components.DonateBottomSheet
+import com.akslabs.cloudgallery.ui.components.MoreAppsBottomSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -230,9 +231,11 @@ fun SettingsItem(
     subtitle: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    iconColor: Color? = null,
     modifier: Modifier = Modifier
 ) {
     val alpha = if (enabled) 1f else 0.4f
+    val finalIconColor = iconColor ?: MaterialTheme.colorScheme.secondary.copy(alpha = alpha)
 
     Row(
         modifier = modifier
@@ -241,8 +244,8 @@ fun SettingsItem(
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val iconContainerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f * alpha)
-        val iconColor = MaterialTheme.colorScheme.secondary.copy(alpha = alpha)
+        val iconContainerColor = (iconColor ?: MaterialTheme.colorScheme.secondary).copy(alpha = 0.3f * alpha)
+        val tintColor = finalIconColor
 
         Box(
             modifier = Modifier
@@ -257,7 +260,7 @@ fun SettingsItem(
                         imageVector = icon,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
-                        tint = iconColor
+                        tint = tintColor
                     )
                 }
                 iconPainter != null -> {
@@ -265,7 +268,7 @@ fun SettingsItem(
                         painter = iconPainter,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
-                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(iconColor)
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tintColor)
                     )
                 }
             }
@@ -298,22 +301,38 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
     var showDialog by remember { mutableStateOf(false) }
     var dialogMessage by remember { mutableStateOf("") }
 
-    // SupportSheet State
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var showSupportSheet by remember { mutableStateOf(false) }
-
-    if (showSupportSheet) {
-        SupportSheet(
-            sheetState = sheetState,
-            onDismissRequest = { showSupportSheet = false }
-        )
-    }
-
     fun openLinkFromHref(href: String) {
         context.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(href))
         )
     }
+
+    // Bottom Sheet States
+    var showMoreAppsSheet by remember { mutableStateOf(false) }
+    var showDonateSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    if (showMoreAppsSheet) {
+        MoreAppsBottomSheet(
+            onDismiss = { showMoreAppsSheet = false },
+            onAppSelected = { href ->
+                showMoreAppsSheet = false
+                openLinkFromHref(href)
+            }
+        )
+    }
+
+    if (showDonateSheet) {
+        DonateBottomSheet(
+            onDismiss = { showDonateSheet = false },
+            onDonateOptionSelected = { href ->
+                showDonateSheet = false
+                openLinkFromHref(href)
+            }
+        )
+    }
+
+
 
     // File launchers for import/export
     val exportBackupFileLauncher = rememberLauncherForActivityResult(
@@ -655,8 +674,8 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     SettingsItem(
                         icon = Icons.Rounded.Android,
                         title = "More Apps",
-                        subtitle = "Explore more tools from us",
-                        onClick = { openLinkFromHref(Constants.moreApps) }
+                        subtitle = "More Apps by AKS-Labs",
+                        onClick = { showMoreAppsSheet = true }
                     )
 
                     SettingsItem(
@@ -685,7 +704,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     SettingsItem(
                         icon = Icons.Rounded.Balance,
                         title = "License",
-                        subtitle = "MIT License",
+                        subtitle = "GPL-3.0 license",
                         onClick = { openLinkFromHref(Constants.LICENSE) }
                     )
 
@@ -693,7 +712,8 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                         iconPainter = painterResource(id = R.drawable.donation),
                         title = "Donate",
                         subtitle = "Support the development",
-                        onClick = { showSupportSheet = true }
+                        iconColor = MaterialTheme.colorScheme.primary,
+                        onClick = { showDonateSheet = true }
                     )
                 }
             }
