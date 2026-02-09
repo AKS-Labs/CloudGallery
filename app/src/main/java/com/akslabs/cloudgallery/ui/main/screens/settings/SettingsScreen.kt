@@ -617,7 +617,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     SettingsSwitchItem(
                         icon = Icons.Rounded.AutoMode,
                         title = "Auto Export Database",
-                        subtitle = "Automatically export to file",
+                        subtitle = "Automatically export to file locally",
                         isChecked = isAutoExportDatabaseEnabled,
                         onCheckedChange = { enabled ->
                             isAutoExportDatabaseEnabled = enabled

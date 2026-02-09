@@ -39,9 +39,10 @@ object BackupHelper {
             // Handle both specific file URIs and directory (tree) URIs
             val targetUri = if (uri.toString().contains("tree")) {
                 val directory = DocumentFile.fromTreeUri(context, uri)
-                val fileName = "CloudGallery_AutoBackup.json"
-                val existingFile = directory?.findFile(fileName)
-                existingFile?.uri ?: directory?.createFile(JSON_MIME, fileName)?.uri
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault())
+                val timestamp = dateFormat.format(Date())
+                val fileName = "CloudGallery_AutoBackup_$timestamp.json"
+                directory?.createFile(JSON_MIME, fileName)?.uri
             } else {
                 uri
             }
