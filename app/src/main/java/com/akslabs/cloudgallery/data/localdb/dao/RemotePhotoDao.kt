@@ -26,6 +26,9 @@ interface RemotePhotoDao {
     @Query("SELECT COUNT(*) FROM remote_photos")
     fun getTotalCountFlow(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM remote_photos")
+    suspend fun getCount(): Int
+
     @Query("SELECT SUM(fileSize) FROM remote_photos")
     fun getTotalSizeFlow(): Flow<Long?>
 

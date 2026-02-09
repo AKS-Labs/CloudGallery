@@ -27,6 +27,9 @@ interface PhotoDao {
     @Query("SELECT COUNT(*) FROM photos")
     fun getAllCountFlow(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM photos")
+    suspend fun getCount(): Int
+
     @Query("SELECT * FROM photos WHERE localId IN (:localIds) AND remoteId IS NOT NULL")
     suspend fun getRemoteIdsForLocals(localIds: List<String>): List<Photo>
 

@@ -48,6 +48,10 @@ import com.akslabs.cloudgallery.ui.components.MoreAppsBottomSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 /**
  * Section header component for grouping settings
  */
@@ -642,7 +646,12 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                         icon = Icons.Rounded.Outbox,
                         title = "Export Database",
                         subtitle = "Manual export to local file",
-                        onClick = { exportBackupFileLauncher.launch(context.getString(R.string.CloudGallery_photos_backup_json)) }
+                        onClick = {
+                            val dateFormat = SimpleDateFormat("yyyy-MM-dd_hh-mm-a", Locale.getDefault())
+                            val timestamp = dateFormat.format(Date())
+                            val defaultFileName = "CloudGallery_Backup_$timestamp.json"
+                            exportBackupFileLauncher.launch(defaultFileName)
+                        }
                     )
 
                     SettingsItem(

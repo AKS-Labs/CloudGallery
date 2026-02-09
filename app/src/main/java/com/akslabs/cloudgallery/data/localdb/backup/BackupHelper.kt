@@ -20,7 +20,7 @@ import androidx.documentfile.provider.DocumentFile
 object BackupHelper {
     const val JSON_MIME = "application/json"
     private const val TAG = "BackupHelper"
-    private const val DATABASE_BACKUP_PREFIX = "database"
+    private const val DATABASE_BACKUP_PREFIX = "CloudGallery_Backup"
 
     private val mapper by lazy {
         ObjectMapper().apply {
@@ -39,7 +39,7 @@ object BackupHelper {
             // Handle both specific file URIs and directory (tree) URIs
             val targetUri = if (uri.toString().contains("tree")) {
                 val directory = DocumentFile.fromTreeUri(context, uri)
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault())
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd_hh-mm-a", Locale.getDefault())
                 val timestamp = dateFormat.format(Date())
                 val fileName = "CloudGallery_AutoBackup_$timestamp.json"
                 directory?.createFile(JSON_MIME, fileName)?.uri
@@ -104,12 +104,12 @@ object BackupHelper {
                 val backupJson = mapper.writeValueAsBytes(backupFile)
 
                 // Create filename with date
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault())
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd_hh-mm-a", Locale.getDefault())
                 val timestamp = dateFormat.format(Date())
-                val fileName = "${DATABASE_BACKUP_PREFIX}_${timestamp}.json"
+                val fileName = "${DATABASE_BACKUP_PREFIX}_$timestamp.json"
 
-                // Create temporary file
-                val tempFile = File.createTempFile("database_backup", ".json")
+                // Create a named file in cache directory
+                val tempFile = File(context.cacheDir, fileName)
                 tempFile.writeBytes(backupJson)
 
                 Log.i(TAG, "Created backup file: $fileName (${tempFile.length()} bytes)")
@@ -199,23 +199,26 @@ object BackupHelper {
     /**
      * Check if database backup is up to date
      */
-    suspend fun isDatabaseBackupUpToDate(): Boolean {
+    suspend fun isDatabaseBackupUpToDate(
+        currentPhotos: Int? = null,
+        currentRemotePhotos: Int? = null
+    ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 val lastBackupTimestamp = Preferences.getLong("last_database_backup_timestamp", 0L)
                 val lastBackupPhotos = Preferences.getLong("last_database_backup_photos", 0L).toInt()
                 val lastBackupRemotePhotos = Preferences.getLong("last_database_backup_remote_photos", 0L).toInt()
 
-                // Get current database state
-                val currentPhotos = DbHolder.database.photoDao().getAll().size
-                val currentRemotePhotos = DbHolder.database.remotePhotoDao().getAll().size
+                // Get current database state efficiently if not provided
+                val photosCount = currentPhotos ?: DbHolder.database.photoDao().getCount()
+                val remotePhotosCount = currentRemotePhotos ?: DbHolder.database.remotePhotoDao().getCount()
 
                 // Check if backup exists and data hasn't changed
                 val hasBackup = lastBackupTimestamp > 0
-                val dataUnchanged = (currentPhotos == lastBackupPhotos && currentRemotePhotos == lastBackupRemotePhotos)
+                val dataUnchanged = (photosCount == lastBackupPhotos && remotePhotosCount == lastBackupRemotePhotos)
 
                 Log.d(TAG, "Backup status - Has backup: $hasBackup, Data unchanged: $dataUnchanged")
-                Log.d(TAG, "Current: $currentPhotos photos, $currentRemotePhotos remote | Last backup: $lastBackupPhotos photos, $lastBackupRemotePhotos remote")
+                Log.d(TAG, "Current: $photosCount photos, $remotePhotosCount remote | Last backup: $lastBackupPhotos photos, $lastBackupRemotePhotos remote")
 
                 hasBackup && dataUnchanged
 
@@ -243,9 +246,12 @@ object BackupHelper {
             val lastBackupTime = Preferences.getLong("last_database_backup_timestamp", 0L)
             val lastBackupFilename = Preferences.getString("last_database_backup_filename", "")
             val lastImportTime = Preferences.getLong("last_database_import_timestamp", 0L)
-            val currentPhotos = DbHolder.database.photoDao().getAll().size
-            val currentRemotePhotos = DbHolder.database.remotePhotoDao().getAll().size
-            val isUpToDate = isDatabaseBackupUpToDate()
+            
+            // Use optimized count queries instead of loading all objects
+            val currentPhotos = DbHolder.database.photoDao().getCount()
+            val currentRemotePhotos = DbHolder.database.remotePhotoDao().getCount()
+            
+            val isUpToDate = isDatabaseBackupUpToDate(currentPhotos, currentRemotePhotos)
 
             BackupStats(
                 lastBackupTime = lastBackupTime,
