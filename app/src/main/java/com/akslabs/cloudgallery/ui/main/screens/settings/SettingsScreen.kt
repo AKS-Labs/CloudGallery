@@ -91,7 +91,7 @@ fun SettingsSwitchItem(
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val iconContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f * alpha)
+        val iconContainerColor = if (enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         val iconColor = MaterialTheme.colorScheme.primary.copy(alpha = alpha)
 
         Box(
@@ -235,7 +235,7 @@ fun SettingsItem(
     modifier: Modifier = Modifier
 ) {
     val alpha = if (enabled) 1f else 0.4f
-    val finalIconColor = iconColor ?: MaterialTheme.colorScheme.secondary.copy(alpha = alpha)
+    val finalIconColor = iconColor ?: MaterialTheme.colorScheme.primary.copy(alpha = alpha)
 
     Row(
         modifier = modifier
@@ -244,7 +244,7 @@ fun SettingsItem(
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val iconContainerColor = (iconColor ?: MaterialTheme.colorScheme.secondary).copy(alpha = 0.3f * alpha)
+        val iconContainerColor = if (enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         val tintColor = finalIconColor
 
         Box(
