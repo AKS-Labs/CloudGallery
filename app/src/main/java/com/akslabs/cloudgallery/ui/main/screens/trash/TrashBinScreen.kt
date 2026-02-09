@@ -59,7 +59,9 @@ import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import androidx.compose.animation.*
+import com.akslabs.cloudgallery.ui.components.ExpressiveEmptyState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
+import androidx.navigation.NavHostController
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalSharedTransitionApi::class, ExperimentalAnimationApi::class)
 @Composable
@@ -71,6 +73,7 @@ fun TrashBinScreen(
     selectedPhotos: Set<String>,
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
+    navController: NavHostController,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope
 ) {
@@ -106,23 +109,15 @@ fun TrashBinScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (deletedPhotos.itemCount == 0 && deletedPhotos.loadState.refresh is LoadState.NotLoading) {
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.DeleteOutline,
-                    contentDescription = "Empty Trash",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(48.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Trash is empty",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            ExpressiveEmptyState(
+                icon = Icons.Rounded.DeleteOutline,
+                title = "Trash is empty",
+                description = "Stay efficient! Deleted photos will appear here before being permanently removed.",
+                actionText = "Back to Gallery",
+                onActionClick = {
+                    navController.popBackStack()
+                }
+            )
         } else {
             val lazyGridState = rememberLazyGridState()
             val gridState = rememberGridState()

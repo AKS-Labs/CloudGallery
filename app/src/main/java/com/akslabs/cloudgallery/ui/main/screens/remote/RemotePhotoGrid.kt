@@ -64,6 +64,8 @@ import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
+import com.akslabs.cloudgallery.ui.components.ExpressiveEmptyState
+import com.akslabs.cloudgallery.ui.main.nav.Screens
 
 private const val TAG = "RemotePhotoGrid"
 
@@ -181,6 +183,7 @@ fun RemotePhotosGrid(
     selectedPhotos: Set<String>,
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
+    navController: NavController,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     lastViewedPhotoId: String? = null,
@@ -283,24 +286,16 @@ fun RemotePhotosGrid(
         if (cloudPhotos.loadState.refresh == LoadState.Loading && cloudPhotos.itemCount == 0) {
             LoadAnimation(modifier = Modifier.align(Alignment.Center))
         } else if (cloudPhotos.itemCount == 0 && cloudPhotos.loadState.refresh is LoadState.NotLoading) {
-             // Empty state
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Cloud,
-                    contentDescription = "No cloud photos",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(48.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Sync images to view here",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+             ExpressiveEmptyState(
+                icon = Icons.Rounded.Cloud,
+                title = "No cloud photos",
+                description = "Sync images to view your collection here anytime, anywhere.",
+                actionText = "Start Backup",
+                onActionClick = {
+                    // Navigate to settings or trigger backup
+                    navController.navigate(Screens.Settings.route)
+                }
+            )
         } else {
             // Calculate effective total items for scrollbar (accounting for headers)
             val effectiveTotalItems = remember(layoutCache, columns) {

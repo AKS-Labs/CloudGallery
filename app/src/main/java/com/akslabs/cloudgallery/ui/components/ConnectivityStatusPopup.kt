@@ -5,6 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.CloudOff
@@ -26,8 +28,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterVertically
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akslabs.cloudgallery.R
@@ -66,17 +70,15 @@ fun ConnectivityStatusPopup() {
 @Composable
 fun ConnectivityStatusBox(isConnected: Boolean) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (isConnected) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.error,
-        label = stringResource(R.string.connectivity_status_background_color)
+        targetValue = if (isConnected) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.errorContainer,
+        label = "connectivity_bg"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (isConnected) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onError,
-        label = stringResource(R.string.connectivity_status_content_color)
+        targetValue = if (isConnected) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+        label = "connectivity_content"
     )
     val message = if (isConnected) {
-        stringResource(
-            R.string.back_online
-        )
+        stringResource(R.string.back_online)
     } else {
         stringResource(R.string.no_internet_connection)
     }
@@ -88,20 +90,36 @@ fun ConnectivityStatusBox(isConnected: Boolean) {
 
     Box(
         modifier = Modifier
-            .background(backgroundColor)
             .fillMaxWidth()
-            .height(60.dp)
-            .padding(8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = iconVector,
-                stringResource(R.string.connectivity_icon),
-                tint = contentColor
-            )
-            Spacer(modifier = Modifier.size(8.dp))
-            Text(message, color = contentColor, fontSize = 15.sp)
+        androidx.compose.material3.Surface(
+            color = backgroundColor,
+            contentColor = contentColor,
+            shape = CircleShape,
+            tonalElevation = 4.dp,
+            modifier = Modifier.height(48.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 24.dp),
+                verticalAlignment = CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = iconVector,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.size(12.dp))
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.sp
+                    )
+                )
+            }
         }
     }
 }

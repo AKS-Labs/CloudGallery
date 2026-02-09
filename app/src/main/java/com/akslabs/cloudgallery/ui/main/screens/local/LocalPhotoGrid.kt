@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.BrokenImage
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.animation.*
+import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.navigation.NavController
 import com.akslabs.cloudgallery.ui.main.nav.Screens
@@ -70,6 +71,7 @@ import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.dao.SyncedPhotoTuple
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
+import com.akslabs.cloudgallery.ui.components.ExpressiveEmptyState
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
@@ -319,6 +321,16 @@ fun LocalPhotoGrid(
         // Only show loading if we don't have cached photos
         if (localPhotos.loadState.refresh == LoadState.Loading && allPhotos.isEmpty()) {
             LoadAnimation(modifier = Modifier.align(Alignment.Center))
+        } else if (allPhotos.isEmpty()) {
+            ExpressiveEmptyState(
+                icon = Icons.Rounded.PhoneAndroid,
+                title = "No photos on device",
+                description = "Grant storage permission or capture some memories to see them appear here.",
+                actionText = "Grant Permission",
+                onActionClick = {
+                    // Navigate to settings or trigger permission dialog
+                }
+            )
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
                 // Calculate effective total items for scrollbar (accounting for headers)

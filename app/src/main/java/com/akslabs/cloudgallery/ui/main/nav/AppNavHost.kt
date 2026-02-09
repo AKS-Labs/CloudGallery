@@ -148,6 +148,7 @@ fun AppNavHost(
                 selectedPhotos = selectedPhotos,
                 onSelectionModeChange = onSelectionModeChange,
                 onSelectedPhotosChange = onSelectedPhotosChange,
+                navController = navController,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this@composable,
                 lastViewedPhotoId = lastViewedId,
@@ -239,6 +240,7 @@ fun AppNavHost(
                 selectedPhotos = selectedPhotos,
                 onSelectionModeChange = onSelectionModeChange,
                 onSelectedPhotosChange = onSelectedPhotosChange,
+                navController = navController,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this@composable
             )

@@ -1,17 +1,16 @@
 package com.akslabs.cloudgallery.ui.components
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.akslabs.cloudgallery.R
 
@@ -26,41 +25,54 @@ fun PermissionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Rounded.Lock,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.permission_required),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+            )
+        },
+        text = {
+            Text(
+                text = permissionTextProvider.getDescription(
+                    isPermanentlyDeclined = isPermanentlyDeclined
+                ),
+                style = MaterialTheme.typography.bodyLarge
+            )
+        },
         confirmButton = {
-            Column(
-                modifier = Modifier.fillMaxWidth()
+            TextButton(
+                onClick = {
+                    if (isPermanentlyDeclined) {
+                        onGoToAppSettingsClick()
+                    } else {
+                        onOkClick()
+                    }
+                }
             ) {
-                Divider()
                 Text(
                     text = if (isPermanentlyDeclined) {
                         stringResource(R.string.grant_permission)
                     } else {
                         stringResource(R.string.ok)
                     },
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            if (isPermanentlyDeclined) {
-                                onGoToAppSettingsClick()
-                            } else {
-                                onOkClick()
-                            }
-                        }
-                        .padding(8.dp)
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                 )
             }
         },
-        title = {
-            Text(text = stringResource(R.string.permission_required))
-        },
-        text = {
-            Text(
-                text = permissionTextProvider.getDescription(
-                    isPermanentlyDeclined = isPermanentlyDeclined
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = stringResource(R.string.cancel),
+                    style = MaterialTheme.typography.labelLarge
                 )
-            )
+            }
         },
         modifier = modifier
     )

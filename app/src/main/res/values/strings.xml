@@ -113,6 +113,7 @@
     <string name="your_bot_is_responsible_for_all..">"Your bot is responsible for all operations(upload, download etc.) to and from Telegram and this app is just a "</string>
     <string name="client_to_interact_with_the_bot..">"client to interact with the bot. This app is not meant to and does not endorse spam or any other malicious activities. "</string>
     <string name="please_use_it_at_your_own_responsibility..">Please use it at your own responsibility. By using this app, you agree to the aforementioned terms and conditions.</string>
+    <string name="cancel">Cancel</string>
 
     <!-- Enhanced Disclaimer Screen -->
     <string name="disclaimer_title">Welcome to CloudGallery</string>
