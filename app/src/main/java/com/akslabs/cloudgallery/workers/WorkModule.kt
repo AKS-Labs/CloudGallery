@@ -328,6 +328,9 @@ object WorkModule {
             .build()
 
         fun enqueuePeriodic() {
+            if (!Preferences.getBoolean(Preferences.isAutoCloudBackupEnabledKey, true)) {
+                return
+            }
             manager.enqueueUniquePeriodicWork(
                 DAILY_DATABASE_BACKUP_WORK,
                 ExistingPeriodicWorkPolicy.KEEP,

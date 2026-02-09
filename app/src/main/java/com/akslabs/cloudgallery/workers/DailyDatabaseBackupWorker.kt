@@ -30,6 +30,16 @@ class DailyDatabaseBackupWorker(
         }
 
         return try {
+            // Check if cloud backup is enabled by user
+            if (!com.akslabs.cloudgallery.data.localdb.Preferences.getBoolean(
+                    com.akslabs.cloudgallery.data.localdb.Preferences.isAutoCloudBackupEnabledKey,
+                    true
+                )
+            ) {
+                Log.d(TAG, "Daily cloud backup disabled by user")
+                return Result.success()
+            }
+
             // Check if backup is needed
             if (!BackupHelper.shouldCreateDailyBackup()) {
                 Log.d(TAG, "Daily backup not needed yet")

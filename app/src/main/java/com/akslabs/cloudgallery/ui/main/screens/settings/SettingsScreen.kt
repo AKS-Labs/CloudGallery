@@ -380,6 +380,9 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
     var isAutoExportDatabaseEnabled by remember {
         mutableStateOf(Preferences.getBoolean(Preferences.isAutoExportDatabaseEnabledKey, false))
     }
+    var isAutoCloudBackupEnabled by remember {
+        mutableStateOf(Preferences.getBoolean(Preferences.isAutoCloudBackupEnabledKey, true))
+    }
     var isMetadataUploadEnabled by remember {
         mutableStateOf(MetadataConfig.shouldIncludeMetadata())
     }
@@ -565,6 +568,30 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                 color = MaterialTheme.colorScheme.surfaceContainerLow
             ) {
                 Column {
+                    SettingsSwitchItem(
+                        icon = Icons.Rounded.CloudUpload,
+                        title = "Auto Cloud Backup",
+                        subtitle = "Daily database backup to Telegram",
+                        isChecked = isAutoCloudBackupEnabled,
+                        onCheckedChange = { enabled ->
+                            isAutoCloudBackupEnabled = enabled
+                            Preferences.edit {
+                                putBoolean(Preferences.isAutoCloudBackupEnabledKey, enabled)
+                            }
+                            if (enabled) {
+                                WorkModule.DailyDatabaseBackup.enqueuePeriodic()
+                                scope.launch {
+                                    context.toastFromMainThread("Auto cloud backup enabled")
+                                }
+                            } else {
+                                WorkModule.DailyDatabaseBackup.cancel()
+                                scope.launch {
+                                    context.toastFromMainThread("Auto cloud backup disabled")
+                                }
+                            }
+                        }
+                    )
+
                     SettingsItem(
                         icon = Icons.Rounded.CloudUpload,
                         title = "Backup Database",

@@ -21,6 +21,7 @@ object Preferences {
     const val startTabKey: String = "startTab"
     const val gridColumnCountKey: String = "gridColumnCount"
     const val isAutoBackupEnabledKey: String = "isPeriodicPhotoBackupEnabled"
+    const val isAutoCloudBackupEnabledKey: String = "isAutoCloudBackupEnabled"
     const val autoBackupIntervalKey: String = "periodicPhotoBackupInterval"
     const val autoBackupNetworkTypeKey: String = "periodicPhotoBackupNetworkType"
     const val isAutoExportDatabaseEnabledKey: String = "isAutoExportDatabaseEnabled"
