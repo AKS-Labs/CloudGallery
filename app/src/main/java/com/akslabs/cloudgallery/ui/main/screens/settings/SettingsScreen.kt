@@ -380,6 +380,15 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
     var isAutoExportDatabaseEnabled by remember {
         mutableStateOf(Preferences.getBoolean(Preferences.isAutoExportDatabaseEnabledKey, false))
     }
+    var currentAutoExportInterval by remember {
+        mutableStateOf(
+            run {
+                val intervals = listOf("Daily" to "1", "Weekly" to "7", "Biweekly" to "14", "Monthly" to "30")
+                val current = Preferences.getString(Preferences.autoExportDatabaseIntervalKey, "7")
+                intervals.find { it.second == current }?.first ?: "Weekly"
+            }
+        )
+    }
     var isAutoCloudBackupEnabled by remember {
         mutableStateOf(Preferences.getBoolean(Preferences.isAutoCloudBackupEnabledKey, true))
     }
@@ -571,7 +580,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     SettingsSwitchItem(
                         icon = Icons.Rounded.CloudUpload,
                         title = "Auto Cloud Backup",
-                        subtitle = "Daily database backup to Telegram",
+                        subtitle = "Daily database backup to Telegram for safekeeping",
                         isChecked = isAutoCloudBackupEnabled,
                         onCheckedChange = { enabled ->
                             isAutoCloudBackupEnabled = enabled
@@ -611,7 +620,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     SettingsItem(
                         icon = Icons.Rounded.CloudSync,
                         title = "Sync Cloud Photos",
-                        subtitle = "Manually refresh from Telegram",
+                        subtitle = "Sync Manually Uploaded images from Telegram Channel",
                         onClick = {
                             scope.launch {
                                 context.toastFromMainThread("Syncing...")
@@ -626,7 +635,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
 
                     SettingsItem(
                         icon = Icons.Rounded.CloudDownload,
-                        title = "Restore Missing",
+                        title = "Restore Missing Photos",
                         subtitle = stringResource(R.string.photos_not_found_on_this_device, totalCloudPhotosCount),
                         onClick = {
                             WorkModule.RestoreMissingFromDevice.enqueue()
@@ -658,6 +667,28 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                             } else {
                                 WorkModule.PeriodicDbExport.cancel()
                                 scope.launch { context.toastFromMainThread("Auto export cancelled") }
+                            }
+                        }
+                    )
+
+                    SettingsDialogItem(
+                        icon = Icons.Rounded.AccessTime,
+                        title = "Export Interval",
+                        subtitle = "How often to export database locally",
+                        currentValue = currentAutoExportInterval,
+                        options = listOf("Daily" to "1", "Weekly" to "7", "Biweekly" to "14", "Monthly" to "30"),
+                        enabled = isAutoExportDatabaseEnabled,
+                        onValueChange = { value ->
+                            Preferences.edit {
+                                putBoolean(Preferences.isAutoExportDatabaseEnabledKey, true)
+                                putString(Preferences.autoExportDatabaseIntervalKey, value)
+                            }
+                            val selectedLabel = listOf("Daily" to "1", "Weekly" to "7", "Biweekly" to "14", "Monthly" to "30")
+                                .find { it.second == value }?.first ?: "Weekly"
+                            currentAutoExportInterval = selectedLabel
+                            WorkModule.PeriodicDbExport.enqueue(forceUpdate = true)
+                            scope.launch {
+                                context.toastFromMainThread("Export interval updated to $selectedLabel")
                             }
                         }
                     )
