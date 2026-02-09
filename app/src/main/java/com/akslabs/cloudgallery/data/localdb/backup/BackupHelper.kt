@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.documentfile.provider.DocumentFile
 
 object BackupHelper {
     const val JSON_MIME = "application/json"
@@ -34,7 +35,23 @@ object BackupHelper {
             val photos = DbHolder.database.photoDao().getAll()
             val remotePhotos = DbHolder.database.remotePhotoDao().getAll()
             val backupFile = BackupFile(photos, remotePhotos)
-            context.contentResolver.openOutputStream(uri)?.use {
+            
+            // Handle both specific file URIs and directory (tree) URIs
+            val targetUri = if (uri.toString().contains("tree")) {
+                val directory = DocumentFile.fromTreeUri(context, uri)
+                val fileName = "CloudGallery_AutoBackup.json"
+                val existingFile = directory?.findFile(fileName)
+                existingFile?.uri ?: directory?.createFile(JSON_MIME, fileName)?.uri
+            } else {
+                uri
+            }
+
+            if (targetUri == null) {
+                Log.e(TAG, "Failed to resolve target URI for export")
+                return
+            }
+
+            context.contentResolver.openOutputStream(targetUri, "wt")?.use {
                 val favoritesJson = mapper.writeValueAsBytes(backupFile)
                 it.write(favoritesJson)
             }

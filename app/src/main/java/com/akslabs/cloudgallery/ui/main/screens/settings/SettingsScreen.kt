@@ -352,12 +352,12 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
     }
 
     val autoExportBackupFileLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument(BackupHelper.JSON_MIME)
+        ActivityResultContracts.OpenDocumentTree()
     ) {
         it?.let { uri ->
             context.contentResolver.takePersistableUriPermission(
                 uri,
-                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
             Preferences.edit {
                 putString(Preferences.autoExportDatabseLocation, uri.toString())
@@ -623,7 +623,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                             isAutoExportDatabaseEnabled = enabled
                             Preferences.edit { putBoolean(Preferences.isAutoExportDatabaseEnabledKey, enabled) }
                             if (enabled) {
-                                autoExportBackupFileLauncher.launch(context.getString(R.string.CloudGallery_auto_photos_backup_json))
+                                autoExportBackupFileLauncher.launch(null)
                             } else {
                                 WorkModule.PeriodicDbExport.cancel()
                                 scope.launch { context.toastFromMainThread("Auto export cancelled") }
