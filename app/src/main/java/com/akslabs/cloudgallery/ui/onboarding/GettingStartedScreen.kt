@@ -57,6 +57,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.AnnotatedString
 import com.akslabs.cloudgallery.utils.Constants
 
@@ -148,7 +149,7 @@ fun GettingStartedScreen(
                 painter = painterResource(id = R.drawable.chitralaya),
                 contentDescription = stringResource(R.string.app_icon),
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(200.dp)
                     .clip(CircleShape),
                 contentScale = ContentScale.FillBounds
             )
@@ -347,19 +348,40 @@ fun GettingStartedScreen(
                             openLinkFromHref(Constants.joinTelegra)
                         }
                     ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.telegram),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Join Telegram Group for more help",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Button(
+                            onClick = { openLinkFromHref(Constants.joinTelegra) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.telegram),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Join Telegram for Support",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+//                        Icon(
+//                            painter = painterResource(id = R.drawable.telegram),
+//                            contentDescription = null,
+//                            tint = MaterialTheme.colorScheme.primary,
+//                            modifier = Modifier.size(20.dp)
+//                        )
+//                        Spacer(modifier = Modifier.width(8.dp))
+//                        Text(
+//                            text = "Join Telegram Group for more help",
+//                            color = MaterialTheme.colorScheme.primary,
+//                            style = MaterialTheme.typography.bodyMedium,
+//                            fontWeight = FontWeight.Medium
+//                        )
                     }
 
                 }
@@ -367,103 +389,103 @@ fun GettingStartedScreen(
 
 
 
-        // Proceed Button
-        Spacer(modifier = Modifier.height(32.dp))
+            // Proceed Button
+            Spacer(modifier = Modifier.height(32.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp),
-            horizontalArrangement = Arrangement.End
-        ) {
-            Button(
-                onClick = {
-                    scope.launch {
-                        // Check connectivity first
-                        val connectivityStatus = ConnectivityObserver.status()
-                        if (connectivityStatus != ConnectivityStatus.Available) {
-                            context.toastFromMainThread("No internet connection. Please check your connection and try again.")
-                            return@launch
-                        }
-
-                        if (botToken.isBlank()) {
-                            isValidToken = false
-                            return@launch
-                        }
-
-                        if (chatId.isBlank()) {
-                            isValidChatId = false
-                            return@launch
-                        }
-
-                        isLoading = true
-                        validationError = null
-
-                        try {
-                            // Save bot token
-                            Preferences.editEncrypted {
-                                putString(Preferences.botToken, botToken)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            // Check connectivity first
+                            val connectivityStatus = ConnectivityObserver.status()
+                            if (connectivityStatus != ConnectivityStatus.Available) {
+                                context.toastFromMainThread("No internet connection. Please check your connection and try again.")
+                                return@launch
                             }
 
-                            // Validate chat ID
-                            val id = chatId.toLongOrNull()
-                            if (id != null) {
-                                Log.i("GettingStartedScreen", "Validating chat ID: $id")
+                            if (botToken.isBlank()) {
+                                isValidToken = false
+                                return@launch
+                            }
 
-                                val validationResult = TelegramHttp.validateChat(id)
+                            if (chatId.isBlank()) {
+                                isValidChatId = false
+                                return@launch
+                            }
 
-                                if (validationResult.first) {
-                                    Preferences.editEncrypted {
-                                        putLong(Preferences.channelId, id)
+                            isLoading = true
+                            validationError = null
+
+                            try {
+                                // Save bot token
+                                Preferences.editEncrypted {
+                                    putString(Preferences.botToken, botToken)
+                                }
+
+                                // Validate chat ID
+                                val id = chatId.toLongOrNull()
+                                if (id != null) {
+                                    Log.i("GettingStartedScreen", "Validating chat ID: $id")
+
+                                    val validationResult = TelegramHttp.validateChat(id)
+
+                                    if (validationResult.first) {
+                                        Preferences.editEncrypted {
+                                            putLong(Preferences.channelId, id)
+                                        }
+                                        botApi.stopPolling()
+                                        onProceed()
+                                    } else {
+                                        isValidChatId = false
+                                        validationError = validationResult.second ?: "Validation failed with no error message."
                                     }
-                                    botApi.stopPolling()
-                                    onProceed()
                                 } else {
                                     isValidChatId = false
-                                    validationError = validationResult.second ?: "Validation failed with no error message."
+                                    validationError = "Invalid chat ID format: $chatId"
                                 }
-                            } else {
+                            } catch (e: Exception) {
+                                Log.e("GettingStartedScreen", "Error validating inputs", e)
                                 isValidChatId = false
-                                validationError = "Invalid chat ID format: $chatId"
+                                validationError = e.stackTraceToString()
+                            } finally {
+                                isLoading = false
                             }
-                        } catch (e: Exception) {
-                            Log.e("GettingStartedScreen", "Error validating inputs", e)
-                            isValidChatId = false
-                            validationError = e.stackTraceToString()
-                        } finally {
-                            isLoading = false
                         }
+                    },
+                    enabled = !isLoading && botToken.isNotBlank() && chatId.isNotBlank(),
+                    modifier = Modifier
+                        .height(56.dp)
+                        .widthIn(min = 120.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
-                },
-                enabled = !isLoading && botToken.isNotBlank() && chatId.isNotBlank(),
-                modifier = Modifier
-                    .height(56.dp)
-                    .widthIn(min = 120.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isLoading) "Validating..." else "Proceed",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
-                } else {
-                    Icon(
-                        imageVector = Icons.Rounded.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isLoading) "Validating..." else "Proceed",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }}
+                }}
         }
     }
 }
