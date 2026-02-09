@@ -10,14 +10,17 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FloatingToolbarDefaults
@@ -30,10 +33,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -51,6 +56,7 @@ import com.akslabs.cloudgallery.ui.main.MainViewModel
 import com.akslabs.cloudgallery.utils.NotificationHelper
 import com.akslabs.cloudgallery.workers.WorkModule
 import com.akslabs.cloudgallery.data.localdb.Preferences
+import com.akslabs.cloudgallery.ui.theme.AnimationConstants
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -72,21 +78,21 @@ fun BottomToolbarFAB(
     val transition = rememberInfiniteTransition(label = "")
     val offsetY by transition.animateFloat(
         initialValue = 0f,
-        targetValue = -60f,
+        targetValue = -40f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
+            animation = tween(1200, easing = AnimationConstants.EmphasizedEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = ""
+        label = "upload_offset"
     )
     val alpha by transition.animateFloat(
         initialValue = 1f,
-        targetValue = 0f,
+        targetValue = 0.2f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
+            animation = tween(1200, easing = AnimationConstants.EmphasizedEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = ""
+        label = "upload_alpha"
     )
 
     HorizontalFloatingToolbar(
@@ -99,22 +105,24 @@ fun BottomToolbarFAB(
         leadingContent = { LeadingContent(navController) },
         trailingContent = { TrailingContent(navController) },
         content = {
+            val containerColor = if (isUploading) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer
+            val contentColor = if (isUploading) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+
             FilledIconButton(
                 modifier = Modifier.width(66.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = containerColor,
+                    contentColor = contentColor
+                ),
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (isUploading) {
-                        // Stop all uploads (manual, instant, and current periodic if running)
                         try {
                             workManager.cancelAllWorkByTag("manual_backup")
                             workManager.cancelAllWorkByTag("instant_upload")
-                            // Also cancel the instant periodic backup worker if it's running
                             workManager.cancelUniqueWork("InstantPhotoBackupWork")
-                            // Cancel periodic worker if it's currently running
                             workManager.cancelUniqueWork(WorkModule.PERIODIC_PHOTO_BACKUP_WORK)
                             
-                            // If auto-backup is enabled, we must re-schedule the periodic worker
-                            // so it runs again at the next interval (without triggering immediate work now)
                             val isAutoBackupEnabled = Preferences.getBoolean(Preferences.isAutoBackupEnabledKey, false)
                             if (isAutoBackupEnabled) {
                                 WorkModule.PeriodicBackup.enqueue(onlySchedule = true)
@@ -126,7 +134,6 @@ fun BottomToolbarFAB(
                             Toast.makeText(context, "Error stopping upload", Toast.LENGTH_SHORT).show()
                         }
                     } else {
-                        // Start manual backup
                         try {
                             workManager.enqueue(backupWorkRequest)
                             Toast.makeText(context, "Backup started", Toast.LENGTH_SHORT).show()
@@ -138,17 +145,19 @@ fun BottomToolbarFAB(
                 }
             ) {
                 if (isUploading) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowUpward,
-                        contentDescription = "Uploading",
-                        modifier = Modifier
-                            .offset(y = offsetY.dp)
-                            .zIndex(1f),
-                        tint = LocalContentColor.current.copy(alpha = alpha)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowUpward,
+                            contentDescription = "Uploading",
+                            modifier = Modifier
+                                .offset(y = offsetY.dp)
+                                .graphicsLayer { this.alpha = alpha },
+                            tint = contentColor
+                        )
+                    }
                 } else {
                     Icon(
-                        imageVector = Icons.Filled.ArrowUpward,
+                        imageVector = Icons.Rounded.ArrowUpward,
                         contentDescription = "Upload"
                     )
                 }
@@ -174,13 +183,9 @@ private fun LeadingContent(navController: NavHostController) {
         }
     ) {
         Icon(
-            imageVector = Icons.Filled.PhoneAndroid,
+            imageVector = Icons.Rounded.PhoneAndroid,
             contentDescription = "Device Photos",
-            tint = when {
-                isSelected -> MaterialTheme.colorScheme.primary
-                isDarkTheme -> Color.White
-                else -> Color.Black
-            }
+            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 
@@ -207,13 +212,9 @@ private fun TrailingContent(navController: NavHostController) {
         }
     ) {
         Icon(
-            imageVector = Icons.Filled.Cloud,
+            imageVector = Icons.Rounded.Cloud,
             contentDescription = "Cloud Photos",
-            tint = when {
-                isCloudSelected -> MaterialTheme.colorScheme.primary
-                isDarkTheme -> Color.White
-                else -> Color.Black
-            }
+            tint = if (isCloudSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
