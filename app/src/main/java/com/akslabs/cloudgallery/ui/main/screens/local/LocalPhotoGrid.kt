@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.animation.*
 import androidx.compose.animation.core.snap
 import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material3.*
 import androidx.navigation.NavController
 import kotlinx.coroutines.Dispatchers
@@ -340,7 +341,7 @@ fun LocalPhotoGrid(
 
         snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .distinctUntilChanged()
-            .debounce(100) // Add debounce here
+            .debounce(250) // More conservative debounce
             .collectLatest { lastIndex ->
                 if (lastIndex == null) return@collectLatest
                 
@@ -351,8 +352,8 @@ fun LocalPhotoGrid(
                 withContext(Dispatchers.IO) {
                     try {
                          // Prefetch a smaller, more targeted range during active scroll
-                         // Micro-Thumbnails (64px) are very cheap
-                        val prefetchRange = (lastIndex + 1)..(lastIndex + 60) 
+                         // Micro-Thumbnails (64px) are very cheap. Reduced from 60 to 20.
+                        val prefetchRange = (lastIndex + 1)..(lastIndex + 20) 
                         prefetchRange.forEach { index ->
                             if (index in currentLayoutItems.indices) {
                                 when (val item = currentLayoutItems[index]) {
@@ -652,11 +653,13 @@ fun LocalPhotoItem(
                 .aspectRatio(1f)
                 .graphicsLayer {
                     val entrance = if (skipEntrance) 1f else animatedValues
-                    alpha = entrance
+                    // Removed alpha = entrance to keep placeholder visible
                     scaleX = deletionScale * (0.92f + 0.08f * entrance)
                     scaleY = deletionScale * (0.92f + 0.08f * entrance)
                     translationY = (1f - entrance) * 15f
                 }
+                .clip(RoundedCornerShape(if (isSelected) 14.dp else 20.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .then(
                     if (isSelected) Modifier.border(
                         6.dp, 
@@ -666,6 +669,14 @@ fun LocalPhotoItem(
                 ),
             contentAlignment = Alignment.Center
         ) {
+            // Visual Placeholder (Icon) shown behind the AsyncImage
+            Icon(
+                imageVector = Icons.Rounded.Image,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                modifier = Modifier.size(32.dp)
+            )
+
             // Fix: Stabilize ImageRequest model to prevent reload waves.
             // Using a fixed size (180) ensures high quality without excessive memory.
             val imageRequest = remember(photo.localId) {
@@ -687,9 +698,10 @@ fun LocalPhotoItem(
                 imageLoader = ImageLoaderModule.thumbnailImageLoader,
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
-                    .clip(RoundedCornerShape(if (isSelected) 14.dp else 20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .graphicsLayer {
+                        // Apply entrance alpha ONLY to the image
+                        alpha = if (skipEntrance) 1f else animatedValues
+                    },
                 placeholder = null
             )
 

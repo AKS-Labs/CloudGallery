@@ -274,6 +274,14 @@ fun TrashPhotoItem(
             ),
         contentAlignment = Alignment.Center
     ) {
+        // Visual Placeholder (Icon)
+        Icon(
+            imageVector = Icons.Rounded.DeleteOutline,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+            modifier = Modifier.size(32.dp)
+        )
+
         // Fix: Stabilize ImageRequest model
         val imageRequest = remember(remotePhoto.remoteId) {
             ImageRequest.Builder(context)
@@ -287,11 +295,7 @@ fun TrashPhotoItem(
             imageLoader = ImageLoaderModule.thumbnailImageLoader,
             model = imageRequest,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
-                .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            modifier = Modifier.fillMaxSize(),
             contentDescription = null,
             placeholder = null
         )

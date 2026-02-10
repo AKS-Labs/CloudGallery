@@ -133,12 +133,15 @@ fun ExpressiveScrollbar(
                         detectTapGestures(
                             onPress = { offset ->
                                 isDragging = true
-                                val progress = (offset.y / trackHeightPx).coerceIn(0f, 1f)
-                                val targetIndex = (progress * (lazyGridState.layoutInfo.totalItemsCount - 1)).toInt()
-                                
-                                coroutineScope.launch {
-                                    animatedProgress.snapTo(progress)
-                                    lazyGridState.scrollToItem(targetIndex)
+                                val progress = (offset.y / trackHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                                val totalItems = lazyGridState.layoutInfo.totalItemsCount
+                                if (totalItems > 0) {
+                                    val targetIndex = (progress * (totalItems - 1)).toInt().coerceIn(0, totalItems - 1)
+                                    
+                                    coroutineScope.launch {
+                                        animatedProgress.snapTo(progress)
+                                        lazyGridState.scrollToItem(targetIndex)
+                                    }
                                 }
                                 tryAwaitRelease()
                                 isDragging = false
@@ -158,27 +161,29 @@ fun ExpressiveScrollbar(
                             onDragCancel = { isDragging = false },
                             onDrag = { change, _ ->
                                 change.consume()
-                                val newThumbTop = (change.position.y - verticalDragOffset).coerceIn(0f, maxOffset)
+                                val newThumbTop = (change.position.y - verticalDragOffset).coerceIn(0f, maxOffset.coerceAtLeast(1f))
                                 val progress = if (maxOffset > 0) newThumbTop / maxOffset else 0f
                                 
                                 val totalItems = lazyGridState.layoutInfo.totalItemsCount
-                                val targetIndex = (progress * (totalItems - 1)).toInt()
-                                val targetRow = (progress * (totalRows - 1)).toInt()
-                                
-                                if (targetRow != lastTargetRow) {
-                                    lastTargetRow = targetRow
-                                    coroutineScope.launch {
-                                        animatedProgress.snapTo(progress)
-                                        lazyGridState.scrollToItem(targetIndex)
-                                        
-                                        // Throttle haptics
-                                        if (targetRow % 10 == 0) {
-                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                if (totalItems > 0) {
+                                    val targetIndex = (progress * (totalItems - 1)).toInt().coerceIn(0, totalItems - 1)
+                                    val targetRow = (progress * (totalRows - 1)).toInt().coerceIn(0, totalRows - 1)
+                                    
+                                    if (targetRow != lastTargetRow) {
+                                        lastTargetRow = targetRow
+                                        coroutineScope.launch {
+                                            animatedProgress.snapTo(progress)
+                                            lazyGridState.scrollToItem(targetIndex)
+                                            
+                                            // Throttle haptics
+                                            if (targetRow % 10 == 0) {
+                                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                            }
                                         }
-                                    }
-                                } else {
-                                    coroutineScope.launch {
-                                        animatedProgress.snapTo(progress)
+                                    } else {
+                                        coroutineScope.launch {
+                                            animatedProgress.snapTo(progress)
+                                        }
                                     }
                                 }
                             }
@@ -201,18 +206,22 @@ fun ExpressiveScrollbar(
                 Canvas(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .width(if (isDragging) 20.dp else 10.dp)
+                        .padding(end = 4.dp) // Maintain a small gap from edge
+                        .width(12.dp)
                         .height(56.dp)
-                        .clip(CircleShape)
                         .graphicsLayer {
-                            val currentThumbOffsetPx = animatedProgress.value * maxOffset
+                            val currentThumbOffsetPx = (animatedProgress.value.coerceIn(0f, 1f)) * maxOffset
                             translationY = currentThumbOffsetPx
                             scaleX = thumbScale
+                            scaleY = thumbScale
+                            alpha = visibilityAlpha
+                            // Anchor to right edge so it expands inward
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
                         }
                 ) {
                     drawRoundRect(
                         color = indicatorColor,
-                        size = Size(size.width * thumbScale, size.height),
+                        size = size, // Use actual size, scaling handled by graphicsLayer
                         cornerRadius = CornerRadius(size.width / 2f)
                     )
                 }

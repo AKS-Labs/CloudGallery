@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -97,29 +98,41 @@ fun PhotoGridDialog(
                             Box(
                                 modifier = Modifier
                                     .height(50.dp)
+                                .graphicsLayer {
+                                    scaleX = entryScale
+                                    scaleY = entryScale
+                                    // Removed alpha = entryAlpha to keep placeholder visible
+                                }
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            // Visual Placeholder (Icon)
+                            Icon(
+                                imageVector = Icons.Rounded.Image,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                                modifier = Modifier.size(24.dp)
+                            )
+
+                            AsyncImage(
+                                imageLoader = ImageLoaderModule.remoteImageLoader,
+                                model = ImageRequest.Builder(context)
+                                    .data(id)
+                                    .size(coil.size.Size(100, 100))
+                                    .placeholderMemoryCacheKey(id)
+                                    .memoryCacheKey(id)
+                                    .crossfade(200)
+                                    .allowRgb565(true)
+                                    .build(),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
                                     .graphicsLayer {
-                                        scaleX = entryScale
-                                        scaleY = entryScale
                                         alpha = entryAlpha
-                                    }
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surface)
-                            ) {
-                                AsyncImage(
-                                    imageLoader = ImageLoaderModule.remoteImageLoader,
-                                    model = ImageRequest.Builder(context)
-                                        .data(id)
-                                        .size(coil.size.Size(100, 100))
-                                        .placeholderMemoryCacheKey(id)
-                                        .memoryCacheKey(id)
-                                        .crossfade(200)
-                                        .allowRgb565(true)
-                                        .build(),
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentDescription = context.getString(R.string.photo)
-                                )
-                            }
+                                    },
+                                contentDescription = context.getString(R.string.photo)
+                            )
+                        }
                         }
                     }
                     

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -353,13 +354,13 @@ fun RemotePhotosGrid(
         
         snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .distinctUntilChanged()
-            .debounce(150) // More conservative debounce for remote items
+            .debounce(250) // More conservative debounce for remote items
             .collectLatest { lastIndex ->
                 if (lastIndex == null) return@collectLatest
                 
                 withContext(Dispatchers.IO) {
                     try {
-                        val prefetchRange = (lastIndex + 1)..(lastIndex + 40)
+                        val prefetchRange = (lastIndex + 1)..(lastIndex + 20)
                         prefetchRange.forEach { index ->
                             if (index in currentLayoutItems.indices) {
                                 when (val item = currentLayoutItems[index]) {
@@ -569,7 +570,7 @@ fun CloudPhotoItem(
                 .aspectRatio(1f)
                 .graphicsLayer {
                     val entrance = if (skipEntrance) 1f else animatedValues
-                    alpha = entrance
+                    // Removed alpha = entrance to keep placeholder icon visible
                     scaleX = 0.92f + 0.08f * entrance
                     scaleY = 0.92f + 0.08f * entrance
                     translationY = (1f - entrance) * 15f
@@ -585,6 +586,14 @@ fun CloudPhotoItem(
                 ),
             contentAlignment = Alignment.Center
         ) {
+            // Visual Placeholder (Icon) shown behind the AsyncImage
+            Icon(
+                imageVector = Icons.Rounded.CloudDownload,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                modifier = Modifier.size(32.dp)
+            )
+
             if (remotePhoto != null) {
                 // Fix: Stabilize ImageRequest model
                 val imageRequest = remember(remotePhoto.remoteId) {
@@ -605,9 +614,10 @@ fun CloudPhotoItem(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
-                        .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                        .graphicsLayer {
+                            // Apply entrance alpha ONLY to the image
+                            alpha = if (skipEntrance) 1f else animatedValues
+                        },
                     contentDescription = stringResource(id = R.string.photo),
                     placeholder = null
                 )
