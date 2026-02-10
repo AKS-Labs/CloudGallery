@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class TrashViewModel : ViewModel() {
@@ -26,6 +27,21 @@ class TrashViewModel : ViewModel() {
     val totalSize: StateFlow<Long> by lazy {
         DbHolder.database.deletedPhotoDao().getTotalSizeFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+    }
+
+    val allDeletedPhotos: StateFlow<List<com.akslabs.cloudgallery.data.localdb.entities.Photo>> by lazy {
+        DbHolder.database.deletedPhotoDao().getAllFlow()
+            .map { list ->
+                list.map { photo ->
+                    com.akslabs.cloudgallery.data.localdb.entities.Photo(
+                        localId = "",
+                        remoteId = photo.remoteId,
+                        photoType = photo.photoType,
+                        pathUri = ""
+                    )
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     }
 
     fun restore(photo: DeletedPhoto) {

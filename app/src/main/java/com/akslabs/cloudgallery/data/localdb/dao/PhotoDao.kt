@@ -15,10 +15,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PhotoDao {
 
-    @Query("SELECT * FROM photos ORDER BY localId DESC")
+    @Query("SELECT * FROM photos ORDER BY pathUri DESC")
     fun getAllPagingSource(): PagingSource<Int, Photo>
 
-    @Query("SELECT * FROM photos ORDER BY localId DESC")
+    @Query("SELECT * FROM photos ORDER BY pathUri DESC")
     fun getAllFlow(): Flow<List<Photo>>
 
     @Query("SELECT * FROM photos")

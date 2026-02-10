@@ -15,6 +15,9 @@ interface DeletedPhotoDao {
     fun getAllPaging(): PagingSource<Int, DeletedPhoto>
 
     @Query("SELECT * FROM deleted_photos ORDER BY deletedAt DESC")
+    fun getAllFlow(): Flow<List<DeletedPhoto>>
+
+    @Query("SELECT * FROM deleted_photos ORDER BY deletedAt DESC")
     fun getAll(): List<DeletedPhoto>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

@@ -283,18 +283,7 @@ fun TrashBinScreen(
         
         // Photo Viewer
         selectedPhotoId?.let { photoId ->
-            val loadedPhotos = mutableListOf<com.akslabs.cloudgallery.data.localdb.entities.Photo>()
-            
-            for (i in 0 until deletedPhotos.itemCount) {
-                val photo = deletedPhotos.peek(i)
-                if (photo != null) {
-                    loadedPhotos.add(
-                        com.akslabs.cloudgallery.data.localdb.entities.Photo(
-                            "", photo.remoteId, photo.photoType, ""
-                        )
-                    )
-                }
-            }
+            val loadedPhotos by viewModel.allDeletedPhotos.collectAsStateWithLifecycle()
             
             if (loadedPhotos.isNotEmpty()) {
                 val window = (context.findActivity())?.window

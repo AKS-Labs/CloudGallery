@@ -118,8 +118,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     val allLocalPhotos: StateFlow<List<com.akslabs.cloudgallery.data.localdb.entities.Photo>> by lazy {
-        DbHolder.database.photoDao().getAllFlow()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        mediaStorePhotos.map { list ->
+            list.map { uiPhoto ->
+                com.akslabs.cloudgallery.data.localdb.entities.Photo(
+                    localId = uiPhoto.localId,
+                    remoteId = uiPhoto.remoteId,
+                    photoType = if (uiPhoto.mimeType.startsWith("video")) "video" else "image",
+                    pathUri = uiPhoto.pathUri
+                )
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     }
 
     val allRemotePhotos: StateFlow<List<com.akslabs.cloudgallery.data.localdb.entities.Photo>> by lazy {
@@ -174,7 +182,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             val photos = ArrayList<LocalUiPhoto>(4096)
             try {
-                resolver.query(collection, projection, null, null, "${android.provider.MediaStore.Images.ImageColumns.DATE_TAKEN} DESC")?.use { cursor ->
+                resolver.query(collection, projection, null, null, "${android.provider.MediaStore.Images.ImageColumns.DATE_MODIFIED} DESC")?.use { cursor ->
                     val idIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns._ID)
                     val takenIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.DATE_TAKEN)
                     val addedIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.DATE_ADDED)
@@ -221,8 +229,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // Ensure photos are sorted by the actual display date
-                photos.sortByDescending { it.displayDateMillis }
+                // Trust the SQL sort order (DATE_MODIFIED DESC) to match the grid perfectly
+                // photos.sortByDescending { it.displayDateMillis }
                 
                 _mediaStorePhotos.value = photos
             } catch (e: Exception) {
