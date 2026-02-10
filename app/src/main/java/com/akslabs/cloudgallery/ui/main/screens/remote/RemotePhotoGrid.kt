@@ -32,6 +32,9 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.*
 import androidx.navigation.NavController
 import androidx.compose.runtime.Composable
@@ -50,9 +53,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
+import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.compose.runtime.snapshotFlow
 import com.akslabs.cloudgallery.ui.components.DragSelectableLazyVerticalGrid
 import com.akslabs.cloudgallery.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.R
@@ -64,6 +76,7 @@ import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
+import androidx.compose.ui.graphics.graphicsLayer
 import com.akslabs.cloudgallery.ui.components.ExpressiveEmptyState
 import com.akslabs.cloudgallery.ui.main.nav.Screens
 
@@ -86,6 +99,8 @@ data class RemoteDateGroup(
 data class RemoteLayoutCache(
     val normalGridItems: List<RemoteGridItem>,
     val dateGroupedItems: List<RemoteGridItem>,
+    val idToNormalIndex: Map<String, Int>,
+    val idToDateGroupedIndex: Map<String, Int>,
     val totalPhotos: Int,
     val lastUpdateTime: Long
 )
@@ -164,9 +179,21 @@ private fun createRemoteLayoutCache(
         }
     }
 
+    val idToNormalIndex = mutableMapOf<String, Int>()
+    normalGridItems.forEachIndexed { index, item ->
+        if (item is RemoteGridItem.PhotoItem) idToNormalIndex[item.photo.remoteId] = index
+    }
+
+    val idToDateGroupedIndex = mutableMapOf<String, Int>()
+    dateGroupedItems.forEachIndexed { index, item ->
+        if (item is RemoteGridItem.PhotoItem) idToDateGroupedIndex[item.photo.remoteId] = index
+    }
+
     return RemoteLayoutCache(
         normalGridItems = normalGridItems,
         dateGroupedItems = dateGroupedItems,
+        idToNormalIndex = idToNormalIndex,
+        idToDateGroupedIndex = idToDateGroupedIndex,
         totalPhotos = cloudPhotos.itemCount,
         lastUpdateTime = System.currentTimeMillis()
     )
@@ -228,9 +255,18 @@ fun RemotePhotosGrid(
     // Layout mode configuration
     val isDateGroupedLayout = gridState.isDateGroupedLayout
 
-    // Create layout cache FIRST
-    val layoutCache = remember(cloudPhotos.itemCount, isDateGroupedLayout) {
-        createRemoteLayoutCache(cloudPhotos)
+    // Create layout cache off-thread to prevent UI jank
+    var layoutCache by remember { 
+        mutableStateOf(RemoteLayoutCache(emptyList(), emptyList(), emptyMap(), emptyMap(), 0, 0L)) 
+    }
+
+    LaunchedEffect(cloudPhotos.itemSnapshotList, isDateGroupedLayout) {
+        withContext(Dispatchers.Default) {
+            val newCache = createRemoteLayoutCache(cloudPhotos)
+            withContext(Dispatchers.Main) {
+                layoutCache = newCache
+            }
+        }
     }
 
     val currentLayoutItems = if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
@@ -243,9 +279,8 @@ fun RemotePhotosGrid(
                 savedIndex to savedOffset
             } else {
                 // User swiped, find new index
-                val index = currentLayoutItems.indexOfFirst { 
-                    it is RemoteGridItem.PhotoItem && it.photo.remoteId == lastViewedPhotoId 
-                }
+                val indexMap = if (isDateGroupedLayout) layoutCache.idToDateGroupedIndex else layoutCache.idToNormalIndex
+                val index = indexMap[lastViewedPhotoId] ?: -1
                 val newIndex = if (index != -1) index else 0
                 newIndex to 0
             }
@@ -260,9 +295,32 @@ fun RemotePhotosGrid(
     )
 
     // Create header-to-index map for lightning fast scrollbar label lookup
-    val headerIndices = remember(currentLayoutItems) {
-        currentLayoutItems.mapIndexedNotNull { index, item ->
-            if (item is RemoteGridItem.HeaderItem) index to item.dateLabel else null
+    var headerIndices by remember { mutableStateOf<List<Pair<Int, String>>>(emptyList()) }
+    var effectiveTotalRows by remember { mutableStateOf(0) }
+
+    LaunchedEffect(currentLayoutItems, columns, isDateGroupedLayout) {
+        withContext(Dispatchers.Default) {
+            val indices = currentLayoutItems.mapIndexedNotNull { index, item ->
+                if (item is RemoteGridItem.HeaderItem) index to item.dateLabel else null
+            }
+
+            val totalRows = if (isDateGroupedLayout) {
+                var rowsCount = 0
+                layoutCache.dateGroupedItems.forEach { item ->
+                    if (item is RemoteGridItem.HeaderItem) {
+                        rowsCount++
+                    }
+                }
+                val photosCount = layoutCache.dateGroupedItems.count { it is RemoteGridItem.PhotoItem }
+                rowsCount + kotlin.math.ceil(photosCount.toFloat() / columns).toInt()
+            } else {
+                kotlin.math.ceil(layoutCache.normalGridItems.size.toFloat() / columns).toInt()
+            }
+
+            withContext(Dispatchers.Main) {
+                headerIndices = indices
+                effectiveTotalRows = totalRows
+            }
         }
     }
 
@@ -287,6 +345,41 @@ fun RemotePhotosGrid(
             }
         }
     }
+    // Optimized prefetching for remote photos: Debounced to prevent main thread saturation
+    LaunchedEffect(currentLayoutItems, isScrollbarDragging) {
+        if (isScrollbarDragging || layoutCache.totalPhotos == 0) return@LaunchedEffect
+        
+        snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .distinctUntilChanged()
+            .debounce(150) // More conservative debounce for remote items
+            .collectLatest { lastIndex ->
+                if (lastIndex == null) return@collectLatest
+                
+                withContext(Dispatchers.IO) {
+                    try {
+                        val prefetchRange = (lastIndex + 1)..(lastIndex + 40)
+                        prefetchRange.forEach { index ->
+                            if (index in currentLayoutItems.indices) {
+                                when (val item = currentLayoutItems[index]) {
+                                    is RemoteGridItem.PhotoItem -> {
+                                        val request = ImageRequest.Builder(context)
+                                            .data(item.photo)
+                                            .size(64, 64) // Prefetch small thumbnails first
+                                            .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                            .build()
+                                        ImageLoaderModule.thumbnailImageLoader.enqueue(request)
+                                    }
+                                    else -> {}
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Remote prefetch error: ${e.message}")
+                    }
+                }
+            }
+    }
+
     val maxLineSpan = columns
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -304,22 +397,6 @@ fun RemotePhotosGrid(
                 }
             )
         } else {
-            // Calculate effective total items for scrollbar (accounting for grid rows)
-            val effectiveTotalRows = remember(layoutCache, columns, isDateGroupedLayout) {
-                if (isDateGroupedLayout) {
-                    var rows = 0
-                    layoutCache.dateGroupedItems.forEach { item ->
-                        if (item is RemoteGridItem.HeaderItem) {
-                            rows++
-                        }
-                    }
-                    val photos = layoutCache.dateGroupedItems.count { it is RemoteGridItem.PhotoItem }
-                    rows + kotlin.math.ceil(photos.toFloat() / columns).toInt()
-                } else {
-                    kotlin.math.ceil(layoutCache.normalGridItems.size.toFloat() / columns).toInt()
-                }
-            }
-
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
                 totalItemsCount = effectiveTotalRows * columns, // Map to full rows
@@ -463,6 +540,23 @@ fun CloudPhotoItem(
 ) {
     val context = LocalContext.current
 
+    // Performance: Disable entrance animations during active scrollbar dragging
+    val skipEntrance = isScrollbarDragging
+    var isVisible by remember { mutableStateOf(skipEntrance) }
+    
+    if (!skipEntrance && !isVisible) {
+        LaunchedEffect(Unit) {
+            delay((index % 6) * 30L) // Stagger
+            isVisible = true
+        }
+    }
+
+    val animatedValues by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = if (!skipEntrance) tween(250) else snap(),
+        label = "item_entrance"
+    )
+
     with(sharedTransitionScope) {
         Box(
             modifier = modifier
@@ -472,72 +566,46 @@ fun CloudPhotoItem(
                     boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
                 )
                 .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .then(
-                if (isSelected) Modifier.border(
-                    6.dp, 
-                    MaterialTheme.colorScheme.primary, 
-                    RoundedCornerShape(16.dp)
-                ) else Modifier
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
-                .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
+                .graphicsLayer {
+                    val entrance = if (skipEntrance) 1f else animatedValues
+                    alpha = entrance
+                    scaleX = 0.92f + 0.08f * entrance
+                    scaleY = 0.92f + 0.08f * entrance
+                    translationY = (1f - entrance) * 15f
+                }
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .then(
+                    if (isSelected) Modifier.border(
+                        6.dp, 
+                        MaterialTheme.colorScheme.primary, 
+                        RoundedCornerShape(16.dp)
+                    ) else Modifier
+                ),
+            contentAlignment = Alignment.Center
         ) {
             if (remotePhoto != null) {
-                val targetSize = if (isScrollbarDragging) 50 else thumbnailResolution
+                val targetSize = if (isScrollbarDragging) 64 else thumbnailResolution
                 
-                val imageRequestBuilder = ImageRequest.Builder(context)
-                    .data(remotePhoto)
-                    .size(Size(targetSize, targetSize))
-                    .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
-                    .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
-                    .allowRgb565(true)
-                
-                if (isScrollbarDragging) {
-                    imageRequestBuilder.crossfade(false)
-                } else {
-                    imageRequestBuilder.crossfade(500)
-                }
-                
-                val imageRequest = imageRequestBuilder.build()
-
-                SubcomposeAsyncImage(
+                AsyncImage(
                     imageLoader = ImageLoaderModule.thumbnailImageLoader,
-                    model = imageRequest,
+                    model = ImageRequest.Builder(context)
+                        .data(remotePhoto)
+                        .size(Size(targetSize, targetSize))
+                        .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
+                        .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
+                        .allowHardware(true)
+                        .allowRgb565(true)
+                        .crossfade(if (isScrollbarDragging) 0 else 200)
+                        .build(),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
+                        .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
                     contentDescription = stringResource(id = R.string.photo),
-                    loading = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            LoadAnimation()
-                        }
-                    },
-                    error = { error ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                imageVector = Icons.Rounded.CloudOff,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
+                    placeholder = null
                 )
 
                 // Selection Tonal Overlay
@@ -545,6 +613,8 @@ fun CloudPhotoItem(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                     )
                 }
@@ -555,26 +625,25 @@ fun CloudPhotoItem(
                         .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 )
             }
-        }
-        
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(10.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    .size(28.dp)
-                    .border(2.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Selected",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(18.dp)
-                )
+            
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .size(28.dp)
+                        .border(2.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
-        }
         }
     }
 }

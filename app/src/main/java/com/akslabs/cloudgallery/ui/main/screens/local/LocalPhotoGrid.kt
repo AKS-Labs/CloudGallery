@@ -41,6 +41,9 @@ import androidx.compose.animation.core.snap
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.navigation.NavController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import coil.compose.AsyncImage
 import com.akslabs.cloudgallery.ui.main.nav.Screens
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 import androidx.compose.runtime.Composable
@@ -51,7 +54,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.derivedStateOf
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +72,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
-import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
 import com.akslabs.cloudgallery.ui.components.DragSelectableLazyVerticalGrid
@@ -83,8 +87,6 @@ import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 private const val TAG = "LocalPhotoGrid"
 
@@ -114,6 +116,8 @@ data class DateGroup(
 data class LayoutCache(
     val normalGridItems: List<LocalGridItem>,
     val dateGroupedItems: List<LocalGridItem>,
+    val idToNormalIndex: Map<String, Int>,
+    val idToDateGroupedIndex: Map<String, Int>,
     val totalPhotos: Int,
     val lastUpdateTime: Long
 )
@@ -185,9 +189,21 @@ private fun createLayoutCache(
         }
     }
 
+    val idToNormalIndex = mutableMapOf<String, Int>()
+    normalGridItems.forEachIndexed { index, item ->
+        if (item is LocalGridItem.PhotoItem) idToNormalIndex[item.photo.localId] = index
+    }
+
+    val idToDateGroupedIndex = mutableMapOf<String, Int>()
+    dateGroupedItems.forEachIndexed { index, item ->
+        if (item is LocalGridItem.PhotoItem) idToDateGroupedIndex[item.photo.localId] = index
+    }
+
     return LayoutCache(
         normalGridItems = normalGridItems,
         dateGroupedItems = dateGroupedItems,
+        idToNormalIndex = idToNormalIndex,
+        idToDateGroupedIndex = idToDateGroupedIndex,
         totalPhotos = allPhotos.size,
         lastUpdateTime = System.currentTimeMillis()
     )
@@ -244,16 +260,52 @@ fun LocalPhotoGrid(
     val gridState = rememberGridState()
     val isDateGroupedLayout = gridState.isDateGroupedLayout
     
-    // Create layout cache first so we can determine initial index
-    val layoutCache = remember(allPhotos, isDateGroupedLayout, deletedPhotoIds.toList()) {
-        createLayoutCache(allPhotos, deletedPhotoIds)
+    // Responsive grid configuration (3-6 columns, default 4)
+    val columns = gridState.columnCount.coerceIn(3, 6)
+    
+    // Create layout cache off-thread to prevent UI jank
+    var layoutCache by remember { 
+        mutableStateOf(LayoutCache(emptyList(), emptyList(), emptyMap(), emptyMap(), 0, 0L)) 
     }
 
-    val currentLayoutItems = remember { 
-        derivedStateOf { 
-            if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems 
-        } 
-    }.value
+    LaunchedEffect(allPhotos, isDateGroupedLayout, deletedPhotoIds.toList()) {
+        withContext(Dispatchers.Default) {
+            val newCache = createLayoutCache(allPhotos, deletedPhotoIds)
+            withContext(Dispatchers.Main) {
+                layoutCache = newCache
+            }
+        }
+    }
+
+    // Move heavy list processing and indexing to background thread
+    var headerIndices by remember { mutableStateOf<List<Pair<Int, String>>>(emptyList()) }
+    var effectiveTotalRows by remember { mutableStateOf(0) }
+
+    val currentLayoutItems: List<LocalGridItem> = remember(layoutCache, isDateGroupedLayout) {
+        if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
+    }
+
+    LaunchedEffect(currentLayoutItems, columns, isDateGroupedLayout) {
+        withContext(Dispatchers.Default) {
+            val indices = currentLayoutItems.mapIndexedNotNull { index: Int, item: LocalGridItem ->
+                if (item is LocalGridItem.HeaderItem) Pair(index, item.dateLabel) else null
+            }
+
+            val totalRows = if (isDateGroupedLayout) {
+                var headerCount = 0
+                currentLayoutItems.forEach { if (it is LocalGridItem.HeaderItem) headerCount++ }
+                val photosCount = currentLayoutItems.count { it is LocalGridItem.PhotoItem }
+                headerCount + kotlin.math.ceil(photosCount.toFloat() / columns).toInt()
+            } else {
+                kotlin.math.ceil(currentLayoutItems.size.toFloat() / columns).toInt()
+            }
+
+            withContext(Dispatchers.Main) {
+                headerIndices = indices
+                effectiveTotalRows = totalRows
+            }
+        }
+    }
 
 
     // Initialize scroll state with EXACT position if returning to the same photo
@@ -265,9 +317,8 @@ fun LocalPhotoGrid(
                 savedIndex to savedOffset
             } else {
                 // User swiped to a new photo, find it and scroll to top
-                val index = currentLayoutItems.indexOfFirst { 
-                    it is LocalGridItem.PhotoItem && it.photo.localId == lastViewedPhotoId 
-                }
+                val indexMap = if (isDateGroupedLayout) layoutCache.idToDateGroupedIndex else layoutCache.idToNormalIndex
+                val index = indexMap[lastViewedPhotoId] ?: -1
                 val newIndex = if (index != -1) index else 0
                 Log.d(TAG, "Restoring to NEW photo: index=$newIndex")
                 newIndex to 0
@@ -282,13 +333,6 @@ fun LocalPhotoGrid(
         initialFirstVisibleItemScrollOffset = initialOffset
     )
 
-    // Create header-to-index map for lightning fast scrollbar label lookup
-    val headerIndices = remember(currentLayoutItems) {
-        currentLayoutItems.mapIndexedNotNull { index, item ->
-            if (item is LocalGridItem.HeaderItem) index to item.dateLabel else null
-        }
-    }
-
     // Aggressive Prefetching (Optimized to prevent ANR)
     LaunchedEffect(currentLayoutItems, isScrollbarDragging) {
         // Disable prefetching during scrollbar dragging to prioritize scroll performance
@@ -296,9 +340,13 @@ fun LocalPhotoGrid(
 
         snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .distinctUntilChanged()
+            .debounce(100) // Add debounce here
             .collectLatest { lastIndex ->
                 if (lastIndex == null) return@collectLatest
                 
+                // Safety check: only prefetch if layoutCache has been initialized
+                if (layoutCache.totalPhotos == 0) return@collectLatest
+
                 // Offload to IO but debounce slightly if needed (collectLatest does this implicitly)
                 withContext(Dispatchers.IO) {
                     try {
@@ -341,8 +389,6 @@ fun LocalPhotoGrid(
             }
     }
 
-    // Responsive grid configuration (3-6 columns, default 4)
-    val columns = gridState.columnCount.coerceIn(3, 6)
     val horizontalSpacing = 12.dp
     val verticalSpacing = 12.dp
 
@@ -404,20 +450,6 @@ fun LocalPhotoGrid(
             )
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
-
-                // Calculate effective total rows for accurate scrollbar mapping
-                val effectiveTotalRows = remember(currentLayoutItems, columns, isDateGroupedLayout) {
-                    if (isDateGroupedLayout) {
-                        var rows = 0
-                        currentLayoutItems.forEach { item ->
-                            if (item is LocalGridItem.HeaderItem) rows++
-                        }
-                        val photos = currentLayoutItems.count { it is LocalGridItem.PhotoItem }
-                        rows + kotlin.math.ceil(photos.toFloat() / columns).toInt()
-                    } else {
-                        kotlin.math.ceil(currentLayoutItems.size.toFloat() / columns).toInt()
-                    }
-                }
 
                 ExpressiveScrollbar(
                     lazyGridState = lazyGridState,
@@ -585,51 +617,27 @@ fun LocalPhotoItem(
 ) {
     val context = LocalContext.current
     
-    // Optimize: logic is simple enough to not need derivedStateOf for a boolean parameter
-    val shouldAnimate = !isScrollbarDragging
+    // Performance: Disable entrance animations during active scrollbar dragging
+    val skipEntrance = isScrollbarDragging
+    var isVisible by remember { mutableStateOf(skipEntrance) }
     
-    // Entrance animation state - only initialized when animations are enabled
-    var isVisible by remember { mutableStateOf(!shouldAnimate) }
-    
-    // Only run visibility animation when NOT dragging
-    if (shouldAnimate) {
+    if (!skipEntrance && !isVisible) {
         LaunchedEffect(Unit) {
+            delay((index % 6) * 30L) // Stagger
             isVisible = true
         }
     }
 
-    val entryScale by animateFloatAsState(
-        targetValue = if (isVisible) 1f else 0.85f,
-        animationSpec = if (shouldAnimate) spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ) else snap(),
-        label = "entry_scale"
-    )
-
-    val entryAlpha by animateFloatAsState(
+    val animatedValues by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0f,
-        animationSpec = if (shouldAnimate) tween(
-            durationMillis = 400,
-            delayMillis = (index % 12) * 40,
-            easing = LinearOutSlowInEasing
-        ) else snap(),
-        label = "entry_alpha"
+        animationSpec = if (!skipEntrance) tween(250) else snap(),
+        label = "item_entrance"
     )
 
-    val itemTranslationY by animateFloatAsState(
-        targetValue = if (isVisible) 0f else 40f,
-        animationSpec = if (shouldAnimate) spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ) else snap(),
-        label = "entry_translation"
-    )
-
-    val scale by animateFloatAsState(
+    val deletionScale by animateFloatAsState(
         targetValue = if (isDeleted) 0.8f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "item_scale"
+        label = "deletion_scale"
     )
 
     with(sharedTransitionScope) {
@@ -641,6 +649,13 @@ fun LocalPhotoItem(
                     boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
                 )
                 .aspectRatio(1f)
+                .graphicsLayer {
+                    val entrance = if (skipEntrance) 1f else animatedValues
+                    alpha = entrance
+                    scaleX = deletionScale * (0.92f + 0.08f * entrance)
+                    scaleY = deletionScale * (0.92f + 0.08f * entrance)
+                    translationY = (1f - entrance) * 15f
+                }
                 .then(
                     if (isSelected) Modifier.border(
                         6.dp, 
@@ -650,87 +665,37 @@ fun LocalPhotoItem(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // 1. Static Placeholder - ALWAYS VISIBLE (No animation)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
-
-            // 1.5 Micro-Thumbnail Layer (Low Quality, Immediate)
+            val targetSize = if (isScrollbarDragging) 64 else thumbnailResolution
+            
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(photo.pathUri)
-                    .size(64, 64) // Explicit low res
-                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                    .crossfade(false)
+                    .size(Size(targetSize, targetSize))
+                    .memoryCacheKey("lt_thumb_${photo.localId}")
+                    .diskCacheKey("lt_thumb_${photo.localId}")
                     .allowHardware(true)
                     .allowRgb565(true)
+                    .crossfade(if (isScrollbarDragging) 0 else 200)
                     .build(),
-                contentDescription = null,
+                contentDescription = stringResource(R.string.photo),
                 contentScale = ContentScale.Crop,
                 imageLoader = ImageLoaderModule.thumbnailImageLoader,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(20.dp))
-                    .alpha(0.7f) // Slightly transparent blending
-            )
-
-            // 2. Animated Content Container
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (shouldAnimate) {
-                            Modifier.graphicsLayer {
-                                scaleX = scale * entryScale
-                                scaleY = scale * entryScale
-                                alpha = entryAlpha
-                                // translationY removed to keep it aligned with placeholder
-                            }
-                        } else {
-                            Modifier.graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                alpha = 1f
-                            }
-                        }
-                    )
                     .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
                     .clip(RoundedCornerShape(if (isSelected) 14.dp else 20.dp))
-            ) {
-                // Optimized loading: using AsyncImage instead of SubcomposeAsyncImage to avoid subcomposition
-                val targetSize = if (isScrollbarDragging) 64 else thumbnailResolution
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                placeholder = null
+            )
 
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(photo.pathUri)
-                        .size(Size(targetSize, targetSize))
-                        .allowHardware(true)
-                        .allowRgb565(true)
-                        .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                        .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                        .build(),
-                    contentDescription = stringResource(R.string.photo),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                    placeholder = null, // Avoiding subcomposition
-                    error = null // Avoiding subcomposition
-                )
-            }
-
-            // Selection Tonal Overlay
             if (isSelected) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .padding(if (isSelected) 6.dp else 0.dp)
+                        .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                 )
-            }
-
-            // Selection Checkmark (Improved)
-            if (isSelected) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -776,4 +741,3 @@ fun LocalPhotoItem(
         */
     }
 }
-

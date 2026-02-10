@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
@@ -274,68 +275,35 @@ fun TrashPhotoItem(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Box(
+        val targetSize = if (isScrollbarDragging) 64 else thumbnailResolution
+        
+        AsyncImage(
+            imageLoader = ImageLoaderModule.thumbnailImageLoader,
+            model = ImageRequest.Builder(context)
+                .data(remotePhoto)
+                .size(Size(targetSize, targetSize))
+                .crossfade(if (isScrollbarDragging) 0 else 200)
+                .build(),
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
                 .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
                 .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
-        ) {
-            val targetSize = if (isScrollbarDragging) 50 else thumbnailResolution
-            
-            val imageRequestBuilder = ImageRequest.Builder(context)
-                .data(remotePhoto)
-                .size(Size(targetSize, targetSize))
-            
-            if (!isScrollbarDragging) {
-                imageRequestBuilder.crossfade(100)
-            }
-            
-            val imageRequest = imageRequestBuilder.build()
+                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            contentDescription = null,
+            placeholder = null
+        )
 
-            SubcomposeAsyncImage(
-                imageLoader = ImageLoaderModule.thumbnailImageLoader,
-                model = imageRequest,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                contentDescription = null,
-                loading = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LoadAnimation()
-                    }
-                },
-                error = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.CloudOff,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
+        // Selection Tonal Overlay
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
             )
 
-            // Selection Tonal Overlay
-            if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                )
-            }
-        }
-        
-        if (isSelected) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)

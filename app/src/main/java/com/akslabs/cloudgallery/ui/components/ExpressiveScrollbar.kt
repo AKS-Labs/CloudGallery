@@ -23,6 +23,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -94,7 +95,7 @@ fun ExpressiveScrollbar(
         }
     }
 
-    val alpha by animateFloatAsState(
+    val visibilityAlpha by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0f,
         animationSpec = tween(300),
         label = "alpha"
@@ -117,20 +118,16 @@ fun ExpressiveScrollbar(
         val thumbHeightPx = with(density) { 56.dp.toPx() } // Slightly taller
         val maxOffset = trackHeightPx - thumbHeightPx
         
-        // Map progress to offset
-        val thumbOffsetPx = animatedProgress.value * maxOffset
-
         if (trackHeightPx > thumbHeightPx && totalRows > 1) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .alpha(alpha)
+                    .graphicsLayer { alpha = visibilityAlpha }
                     .pointerInput(totalRows, trackHeightPx) {
                         detectTapGestures(
                             onPress = { offset ->
                                 isDragging = true
                                 val progress = (offset.y / trackHeightPx).coerceIn(0f, 1f)
-                                // Improved mapping: use floor to avoid jumping too far at the end
                                 val targetRow = (progress * (totalRows - 1)).toInt()
                                 val targetIndex = (targetRow * columnCount).coerceIn(0, totalItemsCount - 1)
                                 
@@ -144,14 +141,21 @@ fun ExpressiveScrollbar(
                         )
                     }
                     .pointerInput(totalRows, trackHeightPx) {
+                        var verticalDragOffset = 0f
                         var lastTargetIndex = -1
                         detectDragGestures(
-                            onDragStart = { isDragging = true },
+                            onDragStart = { offset -> 
+                                isDragging = true
+                                val currentThumbOffset = animatedProgress.value * maxOffset
+                                verticalDragOffset = offset.y - currentThumbOffset
+                            },
                             onDragEnd = { isDragging = false },
                             onDragCancel = { isDragging = false },
                             onDrag = { change, _ ->
                                 change.consume()
-                                val progress = (change.position.y / trackHeightPx).coerceIn(0f, 1f)
+                                val newThumbTop = (change.position.y - verticalDragOffset).coerceIn(0f, maxOffset)
+                                val progress = if (maxOffset > 0) newThumbTop / maxOffset else 0f
+                                
                                 val targetRow = (progress * (totalRows - 1)).toInt()
                                 val targetIndex = (targetRow * columnCount).coerceIn(0, totalItemsCount - 1)
                                 
@@ -159,7 +163,6 @@ fun ExpressiveScrollbar(
                                     lastTargetIndex = targetIndex
                                     coroutineScope.launch {
                                         animatedProgress.snapTo(progress)
-                                        // Use scrollToItem for real-time response, but it's already fast
                                         lazyGridState.scrollToItem(targetIndex)
                                         
                                         if (targetIndex % (columnCount * 5) == 0) {
@@ -167,7 +170,6 @@ fun ExpressiveScrollbar(
                                         }
                                     }
                                 } else {
-                                    // Just update the thumb position even if index didn't change for sub-row smoothness
                                     coroutineScope.launch {
                                         animatedProgress.snapTo(progress)
                                     }
@@ -176,45 +178,30 @@ fun ExpressiveScrollbar(
                         )
                     }
             ) {
-                // Label Bubble (Date etc)
                 if (isDragging && labelProvider != null) {
-                    val label = labelProvider((animatedProgress.value * (totalItemsCount - 1)).roundToInt())
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .offset { 
-                                IntOffset(
-                                    x = (-90.dp).toPx().roundToInt(), 
-                                    y = (thumbOffsetPx + thumbHeightPx / 2 - 24.dp.toPx()).roundToInt()
-                                ) 
-                            }
-                            .alpha(alpha)
-                            .wrapContentWidth(), // Ensure it can expand horizontally
-                        shape = RoundedCornerShape(24.dp), // More pill-like
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        tonalElevation = 6.dp,
-                        shadowElevation = 8.dp // More depth
-                    ) {
-                        Text(
-                            text = label,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp), // Even wider padding
-                            style = MaterialTheme.typography.titleMedium, // Larger text for premium feel
-                            fontWeight = FontWeight.Black, // Super bold
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
+                    ScrollbarLabel(
+                        progressProvider = { animatedProgress.value },
+                        labelProvider = labelProvider,
+                        totalItemsCount = totalItemsCount,
+                        maxOffset = maxOffset,
+                        thumbHeightPx = thumbHeightPx,
+                        visibilityAlpha = visibilityAlpha,
+                        density = density
+                    )
                 }
 
                 // The Thumb
                 Canvas(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .width(if (isDragging) 20.dp else 10.dp) // Mega-pill thickness
+                        .width(if (isDragging) 20.dp else 10.dp)
                         .height(56.dp)
-                        .offset { IntOffset(0, thumbOffsetPx.roundToInt()) }
                         .clip(CircleShape)
+                        .graphicsLayer {
+                            val currentThumbOffsetPx = animatedProgress.value * maxOffset
+                            translationY = currentThumbOffsetPx
+                            scaleX = thumbScale
+                        }
                 ) {
                     drawRoundRect(
                         color = indicatorColor,
@@ -224,5 +211,48 @@ fun ExpressiveScrollbar(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BoxScope.ScrollbarLabel(
+    progressProvider: () -> Float,
+    labelProvider: (Int) -> String,
+    totalItemsCount: Int,
+    maxOffset: Float,
+    thumbHeightPx: Float,
+    visibilityAlpha: Float,
+    density: androidx.compose.ui.unit.Density
+) {
+    Surface(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .offset { 
+                val currentThumbOffsetPx = progressProvider() * maxOffset
+                IntOffset(
+                    x = with(density) { (-90.dp).toPx().roundToInt() }, 
+                    y = (currentThumbOffsetPx + thumbHeightPx / 2 - with(density) { 24.dp.toPx() }).roundToInt()
+                ) 
+            }
+            .graphicsLayer { alpha = visibilityAlpha }
+            .wrapContentWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp
+    ) {
+        val currentLabel = remember(progressProvider(), totalItemsCount) {
+            val index = (progressProvider() * (totalItemsCount - 1)).roundToInt()
+            labelProvider(index)
+        }
+        Text(
+            text = currentLabel,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Black,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
