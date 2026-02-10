@@ -126,8 +126,7 @@ fun TrashBinScreen(
             
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
-                totalItemsCount = deletedPhotos.itemCount,
-                columnCount = columns,
+                totalRows = (deletedPhotos.itemCount + columns - 1) / columns,
                 modifier = Modifier.align(Alignment.CenterEnd),
                 onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
                 labelProvider = { index ->
@@ -275,15 +274,18 @@ fun TrashPhotoItem(
             ),
         contentAlignment = Alignment.Center
     ) {
-        val targetSize = if (isScrollbarDragging) 64 else thumbnailResolution
+        // Fix: Stabilize ImageRequest model
+        val imageRequest = remember(remotePhoto.remoteId) {
+            ImageRequest.Builder(context)
+                .data(remotePhoto)
+                .size(180, 180)
+                .crossfade(200)
+                .build()
+        }
         
         AsyncImage(
             imageLoader = ImageLoaderModule.thumbnailImageLoader,
-            model = ImageRequest.Builder(context)
-                .data(remotePhoto)
-                .size(Size(targetSize, targetSize))
-                .crossfade(if (isScrollbarDragging) 0 else 200)
-                .build(),
+            model = imageRequest,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()

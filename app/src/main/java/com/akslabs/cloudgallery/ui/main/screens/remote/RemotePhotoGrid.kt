@@ -181,7 +181,7 @@ private fun createRemoteLayoutCache(
 
     val idToNormalIndex = mutableMapOf<String, Int>()
     normalGridItems.forEachIndexed { index, item ->
-        if (item is RemoteGridItem.PhotoItem) idToNormalIndex[item.photo.remoteId] = index
+        idToNormalIndex[item.photo.remoteId] = index
     }
 
     val idToDateGroupedIndex = mutableMapOf<String, Int>()
@@ -199,7 +199,7 @@ private fun createRemoteLayoutCache(
     )
 }
 
-@OptIn(ExperimentalAnimationApi::class, ExperimentalSharedTransitionApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalAnimationApi::class, ExperimentalSharedTransitionApi::class, ExperimentalMaterial3ExpressiveApi::class, kotlinx.coroutines.FlowPreview::class)
 @Composable
 fun RemotePhotosGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
@@ -330,8 +330,10 @@ fun RemotePhotosGrid(
             // Wait for layout to settle
             kotlinx.coroutines.delay(100)
             
-            val index = currentLayoutItems.indexOfFirst { 
-                it is RemoteGridItem.PhotoItem && it.photo.remoteId == lastViewedPhotoId 
+            val index = if (isDateGroupedLayout) {
+                layoutCache.idToDateGroupedIndex[lastViewedPhotoId] ?: -1
+            } else {
+                layoutCache.idToNormalIndex[lastViewedPhotoId] ?: -1
             }
             if (index != -1) {
                 // Check visibility just for logging/debugging if needed, but we force scroll
@@ -399,8 +401,7 @@ fun RemotePhotosGrid(
         } else {
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
-                totalItemsCount = effectiveTotalRows * columns, // Map to full rows
-                columnCount = columns,
+                totalRows = effectiveTotalRows,
                 modifier = Modifier.align(Alignment.CenterEnd),
                 onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
                 labelProvider = { index ->
@@ -585,19 +586,22 @@ fun CloudPhotoItem(
             contentAlignment = Alignment.Center
         ) {
             if (remotePhoto != null) {
-                val targetSize = if (isScrollbarDragging) 64 else thumbnailResolution
-                
-                AsyncImage(
-                    imageLoader = ImageLoaderModule.thumbnailImageLoader,
-                    model = ImageRequest.Builder(context)
+                // Fix: Stabilize ImageRequest model
+                val imageRequest = remember(remotePhoto.remoteId) {
+                    ImageRequest.Builder(context)
                         .data(remotePhoto)
-                        .size(Size(targetSize, targetSize))
+                        .size(180, 180)
                         .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
                         .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
                         .allowHardware(true)
                         .allowRgb565(true)
-                        .crossfade(if (isScrollbarDragging) 0 else 200)
-                        .build(),
+                        .crossfade(200)
+                        .build()
+                }
+                
+                AsyncImage(
+                    imageLoader = ImageLoaderModule.thumbnailImageLoader,
+                    model = imageRequest,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()

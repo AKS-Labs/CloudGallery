@@ -125,8 +125,7 @@ fun PhotoGridDialog(
                     
                     ExpressiveScrollbar(
                         lazyGridState = state,
-                        totalItemsCount = idList.size,
-                        columnCount = 4,
+                        totalRows = (idList.size + 3) / 4,
                         modifier = Modifier.align(androidx.compose.ui.Alignment.CenterEnd),
                         labelProvider = { index -> "${index + 1} / ${idList.size}" }
                     )

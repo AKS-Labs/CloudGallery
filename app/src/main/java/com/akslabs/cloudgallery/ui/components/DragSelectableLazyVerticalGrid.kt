@@ -118,7 +118,7 @@ fun DragSelectableLazyVerticalGrid(
                         }
                     }
                 }
-                delay(20) // Check every 20ms
+                delay(40) // Reduced frequency (approx 25fps) to save main thread
             }
         }
     }
@@ -148,7 +148,7 @@ fun DragSelectableLazyVerticalGrid(
                         lazyGridState.scrollBy(scrollAmount)
                     }
                 }
-                delay(16) // Run at approx 60fps
+                delay(32) // Approx 30fps
             }
         }
     }

@@ -191,7 +191,7 @@ private fun createLayoutCache(
 
     val idToNormalIndex = mutableMapOf<String, Int>()
     normalGridItems.forEachIndexed { index, item ->
-        if (item is LocalGridItem.PhotoItem) idToNormalIndex[item.photo.localId] = index
+        idToNormalIndex[item.photo.localId] = index
     }
 
     val idToDateGroupedIndex = mutableMapOf<String, Int>()
@@ -209,7 +209,7 @@ private fun createLayoutCache(
     )
 }
 
-@OptIn(ExperimentalAnimationApi::class, ExperimentalSharedTransitionApi::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalAnimationApi::class, ExperimentalSharedTransitionApi::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class, kotlinx.coroutines.FlowPreview::class)
 @Composable
 fun LocalPhotoGrid(
     localPhotos: LazyPagingItems<LocalUiPhoto>,
@@ -398,8 +398,10 @@ fun LocalPhotoGrid(
             // Wait for layout to settle (in case of restoration race condition)
             kotlinx.coroutines.delay(100)
             
-            val index = currentLayoutItems.indexOfFirst { 
-                it is LocalGridItem.PhotoItem && it.photo.localId == lastViewedPhotoId 
+            val index = if (expanded) {
+                layoutCache.idToDateGroupedIndex[lastViewedPhotoId] ?: -1
+            } else {
+                layoutCache.idToNormalIndex[lastViewedPhotoId] ?: -1
             }
             Log.d(TAG, "Syncing scroll: id=$lastViewedPhotoId, foundIndex=$index")
             if (index != -1) {
@@ -453,8 +455,7 @@ fun LocalPhotoGrid(
 
                 ExpressiveScrollbar(
                     lazyGridState = lazyGridState,
-                    totalItemsCount = effectiveTotalRows * columns,
-                    columnCount = columns,
+                    totalRows = effectiveTotalRows,
                     onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
                     labelProvider = { index ->
                         val safeIndex = index.coerceIn(0, currentLayoutItems.size - 1)
@@ -665,18 +666,22 @@ fun LocalPhotoItem(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            val targetSize = if (isScrollbarDragging) 64 else thumbnailResolution
-            
-            AsyncImage(
-                model = ImageRequest.Builder(context)
+            // Fix: Stabilize ImageRequest model to prevent reload waves.
+            // Using a fixed size (180) ensures high quality without excessive memory.
+            val imageRequest = remember(photo.localId) {
+                ImageRequest.Builder(context)
                     .data(photo.pathUri)
-                    .size(Size(targetSize, targetSize))
+                    .size(180, 180) 
                     .memoryCacheKey("lt_thumb_${photo.localId}")
                     .diskCacheKey("lt_thumb_${photo.localId}")
                     .allowHardware(true)
                     .allowRgb565(true)
-                    .crossfade(if (isScrollbarDragging) 0 else 200)
-                    .build(),
+                    .crossfade(200)
+                    .build()
+            }
+            
+            AsyncImage(
+                model = imageRequest,
                 contentDescription = stringResource(R.string.photo),
                 contentScale = ContentScale.Crop,
                 imageLoader = ImageLoaderModule.thumbnailImageLoader,

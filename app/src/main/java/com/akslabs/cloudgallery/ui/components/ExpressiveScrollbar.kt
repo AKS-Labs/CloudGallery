@@ -42,8 +42,7 @@ import kotlin.math.roundToInt
 @Composable
 fun ExpressiveScrollbar(
     lazyGridState: LazyGridState,
-    totalItemsCount: Int,
-    columnCount: Int,
+    totalRows: Int,
     modifier: Modifier = Modifier,
     labelProvider: ((Int) -> String)? = null,
     indicatorColor: Color = MaterialTheme.colorScheme.primary,
@@ -76,22 +75,29 @@ fun ExpressiveScrollbar(
         onDraggingChange(isDragging)
     }
 
-    if (totalItemsCount <= 0 || columnCount <= 0) return
+    if (totalRows <= 1) return
 
-    val totalRows = (totalItemsCount + columnCount - 1) / columnCount
-    
-    // Update animated progress based on list state
-    LaunchedEffect(lazyGridState.firstVisibleItemIndex, totalRows) {
-        if (totalRows > 1 && !isDragging) {
-            val currentRow = lazyGridState.firstVisibleItemIndex / columnCount
-            val targetProgress = currentRow.toFloat() / (totalRows - 1).coerceAtLeast(1)
-            animatedProgress.animateTo(
-                targetValue = targetProgress,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessLow
+    // Update animated progress based on list state - Row Based
+    LaunchedEffect(lazyGridState.firstVisibleItemIndex) {
+        if (!isDragging) {
+            // Estimate current row from layout info to handle headers correctly
+            val firstVisibleItem = lazyGridState.layoutInfo.visibleItemsInfo.firstOrNull()
+            if (firstVisibleItem != null) {
+                // If the visible items list is large, we might want a more accurate row index
+                // but for progress tracking, the index / estimated_columns is usually okay
+                // OR better: use the firstVisibleItem.index and map it roughly to rows.
+                // For simplicity, we stick to a linear mapping based on index / average_density
+                val progress = (firstVisibleItem.index.toFloat() / lazyGridState.layoutInfo.totalItemsCount.coerceAtLeast(1))
+                    .coerceIn(0f, 1f)
+                
+                animatedProgress.animateTo(
+                    targetValue = progress,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -110,15 +116,15 @@ fun ExpressiveScrollbar(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxHeight()
-            .width(96.dp) // Even wider to accommodate the mega-pill
+            .width(96.dp)
             .zIndex(100f)
             .padding(end = 6.dp)
     ) {
         val trackHeightPx = constraints.maxHeight.toFloat()
-        val thumbHeightPx = with(density) { 56.dp.toPx() } // Slightly taller
+        val thumbHeightPx = with(density) { 56.dp.toPx() }
         val maxOffset = trackHeightPx - thumbHeightPx
         
-        if (trackHeightPx > thumbHeightPx && totalRows > 1) {
+        if (trackHeightPx > thumbHeightPx) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -128,8 +134,7 @@ fun ExpressiveScrollbar(
                             onPress = { offset ->
                                 isDragging = true
                                 val progress = (offset.y / trackHeightPx).coerceIn(0f, 1f)
-                                val targetRow = (progress * (totalRows - 1)).toInt()
-                                val targetIndex = (targetRow * columnCount).coerceIn(0, totalItemsCount - 1)
+                                val targetIndex = (progress * (lazyGridState.layoutInfo.totalItemsCount - 1)).toInt()
                                 
                                 coroutineScope.launch {
                                     animatedProgress.snapTo(progress)
@@ -142,7 +147,7 @@ fun ExpressiveScrollbar(
                     }
                     .pointerInput(totalRows, trackHeightPx) {
                         var verticalDragOffset = 0f
-                        var lastTargetIndex = -1
+                        var lastTargetRow = -1
                         detectDragGestures(
                             onDragStart = { offset -> 
                                 isDragging = true
@@ -156,16 +161,18 @@ fun ExpressiveScrollbar(
                                 val newThumbTop = (change.position.y - verticalDragOffset).coerceIn(0f, maxOffset)
                                 val progress = if (maxOffset > 0) newThumbTop / maxOffset else 0f
                                 
+                                val totalItems = lazyGridState.layoutInfo.totalItemsCount
+                                val targetIndex = (progress * (totalItems - 1)).toInt()
                                 val targetRow = (progress * (totalRows - 1)).toInt()
-                                val targetIndex = (targetRow * columnCount).coerceIn(0, totalItemsCount - 1)
                                 
-                                if (targetIndex != lastTargetIndex) {
-                                    lastTargetIndex = targetIndex
+                                if (targetRow != lastTargetRow) {
+                                    lastTargetRow = targetRow
                                     coroutineScope.launch {
                                         animatedProgress.snapTo(progress)
                                         lazyGridState.scrollToItem(targetIndex)
                                         
-                                        if (targetIndex % (columnCount * 5) == 0) {
+                                        // Throttle haptics
+                                        if (targetRow % 10 == 0) {
                                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                                         }
                                     }
@@ -182,7 +189,7 @@ fun ExpressiveScrollbar(
                     ScrollbarLabel(
                         progressProvider = { animatedProgress.value },
                         labelProvider = labelProvider,
-                        totalItemsCount = totalItemsCount,
+                        totalItemsCount = lazyGridState.layoutInfo.totalItemsCount,
                         maxOffset = maxOffset,
                         thumbHeightPx = thumbHeightPx,
                         visibilityAlpha = visibilityAlpha,
@@ -213,7 +220,6 @@ fun ExpressiveScrollbar(
         }
     }
 }
-
 @Composable
 private fun BoxScope.ScrollbarLabel(
     progressProvider: () -> Float,
