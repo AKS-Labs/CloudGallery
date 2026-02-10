@@ -60,9 +60,17 @@ import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import androidx.compose.animation.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import com.akslabs.cloudgallery.ui.components.ExpressiveEmptyState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.withContext
+
+import kotlinx.coroutines.yield
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalSharedTransitionApi::class, ExperimentalAnimationApi::class)
 @Composable
@@ -100,6 +108,65 @@ fun TrashBinScreen(
         }
     }
 
+    // Aggressive Prefetching for Trash items (Optimized to prevent ANR)
+    val lazyGridState = rememberLazyGridState()
+    LaunchedEffect(deletedPhotos.itemCount, isScrollbarDragging) {
+        val prefetchDebounce = if (isScrollbarDragging) 100L else 150L
+        
+        snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .distinctUntilChanged()
+            .debounce(prefetchDebounce)
+            .collectLatest { lastIndex ->
+                if (lastIndex == null || deletedPhotos.itemCount == 0) return@collectLatest
+                
+                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    try {
+                        val prefetchRange = (lastIndex + 1)..(lastIndex + 40)
+                        prefetchRange.forEach { index ->
+                            if (index < deletedPhotos.itemCount) {
+                                yield() // Allow other background tasks to breathe
+                                val photo = deletedPhotos.peek(index)
+                                if (photo != null) {
+                                    val remotePhoto = RemotePhoto(
+                                        remoteId = photo.remoteId,
+                                        photoType = photo.photoType,
+                                        fileName = photo.fileName,
+                                        fileSize = photo.fileSize,
+                                        uploadedAt = photo.uploadedAt,
+                                        messageId = photo.messageId
+                                    )
+                                    
+                                    val microRequest = ImageRequest.Builder(context)
+                                        .data(remotePhoto)
+                                        .size(64, 64) 
+                                        .allowHardware(true)
+                                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                        .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                        .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                                        .build()
+                                    ImageLoaderModule.thumbnailImageLoader.enqueue(microRequest)
+
+                                    if (index <= lastIndex + 10) {
+                                        val thumbRequest = ImageRequest.Builder(context)
+                                            .data(remotePhoto)
+                                            .size(180, 180)
+                                            .allowHardware(true)
+                                            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                            .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                            .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                                            .build()
+                                        ImageLoaderModule.thumbnailImageLoader.enqueue(thumbRequest)
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("TrashBinScreen", "Prefetch error", e)
+                    }
+                }
+            }
+    }
+
     // Handle Back Press in Selection Mode
     if (selectionMode) {
         BackHandler(enabled = true) {
@@ -120,9 +187,7 @@ fun TrashBinScreen(
                 }
             )
         } else {
-            val lazyGridState = rememberLazyGridState()
-            val gridState = rememberGridState()
-            val columns = gridState.columnCount.coerceIn(3, 6)
+            val columns = rememberGridState().columnCount.coerceIn(3, 6)
             
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
@@ -274,19 +339,17 @@ fun TrashPhotoItem(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Visual Placeholder (Icon)
-        Icon(
-            imageVector = Icons.Rounded.DeleteOutline,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-            modifier = Modifier.size(32.dp)
-        )
+        // Restore: Circular LoadAnimation for trash items
+        LoadAnimation(modifier = Modifier.size(48.dp))
 
         // Fix: Stabilize ImageRequest model
         val imageRequest = remember(remotePhoto.remoteId) {
             ImageRequest.Builder(context)
                 .data(remotePhoto)
                 .size(180, 180)
+                .allowHardware(true)
+                .bitmapConfig(android.graphics.Bitmap.Config.RGB_565) // Forced for memory efficiency
+                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                 .crossfade(200)
                 .build()
         }

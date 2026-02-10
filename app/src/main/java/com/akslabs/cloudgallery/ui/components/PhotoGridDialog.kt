@@ -106,13 +106,7 @@ fun PhotoGridDialog(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            // Visual Placeholder (Icon)
-                            Icon(
-                                imageVector = Icons.Rounded.Image,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                                modifier = Modifier.size(24.dp)
-                            )
+                            // Placeholder background only (Icons removed per user request)
 
                             AsyncImage(
                                 imageLoader = ImageLoaderModule.remoteImageLoader,
@@ -122,7 +116,8 @@ fun PhotoGridDialog(
                                     .placeholderMemoryCacheKey(id)
                                     .memoryCacheKey(id)
                                     .crossfade(200)
-                                    .allowRgb565(true)
+                                    .allowHardware(true)
+                                    .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
                                     .build(),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier

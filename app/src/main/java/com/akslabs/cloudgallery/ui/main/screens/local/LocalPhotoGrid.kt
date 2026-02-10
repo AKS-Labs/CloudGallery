@@ -88,6 +88,7 @@ import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
+import kotlinx.coroutines.yield
 
 private const val TAG = "LocalPhotoGrid"
 
@@ -336,47 +337,47 @@ fun LocalPhotoGrid(
 
     // Aggressive Prefetching (Optimized to prevent ANR)
     LaunchedEffect(currentLayoutItems, isScrollbarDragging) {
-        // Disable prefetching during scrollbar dragging to prioritize scroll performance
-        if (isScrollbarDragging) return@LaunchedEffect
-
+        // Boost prefetching during dragging to ensure thumbnails are ready
+        val prefetchDebounce = if (isScrollbarDragging) 100L else 150L
+        
         snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .distinctUntilChanged()
-            .debounce(250) // More conservative debounce
+            .debounce(prefetchDebounce)
             .collectLatest { lastIndex ->
-                if (lastIndex == null) return@collectLatest
-                
-                // Safety check: only prefetch if layoutCache has been initialized
-                if (layoutCache.totalPhotos == 0) return@collectLatest
+                if (lastIndex == null || layoutCache.totalPhotos == 0) return@collectLatest
 
                 // Offload to IO but debounce slightly if needed (collectLatest does this implicitly)
                 withContext(Dispatchers.IO) {
                     try {
-                         // Prefetch a smaller, more targeted range during active scroll
-                         // Micro-Thumbnails (64px) are very cheap. Reduced from 60 to 20.
-                        val prefetchRange = (lastIndex + 1)..(lastIndex + 20) 
+                        // Prefetch a larger range to stay ahead of the user
+                        // Micro-Thumbnails (64px) are very cheap and fit many in memory
+                        val prefetchRange = (lastIndex + 1)..(lastIndex + 40) 
                         prefetchRange.forEach { index ->
                             if (index in currentLayoutItems.indices) {
+                                yield() // Allow other background tasks to breathe
                                 when (val item = currentLayoutItems[index]) {
                                     is LocalGridItem.PhotoItem -> {
                                         val microRequest = ImageRequest.Builder(context)
                                             .data(item.photo.pathUri)
                                             .size(64, 64) 
                                             .allowHardware(true)
-                                            .allowRgb565(true)
+                                            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
                                             .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                            .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                                             .build()
                                         ImageLoaderModule.thumbnailImageLoader.enqueue(microRequest)
 
-                                        // Only prefetch full thumbnails for immediate next items
-                                        if (index <= lastIndex + 12) {
-                                            val standardRequest = ImageRequest.Builder(context)
+                                        // Prefetch full thumbnails for immediate next items
+                                        if (index <= lastIndex + 10) {
+                                            val thumbRequest = ImageRequest.Builder(context)
                                                 .data(item.photo.pathUri)
-                                                .size(Size(thumbnailResolution, thumbnailResolution))
+                                                .size(180, 180)
                                                 .allowHardware(true)
-                                                .allowRgb565(true)
+                                                .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
                                                 .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                                                 .build()
-                                            ImageLoaderModule.thumbnailImageLoader.enqueue(standardRequest)
+                                            ImageLoaderModule.thumbnailImageLoader.enqueue(thumbRequest)
                                         }
                                     }
                                     else -> {}
@@ -645,10 +646,14 @@ fun LocalPhotoItem(
     with(sharedTransitionScope) {
         Box(
             modifier = modifier
-                .sharedElement(
-                    rememberSharedContentState(key = "photo_${photo.localId}"),
-                    animatedVisibilityScope = animatedVisibilityScope,
-                    boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
+                .then(
+                    if (!isScrollbarDragging) {
+                        Modifier.sharedElement(
+                            rememberSharedContentState(key = "photo_${photo.localId}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
+                        )
+                    } else Modifier
                 )
                 .aspectRatio(1f)
                 .graphicsLayer {
@@ -669,14 +674,8 @@ fun LocalPhotoItem(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // Visual Placeholder (Icon) shown behind the AsyncImage
-            Icon(
-                imageVector = Icons.Rounded.Image,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                modifier = Modifier.size(32.dp)
-            )
-
+            // Placeholder background only (Icons removed per user request)
+            
             // Fix: Stabilize ImageRequest model to prevent reload waves.
             // Using a fixed size (180) ensures high quality without excessive memory.
             val imageRequest = remember(photo.localId) {
@@ -687,6 +686,8 @@ fun LocalPhotoItem(
                     .diskCacheKey("lt_thumb_${photo.localId}")
                     .allowHardware(true)
                     .allowRgb565(true)
+                    .bitmapConfig(android.graphics.Bitmap.Config.RGB_565) // Forced for memory efficiency
+                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                     .crossfade(200)
                     .build()
             }

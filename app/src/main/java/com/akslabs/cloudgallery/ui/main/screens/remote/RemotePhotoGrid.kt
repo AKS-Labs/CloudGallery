@@ -80,6 +80,7 @@ import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVertica
 import androidx.compose.ui.graphics.graphicsLayer
 import com.akslabs.cloudgallery.ui.components.ExpressiveEmptyState
 import com.akslabs.cloudgallery.ui.main.nav.Screens
+import kotlinx.coroutines.yield
 
 private const val TAG = "RemotePhotoGrid"
 
@@ -350,27 +351,44 @@ fun RemotePhotosGrid(
     }
     // Optimized prefetching for remote photos: Debounced to prevent main thread saturation
     LaunchedEffect(currentLayoutItems, isScrollbarDragging) {
-        if (isScrollbarDragging || layoutCache.totalPhotos == 0) return@LaunchedEffect
+        val prefetchDebounce = if (isScrollbarDragging) 100L else 150L
         
         snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .distinctUntilChanged()
-            .debounce(250) // More conservative debounce for remote items
+            .debounce(prefetchDebounce)
             .collectLatest { lastIndex ->
-                if (lastIndex == null) return@collectLatest
+                if (lastIndex == null || layoutCache.totalPhotos == 0) return@collectLatest
                 
                 withContext(Dispatchers.IO) {
                     try {
-                        val prefetchRange = (lastIndex + 1)..(lastIndex + 20)
+                        val prefetchRange = (lastIndex + 1)..(lastIndex + 40)
                         prefetchRange.forEach { index ->
                             if (index in currentLayoutItems.indices) {
+                                yield() // Allow other background tasks to breathe
                                 when (val item = currentLayoutItems[index]) {
                                     is RemoteGridItem.PhotoItem -> {
-                                        val request = ImageRequest.Builder(context)
+                                        val microRequest = ImageRequest.Builder(context)
                                             .data(item.photo)
-                                            .size(64, 64) // Prefetch small thumbnails first
+                                            .size(64, 64) 
+                                            .allowHardware(true)
+                                            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
                                             .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                            .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                                             .build()
-                                        ImageLoaderModule.thumbnailImageLoader.enqueue(request)
+                                        ImageLoaderModule.thumbnailImageLoader.enqueue(microRequest)
+
+                                        // Prefetch full thumbnails for immediate next items
+                                        if (index <= lastIndex + 10) {
+                                            val thumbRequest = ImageRequest.Builder(context)
+                                                .data(item.photo)
+                                                .size(180, 180)
+                                                .allowHardware(true)
+                                                .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                                .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                                                .build()
+                                            ImageLoaderModule.thumbnailImageLoader.enqueue(thumbRequest)
+                                        }
                                     }
                                     else -> {}
                                 }
@@ -562,10 +580,14 @@ fun CloudPhotoItem(
     with(sharedTransitionScope) {
         Box(
             modifier = modifier
-                .sharedElement(
-                    rememberSharedContentState(key = "photo_${remotePhoto?.remoteId}"),
-                    animatedVisibilityScope = animatedVisibilityScope,
-                    boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
+                .then(
+                    if (!isScrollbarDragging) {
+                        Modifier.sharedElement(
+                            rememberSharedContentState(key = "photo_${remotePhoto?.remoteId}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
+                        )
+                    } else Modifier
                 )
                 .aspectRatio(1f)
                 .graphicsLayer {
@@ -586,13 +608,8 @@ fun CloudPhotoItem(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // Visual Placeholder (Icon) shown behind the AsyncImage
-            Icon(
-                imageVector = Icons.Rounded.CloudDownload,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                modifier = Modifier.size(32.dp)
-            )
+            // Restore: Circular LoadAnimation for remote items
+            LoadAnimation(modifier = Modifier.size(48.dp))
 
             if (remotePhoto != null) {
                 // Fix: Stabilize ImageRequest model
@@ -600,10 +617,11 @@ fun CloudPhotoItem(
                     ImageRequest.Builder(context)
                         .data(remotePhoto)
                         .size(180, 180)
-                        .memoryCacheKey("grid_thumb_${remotePhoto.remoteId}")
-                        .diskCacheKey("grid_thumb_${remotePhoto.remoteId}")
+                        .memoryCacheKey("rt_thumb_${remotePhoto.remoteId}")
+                        .diskCacheKey("rt_thumb_${remotePhoto.remoteId}")
                         .allowHardware(true)
-                        .allowRgb565(true)
+                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565) // Forced for memory efficiency
+                        .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                         .crossfade(200)
                         .build()
                 }

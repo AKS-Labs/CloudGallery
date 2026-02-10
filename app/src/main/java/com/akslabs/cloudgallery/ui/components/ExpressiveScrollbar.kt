@@ -45,7 +45,7 @@ fun ExpressiveScrollbar(
     totalRows: Int,
     modifier: Modifier = Modifier,
     labelProvider: ((Int) -> String)? = null,
-    indicatorColor: Color = MaterialTheme.colorScheme.primary,
+    indicatorColor: Color = MaterialTheme.colorScheme.primaryContainer,
     onDraggingChange: (Boolean) -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -77,16 +77,28 @@ fun ExpressiveScrollbar(
 
     if (totalRows <= 1) return
 
-    // Update animated progress based on list state - Row Based
+    // State for immediate drag responsiveness - Using simple remembers to avoid boxing overhead
+    var rawDragOffset by remember { mutableFloatStateOf(0f) }
+    var useRawOffset by remember { mutableStateOf(false) }
+    
+    // Channel for conflated scroll updates to prevent main thread saturation (ANR)
+    val scrollChannel = remember { kotlinx.coroutines.channels.Channel<Int>(kotlinx.coroutines.channels.Channel.CONFLATED) }
+    
+    // Collector for throttled scroll updates
+    LaunchedEffect(scrollChannel) {
+        for (targetIndex in scrollChannel) {
+            lazyGridState.scrollToItem(targetIndex)
+            // Sync animated progress in background without blocking the drag loop
+            val progress = (targetIndex.toFloat() / lazyGridState.layoutInfo.totalItemsCount.coerceAtLeast(1))
+            animatedProgress.snapTo(progress)
+        }
+    }
+
+    // Update animated progress based on list state when NOT dragging
     LaunchedEffect(lazyGridState.firstVisibleItemIndex) {
         if (!isDragging) {
-            // Estimate current row from layout info to handle headers correctly
             val firstVisibleItem = lazyGridState.layoutInfo.visibleItemsInfo.firstOrNull()
             if (firstVisibleItem != null) {
-                // If the visible items list is large, we might want a more accurate row index
-                // but for progress tracking, the index / estimated_columns is usually okay
-                // OR better: use the firstVisibleItem.index and map it roughly to rows.
-                // For simplicity, we stick to a linear mapping based on index / average_density
                 val progress = (firstVisibleItem.index.toFloat() / lazyGridState.layoutInfo.totalItemsCount.coerceAtLeast(1))
                     .coerceIn(0f, 1f)
                 
@@ -116,9 +128,9 @@ fun ExpressiveScrollbar(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxHeight()
-            .width(96.dp)
+            .width(52.dp) // Even tighter
             .zIndex(100f)
-            .padding(end = 6.dp)
+            .padding(end = 1.dp) 
     ) {
         val trackHeightPx = constraints.maxHeight.toFloat()
         val thumbHeightPx = with(density) { 56.dp.toPx() }
@@ -133,18 +145,18 @@ fun ExpressiveScrollbar(
                         detectTapGestures(
                             onPress = { offset ->
                                 isDragging = true
+                                useRawOffset = true
                                 val progress = (offset.y / trackHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                                rawDragOffset = (progress * maxOffset)
+                                
                                 val totalItems = lazyGridState.layoutInfo.totalItemsCount
                                 if (totalItems > 0) {
                                     val targetIndex = (progress * (totalItems - 1)).toInt().coerceIn(0, totalItems - 1)
-                                    
-                                    coroutineScope.launch {
-                                        animatedProgress.snapTo(progress)
-                                        lazyGridState.scrollToItem(targetIndex)
-                                    }
+                                    scrollChannel.trySend(targetIndex)
                                 }
                                 tryAwaitRelease()
                                 isDragging = false
+                                useRawOffset = false
                             }
                         )
                     }
@@ -154,35 +166,38 @@ fun ExpressiveScrollbar(
                         detectDragGestures(
                             onDragStart = { offset -> 
                                 isDragging = true
+                                useRawOffset = true
                                 val currentThumbOffset = animatedProgress.value * maxOffset
                                 verticalDragOffset = offset.y - currentThumbOffset
+                                rawDragOffset = currentThumbOffset
                             },
-                            onDragEnd = { isDragging = false },
-                            onDragCancel = { isDragging = false },
+                            onDragEnd = { 
+                                isDragging = false
+                                useRawOffset = false
+                            },
+                            onDragCancel = { 
+                                isDragging = false
+                                useRawOffset = false
+                            },
                             onDrag = { change, _ ->
                                 change.consume()
                                 val newThumbTop = (change.position.y - verticalDragOffset).coerceIn(0f, maxOffset.coerceAtLeast(1f))
-                                val progress = if (maxOffset > 0) newThumbTop / maxOffset else 0f
+                                rawDragOffset = newThumbTop // ZERO-OVERHEAD tracking
                                 
+                                val progress = if (maxOffset > 0) newThumbTop / maxOffset else 0f
                                 val totalItems = lazyGridState.layoutInfo.totalItemsCount
+                                
                                 if (totalItems > 0) {
                                     val targetIndex = (progress * (totalItems - 1)).toInt().coerceIn(0, totalItems - 1)
                                     val targetRow = (progress * (totalRows - 1)).toInt().coerceIn(0, totalRows - 1)
                                     
+                                    // Throttled scroll update via conflated channel (Safe for Main Thread)
+                                    scrollChannel.trySend(targetIndex)
+                                    
                                     if (targetRow != lastTargetRow) {
                                         lastTargetRow = targetRow
-                                        coroutineScope.launch {
-                                            animatedProgress.snapTo(progress)
-                                            lazyGridState.scrollToItem(targetIndex)
-                                            
-                                            // Throttle haptics
-                                            if (targetRow % 10 == 0) {
-                                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                            }
-                                        }
-                                    } else {
-                                        coroutineScope.launch {
-                                            animatedProgress.snapTo(progress)
+                                        if (targetRow % 10 == 0) {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                                         }
                                     }
                                 }
@@ -190,9 +205,11 @@ fun ExpressiveScrollbar(
                         )
                     }
             ) {
+                val currentProgress = if (useRawOffset) rawDragOffset / maxOffset.coerceAtLeast(1f) else animatedProgress.value
+
                 if (isDragging && labelProvider != null) {
                     ScrollbarLabel(
-                        progressProvider = { animatedProgress.value },
+                        progressProvider = { currentProgress },
                         labelProvider = labelProvider,
                         totalItemsCount = lazyGridState.layoutInfo.totalItemsCount,
                         maxOffset = maxOffset,
@@ -202,26 +219,24 @@ fun ExpressiveScrollbar(
                     )
                 }
 
-                // The Thumb
+                // The Thumb - Glued to finger with absolute zero lag
                 Canvas(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(end = 4.dp) // Maintain a small gap from edge
-                        .width(12.dp)
+                        .width(7.dp) // Sleek 7dp
                         .height(56.dp)
                         .graphicsLayer {
-                            val currentThumbOffsetPx = (animatedProgress.value.coerceIn(0f, 1f)) * maxOffset
-                            translationY = currentThumbOffsetPx
+                            val thumbOffset = if (useRawOffset) rawDragOffset else (animatedProgress.value * maxOffset)
+                            translationY = thumbOffset.coerceIn(0f, maxOffset)
                             scaleX = thumbScale
                             scaleY = thumbScale
                             alpha = visibilityAlpha
-                            // Anchor to right edge so it expands inward
                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
                         }
                 ) {
                     drawRoundRect(
-                        color = indicatorColor,
-                        size = size, // Use actual size, scaling handled by graphicsLayer
+                        color = indicatorColor.copy(alpha = 1f),
+                        size = size,
                         cornerRadius = CornerRadius(size.width / 2f)
                     )
                 }
@@ -245,26 +260,34 @@ private fun BoxScope.ScrollbarLabel(
             .offset { 
                 val currentThumbOffsetPx = progressProvider() * maxOffset
                 IntOffset(
-                    x = with(density) { (-90.dp).toPx().roundToInt() }, 
-                    y = (currentThumbOffsetPx + thumbHeightPx / 2 - with(density) { 24.dp.toPx() }).roundToInt()
+                    x = with(density) { (-70.dp).toPx().roundToInt() }, // Closer to thumb
+                    y = (currentThumbOffsetPx + thumbHeightPx / 2 - with(density) { 20.dp.toPx() }).roundToInt()
                 ) 
             }
             .graphicsLayer { alpha = visibilityAlpha }
             .wrapContentWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        tonalElevation = 6.dp,
-        shadowElevation = 8.dp
+        shape = RoundedCornerShape(16.dp), // More compact
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
+        tonalElevation = 4.dp,
+        shadowElevation = 6.dp
     ) {
-        val currentLabel = remember(progressProvider(), totalItemsCount) {
-            val index = (progressProvider() * (totalItemsCount - 1)).roundToInt()
-            labelProvider(index)
+        // Debounce label updates slightly to prevent flickering during rapid movement
+        var debouncedIndex by remember { mutableIntStateOf(0) }
+        LaunchedEffect(progressProvider()) {
+            val target = (progressProvider() * (totalItemsCount - 1)).roundToInt().coerceIn(0, totalItemsCount - 1)
+            if ((target - debouncedIndex).absoluteValue > 5 || target == 0 || target == totalItemsCount - 1) {
+                debouncedIndex = target
+            }
+        }
+
+        val currentLabel = remember(debouncedIndex) {
+            labelProvider(debouncedIndex)
         }
         Text(
             text = currentLabel,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Black,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), // More compact padding
+            style = MaterialTheme.typography.labelLarge, // Smaller font
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
             maxLines = 1,
             softWrap = false
