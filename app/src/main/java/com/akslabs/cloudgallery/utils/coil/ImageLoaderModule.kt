@@ -47,7 +47,7 @@ object ImageLoaderModule {
             .diskCache {
                 DiskCache.Builder()
                     .directory(appContext.cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.1) // 10% of available disk space
+                    .maxSizeBytes(20 * 1024 * 1024L) // Strictly 20MB limit
                     .build()
             }
             .okHttpClient(okHttpClient)
@@ -56,7 +56,7 @@ object ImageLoaderModule {
             .build()
         Log.i(TAG, "remoteImageLoader created successfully")
 
-        // Optimized thumbnail loader for grid views
+        // Optimized thumbnail loader for grid views - Balanced performance
         Log.d(TAG, "Creating thumbnailImageLoader...")
         thumbnailImageLoader = ImageLoader.Builder(appContext)
             .crossfade(false) // Disable crossfade for faster loading
@@ -67,14 +67,14 @@ object ImageLoaderModule {
             .allowRgb565(true) // Use less memory per image
             .memoryCache {
                 MemoryCache.Builder(appContext)
-                    .maxSizePercent(0.30) // More memory for thumbnails
+                    .maxSizePercent(0.20) // Reduced to 20% to strictly save resources
                     .strongReferencesEnabled(true)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(appContext.cacheDir.resolve("thumbnail_cache"))
-                    .maxSizePercent(0.08) // Slightly more disk space for thumbnails
+                    .maxSizeBytes(20 * 1024 * 1024L) // Strictly 20MB limit
                     .build()
             }
             .okHttpClient(okHttpClient)

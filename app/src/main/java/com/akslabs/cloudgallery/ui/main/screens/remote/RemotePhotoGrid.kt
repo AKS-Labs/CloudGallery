@@ -32,12 +32,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.animation.*
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.*
 import androidx.navigation.NavController
 import androidx.compose.runtime.Composable
@@ -56,7 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
 import com.akslabs.cloudgallery.ui.components.DragSelectableLazyVerticalGrid
@@ -303,30 +297,24 @@ fun RemotePhotosGrid(
                 }
             )
         } else {
+            // Calculate effective total items for scrollbar (accounting for headers)
+            val effectiveTotalItems = remember(layoutCache, columns) {
+                if (isDateGroupedLayout) {
+                    val headers = layoutCache.dateGroupedItems.count { it is RemoteGridItem.HeaderItem }
+                    val photos = layoutCache.dateGroupedItems.count { it is RemoteGridItem.PhotoItem }
+                    val totalRows = headers + kotlin.math.ceil(photos.toFloat() / columns).toInt()
+                    totalRows * columns
+                } else {
+                    layoutCache.normalGridItems.size
+                }
+            }
 
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
-                totalItemsCount = currentLayoutItems.size,
+                totalItemsCount = effectiveTotalItems,
                 columnCount = columns,
-                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
-                labelProvider = { index ->
-                    val safeIndex = index.coerceIn(0, currentLayoutItems.size - 1)
-                    when (val item = currentLayoutItems[safeIndex]) {
-                        is RemoteGridItem.HeaderItem -> item.dateLabel
-                        is RemoteGridItem.PhotoItem -> {
-                            var foundLabel = "..."
-                            for (i in safeIndex downTo 0) {
-                                val current = currentLayoutItems[i]
-                                if (current is RemoteGridItem.HeaderItem) {
-                                    foundLabel = current.dateLabel
-                                    break
-                                }
-                            }
-                            foundLabel
-                        }
-                    }
-                },
-                modifier = Modifier.align(Alignment.CenterEnd)
+                modifier = Modifier.align(Alignment.CenterEnd),
+                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging }
             )
             DragSelectableLazyVerticalGrid(
                 lazyGridState = lazyGridState,
@@ -444,40 +432,6 @@ fun CloudPhotoItem(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    
-    // Entrance animation state
-    var isVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        isVisible = true
-    }
-
-    val entryScale by animateFloatAsState(
-        targetValue = if (isVisible) 1f else 0.85f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "entry_scale"
-    )
-
-    val entryAlpha by animateFloatAsState(
-        targetValue = if (isVisible) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = 400,
-            delayMillis = (index % 12) * 40,
-            easing = LinearOutSlowInEasing
-        ),
-        label = "entry_alpha"
-    )
-
-    val itemTranslationY by animateFloatAsState(
-        targetValue = if (isVisible) 0f else 40f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "entry_translation"
-    )
 
     with(sharedTransitionScope) {
         Box(
@@ -488,31 +442,25 @@ fun CloudPhotoItem(
                     boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
                 )
                 .aspectRatio(1f)
-                .graphicsLayer {
-                    scaleX = entryScale
-                    scaleY = entryScale
-                    alpha = entryAlpha
-                    translationY = itemTranslationY
-                }
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .then(
-                    if (isSelected) Modifier.border(
-                        6.dp, 
-                        MaterialTheme.colorScheme.primary, 
-                        RoundedCornerShape(20.dp)
-                    ) else Modifier
-                ),
-            contentAlignment = Alignment.Center
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .then(
+                if (isSelected) Modifier.border(
+                    6.dp, 
+                    MaterialTheme.colorScheme.primary, 
+                    RoundedCornerShape(16.dp)
+                ) else Modifier
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
+                .clip(RoundedCornerShape(if (isSelected) 10.dp else 16.dp))
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (isSelected) Modifier.padding(6.dp) else Modifier)
-                    .clip(RoundedCornerShape(if (isSelected) 14.dp else 20.dp))
-            ) {
             if (remotePhoto != null) {
-                val targetSize = if (isScrollbarDragging) 40 else thumbnailResolution
+                val targetSize = if (isScrollbarDragging) 50 else thumbnailResolution
                 
                 val imageRequestBuilder = ImageRequest.Builder(context)
                     .data(remotePhoto)
@@ -524,18 +472,42 @@ fun CloudPhotoItem(
                 if (isScrollbarDragging) {
                     imageRequestBuilder.crossfade(false)
                 } else {
-                    imageRequestBuilder.crossfade(200)
+                    imageRequestBuilder.crossfade(500)
                 }
-                imageRequestBuilder.allowRgb565(true)
                 
                 val imageRequest = imageRequestBuilder.build()
 
-                AsyncImage(
+                SubcomposeAsyncImage(
                     imageLoader = ImageLoaderModule.thumbnailImageLoader,
                     model = imageRequest,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
-                    contentDescription = stringResource(id = R.string.photo)
+                    contentDescription = stringResource(id = R.string.photo),
+                    loading = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LoadAnimation()
+                        }
+                    },
+                    error = { error ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                imageVector = Icons.Rounded.CloudOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
                 )
 
                 // Selection Tonal Overlay

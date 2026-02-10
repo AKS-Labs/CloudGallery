@@ -550,7 +550,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                         },
                                         windowInsets = WindowInsets(0, 0, 0, 0),
                                         scrollBehavior = scrollBehavior,
-                                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                                        colors = TopAppBarDefaults.topAppBarColors(
+                                            containerColor = MaterialTheme.colorScheme.surface,
+                                            scrolledContainerColor = MaterialTheme.colorScheme.surface
+                                        )
                                     )
                                     ConnectivityStatusPopup()
                                 }
