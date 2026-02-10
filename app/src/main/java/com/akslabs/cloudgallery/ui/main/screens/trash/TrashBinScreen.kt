@@ -128,7 +128,18 @@ fun TrashBinScreen(
                 totalItemsCount = deletedPhotos.itemCount,
                 columnCount = columns,
                 modifier = Modifier.align(Alignment.CenterEnd),
-                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging }
+                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
+                labelProvider = { index ->
+                    val photo = deletedPhotos.peek(index)
+                    if (photo != null) {
+                        try {
+                            java.text.SimpleDateFormat("MMM yyyy", java.util.Locale.getDefault())
+                                .format(java.util.Date(photo.uploadedAt))
+                        } catch (e: Exception) {
+                            "..."
+                        }
+                    } else "..."
+                }
             )
             
             DragSelectableLazyVerticalGrid(

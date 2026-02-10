@@ -259,6 +259,13 @@ fun RemotePhotosGrid(
         initialFirstVisibleItemScrollOffset = initialOffset
     )
 
+    // Create header-to-index map for lightning fast scrollbar label lookup
+    val headerIndices = remember(currentLayoutItems) {
+        currentLayoutItems.mapIndexedNotNull { index, item ->
+            if (item is RemoteGridItem.HeaderItem) index to item.dateLabel else null
+        }
+    }
+
     // Sync scroll to last viewed photo (backup)
     LaunchedEffect(lastViewedPhotoId, layoutCache) {
         if (!lastViewedPhotoId.isNullOrEmpty() && layoutCache.totalPhotos > 0) {
@@ -297,24 +304,47 @@ fun RemotePhotosGrid(
                 }
             )
         } else {
-            // Calculate effective total items for scrollbar (accounting for headers)
-            val effectiveTotalItems = remember(layoutCache, columns) {
+            // Calculate effective total items for scrollbar (accounting for grid rows)
+            val effectiveTotalRows = remember(layoutCache, columns, isDateGroupedLayout) {
                 if (isDateGroupedLayout) {
-                    val headers = layoutCache.dateGroupedItems.count { it is RemoteGridItem.HeaderItem }
+                    var rows = 0
+                    layoutCache.dateGroupedItems.forEach { item ->
+                        if (item is RemoteGridItem.HeaderItem) {
+                            rows++
+                        }
+                    }
                     val photos = layoutCache.dateGroupedItems.count { it is RemoteGridItem.PhotoItem }
-                    val totalRows = headers + kotlin.math.ceil(photos.toFloat() / columns).toInt()
-                    totalRows * columns
+                    rows + kotlin.math.ceil(photos.toFloat() / columns).toInt()
                 } else {
-                    layoutCache.normalGridItems.size
+                    kotlin.math.ceil(layoutCache.normalGridItems.size.toFloat() / columns).toInt()
                 }
             }
 
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
-                totalItemsCount = effectiveTotalItems,
+                totalItemsCount = effectiveTotalRows * columns, // Map to full rows
                 columnCount = columns,
                 modifier = Modifier.align(Alignment.CenterEnd),
-                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging }
+                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
+                labelProvider = { index ->
+                    val safeIndex = index.coerceIn(0, currentLayoutItems.size - 1)
+                    
+                    // Binary search for the nearest header at or above safeIndex
+                    var low = 0
+                    var high = headerIndices.size - 1
+                    var result = "..."
+                    
+                    while (low <= high) {
+                        val mid = (low + high) / 2
+                        if (headerIndices[mid].first <= safeIndex) {
+                            result = headerIndices[mid].second
+                            low = mid + 1
+                        } else {
+                            high = mid - 1
+                        }
+                    }
+                    result
+                }
             )
             DragSelectableLazyVerticalGrid(
                 lazyGridState = lazyGridState,

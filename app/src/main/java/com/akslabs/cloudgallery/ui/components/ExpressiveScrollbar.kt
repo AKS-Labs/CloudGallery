@@ -130,7 +130,8 @@ fun ExpressiveScrollbar(
                             onPress = { offset ->
                                 isDragging = true
                                 val progress = (offset.y / trackHeightPx).coerceIn(0f, 1f)
-                                val targetRow = (progress * (totalRows - 1)).roundToInt()
+                                // Improved mapping: use floor to avoid jumping too far at the end
+                                val targetRow = (progress * (totalRows - 1)).toInt()
                                 val targetIndex = (targetRow * columnCount).coerceIn(0, totalItemsCount - 1)
                                 
                                 coroutineScope.launch {
@@ -143,6 +144,7 @@ fun ExpressiveScrollbar(
                         )
                     }
                     .pointerInput(totalRows, trackHeightPx) {
+                        var lastTargetIndex = -1
                         detectDragGestures(
                             onDragStart = { isDragging = true },
                             onDragEnd = { isDragging = false },
@@ -150,15 +152,24 @@ fun ExpressiveScrollbar(
                             onDrag = { change, _ ->
                                 change.consume()
                                 val progress = (change.position.y / trackHeightPx).coerceIn(0f, 1f)
-                                val targetRow = (progress * (totalRows - 1)).roundToInt()
+                                val targetRow = (progress * (totalRows - 1)).toInt()
                                 val targetIndex = (targetRow * columnCount).coerceIn(0, totalItemsCount - 1)
                                 
-                                coroutineScope.launch {
-                                    animatedProgress.snapTo(progress)
-                                    lazyGridState.scrollToItem(targetIndex)
-                                    
-                                    if (targetIndex % 50 == 0) {
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                if (targetIndex != lastTargetIndex) {
+                                    lastTargetIndex = targetIndex
+                                    coroutineScope.launch {
+                                        animatedProgress.snapTo(progress)
+                                        // Use scrollToItem for real-time response, but it's already fast
+                                        lazyGridState.scrollToItem(targetIndex)
+                                        
+                                        if (targetIndex % (columnCount * 5) == 0) {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                        }
+                                    }
+                                } else {
+                                    // Just update the thumb position even if index didn't change for sub-row smoothness
+                                    coroutineScope.launch {
+                                        animatedProgress.snapTo(progress)
                                     }
                                 }
                             }

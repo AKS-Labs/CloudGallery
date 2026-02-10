@@ -56,6 +56,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -281,43 +282,60 @@ fun LocalPhotoGrid(
         initialFirstVisibleItemScrollOffset = initialOffset
     )
 
-    // Aggressive Prefetching for Lightning Fast Thumbnails
+    // Create header-to-index map for lightning fast scrollbar label lookup
+    val headerIndices = remember(currentLayoutItems) {
+        currentLayoutItems.mapIndexedNotNull { index, item ->
+            if (item is LocalGridItem.HeaderItem) index to item.dateLabel else null
+        }
+    }
+
     // Aggressive Prefetching (Optimized to prevent ANR)
     LaunchedEffect(currentLayoutItems, isScrollbarDragging) {
+        // Disable prefetching during scrollbar dragging to prioritize scroll performance
         if (isScrollbarDragging) return@LaunchedEffect
 
-        // Observe layout on MAIN, process on IO
         snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .distinctUntilChanged()
             .collectLatest { lastIndex ->
-                 // Offload the loop and object creation to IO thread
+                if (lastIndex == null) return@collectLatest
+                
+                // Offload to IO but debounce slightly if needed (collectLatest does this implicitly)
                 withContext(Dispatchers.IO) {
-                    if (lastIndex != null) {
-                        try {
-                             // Prefetch next 40 items
-                            val prefetchRange = (lastIndex + 1)..(lastIndex + 40) 
-                            prefetchRange.forEach { index ->
-                                if (index in currentLayoutItems.indices) {
-                                    when (val item = currentLayoutItems[index]) {
-                                        is LocalGridItem.PhotoItem -> {
-                                            // Create request on IO thread (safe)
-                                            val request = ImageRequest.Builder(context)
+                    try {
+                         // Prefetch a smaller, more targeted range during active scroll
+                         // Micro-Thumbnails (64px) are very cheap
+                        val prefetchRange = (lastIndex + 1)..(lastIndex + 60) 
+                        prefetchRange.forEach { index ->
+                            if (index in currentLayoutItems.indices) {
+                                when (val item = currentLayoutItems[index]) {
+                                    is LocalGridItem.PhotoItem -> {
+                                        val microRequest = ImageRequest.Builder(context)
+                                            .data(item.photo.pathUri)
+                                            .size(64, 64) 
+                                            .allowHardware(true)
+                                            .allowRgb565(true)
+                                            .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                            .build()
+                                        ImageLoaderModule.thumbnailImageLoader.enqueue(microRequest)
+
+                                        // Only prefetch full thumbnails for immediate next items
+                                        if (index <= lastIndex + 12) {
+                                            val standardRequest = ImageRequest.Builder(context)
                                                 .data(item.photo.pathUri)
                                                 .size(Size(thumbnailResolution, thumbnailResolution))
                                                 .allowHardware(true)
                                                 .allowRgb565(true)
                                                 .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
                                                 .build()
-                                            // Enqueue is non-blocking, but good to do here
-                                            ImageLoaderModule.thumbnailImageLoader.enqueue(request)
+                                            ImageLoaderModule.thumbnailImageLoader.enqueue(standardRequest)
                                         }
-                                        else -> {}
                                     }
+                                    else -> {}
                                 }
                             }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Prefetch error", e)
                         }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Prefetch error", e)
                     }
                 }
             }
@@ -387,28 +405,43 @@ fun LocalPhotoGrid(
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
 
+                // Calculate effective total rows for accurate scrollbar mapping
+                val effectiveTotalRows = remember(currentLayoutItems, columns, isDateGroupedLayout) {
+                    if (isDateGroupedLayout) {
+                        var rows = 0
+                        currentLayoutItems.forEach { item ->
+                            if (item is LocalGridItem.HeaderItem) rows++
+                        }
+                        val photos = currentLayoutItems.count { it is LocalGridItem.PhotoItem }
+                        rows + kotlin.math.ceil(photos.toFloat() / columns).toInt()
+                    } else {
+                        kotlin.math.ceil(currentLayoutItems.size.toFloat() / columns).toInt()
+                    }
+                }
+
                 ExpressiveScrollbar(
                     lazyGridState = lazyGridState,
-                    totalItemsCount = currentLayoutItems.size,
+                    totalItemsCount = effectiveTotalRows * columns,
                     columnCount = columns,
                     onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
                     labelProvider = { index ->
                         val safeIndex = index.coerceIn(0, currentLayoutItems.size - 1)
-                        when (val item = currentLayoutItems[safeIndex]) {
-                            is LocalGridItem.HeaderItem -> item.dateLabel
-                            is LocalGridItem.PhotoItem -> {
-                                // Find nearest header above this item
-                                var foundLabel = "..."
-                                for (i in safeIndex downTo 0) {
-                                    val current = currentLayoutItems[i]
-                                    if (current is LocalGridItem.HeaderItem) {
-                                        foundLabel = current.dateLabel
-                                        break
-                                    }
-                                }
-                                foundLabel
+                        
+                        // Binary search for the nearest header at or above safeIndex
+                        var low = 0
+                        var high = headerIndices.size - 1
+                        var result = "..."
+                        
+                        while (low <= high) {
+                            val mid = (low + high) / 2
+                            if (headerIndices[mid].first <= safeIndex) {
+                                result = headerIndices[mid].second
+                                low = mid + 1
+                            } else {
+                                high = mid - 1
                             }
                         }
+                        result
                     },
                     modifier = Modifier.align(Alignment.CenterEnd)
                 )
@@ -623,6 +656,25 @@ fun LocalPhotoItem(
                     .fillMaxSize()
                     .clip(RoundedCornerShape(20.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+
+            // 1.5 Micro-Thumbnail Layer (Low Quality, Immediate)
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(photo.pathUri)
+                    .size(64, 64) // Explicit low res
+                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .crossfade(false)
+                    .allowHardware(true)
+                    .allowRgb565(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                imageLoader = ImageLoaderModule.thumbnailImageLoader,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(20.dp))
+                    .alpha(0.7f) // Slightly transparent blending
             )
 
             // 2. Animated Content Container

@@ -128,7 +128,7 @@ fun PhotoGridDialog(
                         totalItemsCount = idList.size,
                         columnCount = 4,
                         modifier = Modifier.align(androidx.compose.ui.Alignment.CenterEnd),
-                        labelProvider = { "Selection" }
+                        labelProvider = { index -> "${index + 1} / ${idList.size}" }
                     )
                 }
             }
