@@ -531,7 +531,7 @@ fun LocalPhotoGrid(
                     columns = GridCells.Fixed(columns),
                     contentPadding = PaddingValues(
                         start = 16.dp,
-                        top = 8.dp,
+                        top = 0.dp,
                         end = 16.dp,
                         bottom = 96.dp
                     ),
