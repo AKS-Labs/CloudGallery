@@ -663,13 +663,13 @@ fun LocalPhotoItem(
                     scaleY = deletionScale * (0.92f + 0.08f * entrance)
                     translationY = (1f - entrance) * 15f
                 }
-                .clip(RoundedCornerShape(if (isSelected) 14.dp else 20.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .then(
                     if (isSelected) Modifier.border(
                         6.dp, 
                         MaterialTheme.colorScheme.primary, 
-                        RoundedCornerShape(20.dp)
+                        RoundedCornerShape(16.dp)
                     ) else Modifier
                 ),
             contentAlignment = Alignment.Center
@@ -711,7 +711,7 @@ fun LocalPhotoItem(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(if (isSelected) 6.dp else 0.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                 )
                 Box(
@@ -731,31 +731,24 @@ fun LocalPhotoItem(
                     )
                 }
             }
-        }
 
-        // Cloud Icon (if backed up)
-        // Note: Local Photo usually doesn't have remoteId directly, but we check if it's synced
-        // For now, if we want to show it, we need to pass a property or look it up.
-        // Assuming we might have a way to know if it's backed up.
-        // I'll comment this out or use a dummy check for now to fix the build error.
-        /*
-        if (photo.remoteId != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(10.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f), CircleShape)
-                    .size(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.CloudDone,
-                    contentDescription = "Backed up",
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(14.dp)
-                )
+            if (photo.remoteId != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(10.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f), CircleShape)
+                        .size(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CloudDone,
+                        contentDescription = "Backed up",
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
             }
         }
-        */
     }
 }
