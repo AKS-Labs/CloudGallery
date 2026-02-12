@@ -1,0 +1,61 @@
+Never Lose a Precious Memory Again! 📸✨
+
+Chitralaya CloudGallery (चित्रालय - "House of Images" in Sanskrit) is your personal photo fortress that transforms Telegram into unlimited, truly private cloud storage! Say goodbye to the anxiety of losing precious memories and hello to unlimited backup freedom.
+
+🎯 The Problem We Solve:
+
+Running out of phone storage? Worried about losing irreplaceable photos? Fed up with expensive cloud services that spy on your memories? Chitralaya CloudGallery has your back! It transforms YOUR Telegram bot into a private, unlimited photo Cloud storage - and the best part? YOU control everything!
+
+✨ What Makes Chitralaya CloudGallery Special:
+
+• 🔒 100% Private: Uses YOUR Telegram bot - no sneaky third parties, no data mining, no corporate surveillance. Your memories stay yours!
+• ⚡ Lightning Fast: Real-time photo backup to your personal Telegram channel
+• 🎨 Gorgeous Interface: Stunning Material Design 3 with customizable photo grids (3-6 columns!)
+• 🔋 Battery Friendly: Smart background sync that won't drain your battery like other apps
+• 🛡️ Fort Knox Security: AES-256 encryption keeps your precious memories locked up tight
+• 🌍 Universal Access: View your photos from ANY device with Telegram - phone, tablet, computer, you name it!
+• 🚫 Zero Bloat: No ads, no trackers, no unnecessary permissions - just pure photo backup magic
+• 📱 Smart Sync: Intelligent change detection - only backs up what's new, no duplicate chaos
+
+🚀 How the Magic Works:
+
+It's surprisingly simple! You create your own Telegram bot (takes 2 minutes with @BotFather), connect CloudGallery to it, and boom! Every photo on your device can be automatically backed up to your personal Telegram channel. It's like having a digital photo curator that never sleeps! 📮
+
+🛡️ Privacy That Actually Matters:
+
+In a world full of apps that spy on your photos, CloudGallery is different:
+
+✅ Direct communication with YOUR Telegram bot only
+✅ Zero external servers or cloud services
+✅ No analytics, telemetry, or tracking nonsense
+✅ Open source code - peek under the hood anytime!
+✅ You own the bot, you control the data
+
+🎯 Perfect For:
+
+• Photography Enthusiasts: Keep your masterpieces safe without storage limits
+• Privacy Advocates: Finally, a backup solution that respects your memories
+• Digital Nomads: Access your photos from anywhere in the world
+• Parents: Never lose those precious family moments again
+• Content Creators: Unlimited backup for your creative work
+• Tech-Savvy Users: Love having control over your digital life
+
+🔧 Quick Setup (Seriously, It's Easy!):
+
+1. Chat with @BotFather on Telegram to create your bot (2 minutes)
+2. Install CloudGallery and grant photo permissions
+3. Enter your bot token and chat ID
+4. Watch the magic happen! ✨
+
+💡 Pro Tips:
+
+• Create organized Telegram channels for different photo categories
+• Use Telegram's powerful search to find old photos instantly
+• Access your photos from Telegram Web on any computer
+• Enjoy truly unlimited storage - Telegram doesn't count against any limits!
+
+🌟 Why Choose Chitralaya CloudGallery?
+
+Because your memories are priceless, your privacy matters, and you deserve unlimited storage that works for YOU, not against you. Built by developers who actually care about user privacy and digital rights!
+
+Join the revolution of truly private, user-controlled photo backup solutions. Your future self (and your phone storage) will thank you! 🎉
