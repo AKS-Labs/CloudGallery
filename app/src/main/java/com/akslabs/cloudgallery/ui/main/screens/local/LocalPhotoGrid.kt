@@ -145,8 +145,9 @@ private fun groupPhotosByDateOptimized(
 ): List<DateGroup> {
     val photosByDate = mutableMapOf<String, MutableList<Pair<LocalUiPhoto, Int>>>()
     
+    val deletedSet = deletedPhotoIds.toSet()
     allPhotos.forEachIndexed { index, photo ->
-        if (!deletedPhotoIds.contains(photo.localId)) {
+        if (!deletedSet.contains(photo.localId)) {
             val dateLabel = formatPhotoDate(photo.displayDateMillis)
             photosByDate.getOrPut(dateLabel) { mutableListOf() }.add(photo to index)
         }
@@ -169,9 +170,10 @@ private fun createLayoutCache(
 ): LayoutCache {
     val start = System.currentTimeMillis()
 
+    val deletedSet = deletedPhotoIds.toSet()
     // Create normal grid items
     val normalGridItems = allPhotos.mapIndexedNotNull { index, photo ->
-        if (deletedPhotoIds.contains(photo.localId)) null else LocalGridItem.PhotoItem(photo, index)
+        if (deletedSet.contains(photo.localId)) null else LocalGridItem.PhotoItem(photo, index)
     }
 
     // Create date grouped items
@@ -335,60 +337,80 @@ fun LocalPhotoGrid(
         initialFirstVisibleItemScrollOffset = initialOffset
     )
 
-    // Aggressive Prefetching (Optimized to prevent ANR)
+    // Intelligent Directional Prefetching
+    var lastPrefetchIndex by remember { mutableStateOf(-1) }
     LaunchedEffect(currentLayoutItems, isScrollbarDragging) {
-        // Boost prefetching during dragging to ensure thumbnails are ready
-        val prefetchDebounce = if (isScrollbarDragging) 100L else 150L
+        val prefetchDebounce = if (isScrollbarDragging) 50L else 120L
         
-        snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .distinctUntilChanged()
-            .debounce(prefetchDebounce)
-            .collectLatest { lastIndex ->
-                if (lastIndex == null || layoutCache.totalPhotos == 0) return@collectLatest
+        snapshotFlow { 
+            val layoutInfo = lazyGridState.layoutInfo
+            val visibleItems = layoutInfo.visibleItemsInfo
+            if (visibleItems.isEmpty()) null
+            else {
+                val first = visibleItems.first().index
+                val last = visibleItems.last().index
+                Triple(first, last, layoutInfo.totalItemsCount)
+            }
+        }
+        .distinctUntilChanged()
+        .debounce(prefetchDebounce)
+        .collectLatest { info ->
+            if (info == null || layoutCache.totalPhotos == 0) return@collectLatest
+            val (firstVisible, lastVisible, totalItems) = info
 
-                // Offload to IO but debounce slightly if needed (collectLatest does this implicitly)
-                withContext(Dispatchers.IO) {
-                    try {
-                        // Prefetch a larger range to stay ahead of the user
-                        // Micro-Thumbnails (64px) are very cheap and fit many in memory
-                        val prefetchRange = (lastIndex + 1)..(lastIndex + 40) 
-                        prefetchRange.forEach { index ->
-                            if (index in currentLayoutItems.indices) {
-                                yield() // Allow other background tasks to breathe
-                                when (val item = currentLayoutItems[index]) {
-                                    is LocalGridItem.PhotoItem -> {
-                                        val microRequest = ImageRequest.Builder(context)
-                                            .data(item.photo.pathUri)
-                                            .size(64, 64) 
-                                            .allowHardware(true)
-                                            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
-                                            .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                                            .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                                            .build()
-                                        ImageLoaderModule.thumbnailImageLoader.enqueue(microRequest)
+            // Determine scroll direction based on visible range shift
+            val direction = if (lastVisible > lastPrefetchIndex) 1 else -1
+            lastPrefetchIndex = lastVisible
 
-                                        // Prefetch full thumbnails for immediate next items
-                                        if (index <= lastIndex + 10) {
-                                            val thumbRequest = ImageRequest.Builder(context)
-                                                .data(item.photo.pathUri)
-                                                .size(180, 180)
-                                                .allowHardware(true)
-                                                .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
-                                                .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                                                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                                                .build()
-                                            ImageLoaderModule.thumbnailImageLoader.enqueue(thumbRequest)
-                                        }
-                                    }
-                                    else -> {}
+            withContext(Dispatchers.IO) {
+                try {
+                    // Prefetch ahead based on direction
+                    val range = if (direction > 0) {
+                        (lastVisible + 1)..(lastVisible + 25).coerceAtMost(totalItems - 1)
+                    } else {
+                        (firstVisible - 25).coerceAtLeast(0)..(firstVisible - 1)
+                    }
+
+                    if (range.isEmpty()) return@withContext
+
+                    range.forEach { index ->
+                        if (index in currentLayoutItems.indices) {
+                            yield()
+                            val item = currentLayoutItems[index]
+                            if (item is LocalGridItem.PhotoItem) {
+                                // 1. Micro-Thumbnail (64x64) - Ultra fast and low memory
+                                val microRequest = ImageRequest.Builder(context)
+                                    .data(item.photo.pathUri)
+                                    .size(64, 64)
+                                    .memoryCacheKey("micro_${item.photo.localId}")
+                                    .diskCacheKey("micro_${item.photo.localId}")
+                                    .precision(coil.size.Precision.INEXACT)
+                                    .allowHardware(true)
+                                    .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                    .build()
+                                ImageLoaderModule.thumbnailImageLoader.enqueue(microRequest)
+
+                                // 2. Standard Thumbnail (180x180) - Only for immediate items
+                                val distance = if (direction > 0) index - lastVisible else firstVisible - index
+                                if (distance <= 8) {
+                                    val thumbRequest = ImageRequest.Builder(context)
+                                        .data(item.photo.pathUri)
+                                        .size(180, 180)
+                                        .memoryCacheKey("lt_thumb_${item.photo.localId}")
+                                        .diskCacheKey("lt_thumb_${item.photo.localId}")
+                                        .allowHardware(true)
+                                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                        .build()
+                                    ImageLoaderModule.thumbnailImageLoader.enqueue(thumbRequest)
                                 }
                             }
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Prefetch error", e)
                     }
+                } catch (e: Exception) {
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Prefetch error", e)
                 }
             }
+        }
     }
 
     val horizontalSpacing = 12.dp

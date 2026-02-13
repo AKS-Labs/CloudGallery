@@ -47,12 +47,11 @@ object ImageLoaderModule {
             .diskCache {
                 DiskCache.Builder()
                     .directory(appContext.cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(20 * 1024 * 1024L) // Strictly 20MB limit
+                    .maxSizeBytes(250 * 1024 * 1024L) // 250MB for full images
                     .build()
             }
             .okHttpClient(okHttpClient)
             .components { add(NetworkFetcher.Factory()) }
-            .logger(DebugLogger())
             .build()
         Log.i(TAG, "remoteImageLoader created successfully")
 
@@ -74,7 +73,7 @@ object ImageLoaderModule {
             .diskCache {
                 DiskCache.Builder()
                     .directory(appContext.cacheDir.resolve("thumbnail_cache"))
-                    .maxSizeBytes(20 * 1024 * 1024L) // Strictly 20MB limit
+                    .maxSizeBytes(500 * 1024 * 1024L) // 500MB for thumbnails
                     .build()
             }
             .okHttpClient(okHttpClient)
