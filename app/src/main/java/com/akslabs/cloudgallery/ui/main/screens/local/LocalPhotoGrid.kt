@@ -75,6 +75,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import coil.request.ImageRequest
 import coil.size.Size
+import coil.size.Precision
 import com.akslabs.cloudgallery.ui.components.DragSelectableLazyVerticalGrid
 import com.akslabs.cloudgallery.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.BuildConfig
@@ -337,6 +338,39 @@ fun LocalPhotoGrid(
         initialFirstVisibleItemScrollOffset = initialOffset
     )
 
+    // Calculate Scroll Velocity for Adaptive Loading
+    var scrollVelocity by remember { mutableStateOf(0f) }
+    LaunchedEffect(lazyGridState) {
+        var lastOffset = lazyGridState.firstVisibleItemScrollOffset
+        var lastIndex = lazyGridState.firstVisibleItemIndex
+        var lastTime = System.currentTimeMillis()
+        
+        snapshotFlow { 
+            Triple(lazyGridState.firstVisibleItemScrollOffset, lazyGridState.firstVisibleItemIndex, lazyGridState.isScrollInProgress) 
+        }
+        .collect { (offset, index, isScrolling) ->
+            if (!isScrolling) {
+                scrollVelocity = 0f
+                lastOffset = offset
+                lastIndex = index
+                lastTime = System.currentTimeMillis()
+                return@collect
+            }
+            
+            val currentTime = System.currentTimeMillis()
+            val deltaT = (currentTime - lastTime).coerceAtLeast(1)
+            // Approximate pixels traveled (item height is roughly 150dp -> 450px)
+            val deltaX = (index - lastIndex) * 450 + (offset - lastOffset)
+            scrollVelocity = kotlin.math.abs(deltaX.toFloat() / deltaT * 1000f)
+            
+            lastOffset = offset
+            lastIndex = index
+            lastTime = currentTime
+        }
+    }
+    val isScrollingFast = scrollVelocity > 2500f // px per second
+
+
     // Intelligent Directional Prefetching
     var lastPrefetchIndex by remember { mutableStateOf(-1) }
     LaunchedEffect(currentLayoutItems, isScrollbarDragging) {
@@ -598,6 +632,7 @@ fun LocalPhotoGrid(
                                         isSelected = isSelected,
                                         isDeleted = isDeleted,
                                         isScrollbarDragging = isScrollbarDragging,
+                                        isScrollingFast = isScrollingFast,
                                         thumbnailResolution = thumbnailResolution,
                                         sharedTransitionScope = sharedTransitionScope,
                                         animatedVisibilityScope = animatedVisibilityScope,
@@ -635,6 +670,7 @@ fun LocalPhotoItem(
     isSelected: Boolean,
     isDeleted: Boolean,
     isScrollbarDragging: Boolean = false,
+    isScrollingFast: Boolean = false,
     thumbnailResolution: Int = 150,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
@@ -698,20 +734,34 @@ fun LocalPhotoItem(
         ) {
             // Placeholder background only (Icons removed per user request)
             
-            // Fix: Stabilize ImageRequest model to prevent reload waves.
-            // Using a fixed size (180) ensures high quality without excessive memory.
-            val imageRequest = remember(photo.localId) {
+            // Adaptive Loading: Only load 180px thumb if not scrolling fast
+            val loadHighRes = !isScrollingFast
+            
+            val microRequest = remember(photo.localId) {
                 ImageRequest.Builder(context)
                     .data(photo.pathUri)
-                    .size(180, 180) 
-                    .memoryCacheKey("lt_thumb_${photo.localId}")
-                    .diskCacheKey("lt_thumb_${photo.localId}")
+                    .size(64, 64)
+                    .memoryCacheKey("micro_${photo.localId}")
+                    .diskCacheKey("micro_${photo.localId}")
+                    .precision(Precision.INEXACT)
                     .allowHardware(true)
-                    .allowRgb565(true)
-                    .bitmapConfig(android.graphics.Bitmap.Config.RGB_565) // Forced for memory efficiency
-                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                    .crossfade(200)
+                    .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
                     .build()
+            }
+
+            val imageRequest = remember(photo.localId, loadHighRes) {
+                if (loadHighRes) {
+                    ImageRequest.Builder(context)
+                        .data(photo.pathUri)
+                        .size(180, 180) 
+                        .memoryCacheKey("lt_thumb_${photo.localId}")
+                        .diskCacheKey("lt_thumb_${photo.localId}")
+                        .allowHardware(true)
+                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                        .crossfade(200)
+                        .placeholderMemoryCacheKey("micro_${photo.localId}") // Use micro as placeholder
+                        .build()
+                } else microRequest
             }
             
             AsyncImage(
@@ -724,8 +774,7 @@ fun LocalPhotoItem(
                     .graphicsLayer {
                         // Apply entrance alpha ONLY to the image
                         alpha = if (skipEntrance) 1f else animatedValues
-                    },
-                placeholder = null
+                    }
             )
 
             if (isSelected) {

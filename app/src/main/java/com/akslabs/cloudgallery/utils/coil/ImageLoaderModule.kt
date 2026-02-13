@@ -10,6 +10,12 @@ import coil.request.CachePolicy
 import coil.util.DebugLogger
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+import coil.intercept.Interceptor
+import coil.request.ImageResult
+import coil.request.SuccessResult
+import coil.size.Precision
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
 
 object ImageLoaderModule {
     private const val TAG = "ImageLoaderModule"
@@ -77,9 +83,26 @@ object ImageLoaderModule {
                     .build()
             }
             .okHttpClient(okHttpClient)
-            .components { add(NetworkFetcher.Factory()) }
+            .components { 
+                add(NetworkFetcher.Factory()) 
+            }
             .build()
         Log.i(TAG, "thumbnailImageLoader created successfully")
+
+        // Register memory trimmer
+        appContext.registerComponentCallbacks(object : ComponentCallbacks2 {
+            override fun onTrimMemory(level: Int) {
+                Log.d(TAG, "Trimming memory: level=$level")
+                remoteImageLoader.memoryCache?.trimMemory(level)
+                thumbnailImageLoader.memoryCache?.trimMemory(level)
+            }
+            override fun onConfigurationChanged(newConfig: Configuration) {}
+            override fun onLowMemory() {
+                Log.w(TAG, "CRITICAL: Low memory, clearing all caches")
+                remoteImageLoader.memoryCache?.clear()
+                thumbnailImageLoader.memoryCache?.clear()
+            }
+        })
 
         Log.i(TAG, "=== IMAGE LOADERS INITIALIZATION COMPLETE ===")
         Log.i(TAG, "Available loaders:")
