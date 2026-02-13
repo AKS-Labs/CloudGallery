@@ -371,10 +371,16 @@ fun LocalPhotoGrid(
     val isScrollingFast = scrollVelocity > 2500f // px per second
 
 
-    // Intelligent Directional Prefetching
-    var lastPrefetchIndex by remember { mutableStateOf(-1) }
+    // Intelligent Directional Prefetching (V3)
+    var lastPrefetchRange by remember { mutableStateOf(0..0) }
+    var prevFirstVisible by remember { mutableStateOf(-1) }
+    var prevLastVisible by remember { mutableStateOf(-1) }
+    
+    // session prefetched IDs to avoid redundant enqueuing
+    val enqueuedPrefetchIds = remember { mutableSetOf<String>() }
+    
     LaunchedEffect(currentLayoutItems, isScrollbarDragging) {
-        val prefetchDebounce = if (isScrollbarDragging) 50L else 120L
+        val prefetchDebounce = if (isScrollbarDragging) 50L else 100L
         
         snapshotFlow { 
             val layoutInfo = lazyGridState.layoutInfo
@@ -392,53 +398,75 @@ fun LocalPhotoGrid(
             if (info == null || layoutCache.totalPhotos == 0) return@collectLatest
             val (firstVisible, lastVisible, totalItems) = info
 
-            // Determine scroll direction based on visible range shift
-            val direction = if (lastVisible > lastPrefetchIndex) 1 else -1
-            lastPrefetchIndex = lastVisible
+            // Robust Direction Detection: Compare both first and last index shifts
+            val firstShift = firstVisible - prevFirstVisible
+            val lastShift = lastVisible - prevLastVisible
+            
+            // If we don't have previous state, assume down (1)
+            val direction = if (prevFirstVisible == -1) 1 else {
+                if (firstShift > 0 || lastShift > 0) 1 else if (firstShift < 0 || lastShift < 0) -1 else 0
+            }
+            
+            prevFirstVisible = firstVisible
+            prevLastVisible = lastVisible
+            
+            if (direction == 0) return@collectLatest
 
             withContext(Dispatchers.IO) {
                 try {
                     // Prefetch ahead based on direction
                     val range = if (direction > 0) {
-                        (lastVisible + 1)..(lastVisible + 25).coerceAtMost(totalItems - 1)
+                        (lastVisible + 1)..(lastVisible + 100).coerceAtMost(totalItems - 1)
                     } else {
-                        (firstVisible - 25).coerceAtLeast(0)..(firstVisible - 1)
+                        (firstVisible - 100).coerceAtLeast(0)..(firstVisible - 1)
                     }
 
-                    if (range.isEmpty()) return@withContext
+                    if (range.isEmpty() || range == lastPrefetchRange) return@withContext
+                    lastPrefetchRange = range
 
                     range.forEach { index ->
                         if (index in currentLayoutItems.indices) {
                             yield()
                             val item = currentLayoutItems[index]
                             if (item is LocalGridItem.PhotoItem) {
-                                // 1. Micro-Thumbnail (64x64) - Ultra fast and low memory
-                                val microRequest = ImageRequest.Builder(context)
-                                    .data(item.photo.pathUri)
-                                    .size(64, 64)
-                                    .memoryCacheKey("micro_${item.photo.localId}")
-                                    .diskCacheKey("micro_${item.photo.localId}")
-                                    .precision(coil.size.Precision.INEXACT)
-                                    .allowHardware(true)
-                                    .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
-                                    .build()
-                                ImageLoaderModule.thumbnailImageLoader.enqueue(microRequest)
+                                val photoId = item.photo.localId
+                                
+                                // 1. Micro-Thumbnail (64x64)
+                                if (!enqueuedPrefetchIds.contains("micro_$photoId")) {
+                                    val microRequest = ImageRequest.Builder(context)
+                                        .data(item.photo.pathUri)
+                                        .size(64, 64)
+                                        .memoryCacheKey("micro_$photoId")
+                                        .diskCacheKey("micro_$photoId")
+                                        .precision(coil.size.Precision.INEXACT)
+                                        .allowHardware(true)
+                                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                        .build()
+                                    ImageLoaderModule.thumbnailImageLoader.enqueue(microRequest)
+                                    enqueuedPrefetchIds.add("micro_$photoId")
+                                }
 
-                                // 2. Standard Thumbnail (180x180) - Only for immediate items
+                                // 2. Standard Thumbnail (User Resolution) - Immediate buffer
                                 val distance = if (direction > 0) index - lastVisible else firstVisible - index
-                                if (distance <= 8) {
+                                if (distance <= 10 && !enqueuedPrefetchIds.contains("thumb_$photoId")) {
                                     val thumbRequest = ImageRequest.Builder(context)
                                         .data(item.photo.pathUri)
-                                        .size(180, 180)
-                                        .memoryCacheKey("lt_thumb_${item.photo.localId}")
-                                        .diskCacheKey("lt_thumb_${item.photo.localId}")
+                                        .size(thumbnailResolution, thumbnailResolution)
+                                        .memoryCacheKey("lt_thumb_$photoId")
+                                        .diskCacheKey("lt_thumb_$photoId")
                                         .allowHardware(true)
                                         .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
                                         .build()
                                     ImageLoaderModule.thumbnailImageLoader.enqueue(thumbRequest)
+                                    enqueuedPrefetchIds.add("thumb_$photoId")
                                 }
                             }
                         }
+                    }
+                    
+                    // Periodically prune the set if it gets too large
+                    if (enqueuedPrefetchIds.size > 1000) {
+                        enqueuedPrefetchIds.clear()
                     }
                 } catch (e: Exception) {
                     if (BuildConfig.DEBUG) Log.e(TAG, "Prefetch error", e)
@@ -734,9 +762,10 @@ fun LocalPhotoItem(
         ) {
             // Placeholder background only (Icons removed per user request)
             
-            // Adaptive Loading: Only load 180px thumb if not scrolling fast
+            // Adaptive Loading: Only upgrade to High-Res when scrolling slowed down
             val loadHighRes = !isScrollingFast
             
+            // Tier 1: Micro-Thumbnail (Decoupled lifecycle to ensure it stays in memory as a base layer)
             val microRequest = remember(photo.localId) {
                 ImageRequest.Builder(context)
                     .data(photo.pathUri)
@@ -749,19 +778,26 @@ fun LocalPhotoItem(
                     .build()
             }
 
-            val imageRequest = remember(photo.localId, loadHighRes) {
-                if (loadHighRes) {
-                    ImageRequest.Builder(context)
-                        .data(photo.pathUri)
-                        .size(180, 180) 
-                        .memoryCacheKey("lt_thumb_${photo.localId}")
-                        .diskCacheKey("lt_thumb_${photo.localId}")
-                        .allowHardware(true)
-                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
-                        .crossfade(200)
-                        .placeholderMemoryCacheKey("micro_${photo.localId}") // Use micro as placeholder
-                        .build()
-                } else microRequest
+            // Tier 2: Standard Thumbnail (Uses Micro as a persistent placeholder)
+            val imageRequest = remember(photo.localId, loadHighRes, thumbnailResolution) {
+                ImageRequest.Builder(context)
+                    .data(photo.pathUri)
+                    .size(thumbnailResolution, thumbnailResolution) 
+                    .memoryCacheKey("lt_thumb_${photo.localId}")
+                    .diskCacheKey("lt_thumb_${photo.localId}")
+                    .allowHardware(true)
+                    .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                    // If we're scrolling fast, ONLY return the micro-version immediately
+                    .apply { 
+                        if (!loadHighRes) {
+                            size(64, 64)
+                            memoryCacheKey("micro_${photo.localId}")
+                        } else {
+                            crossfade(if (skipEntrance) 0 else 200)
+                            placeholderMemoryCacheKey("micro_${photo.localId}")
+                        }
+                    }
+                    .build()
             }
             
             AsyncImage(
