@@ -13,3 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+*.txt
+!fastlane/
+!fastlane/**/*.txt
+/builderrors.md

@@ -11,13 +11,13 @@ plugins {
 android {
     namespace = "com.akslabs.cloudgallery"
     compileSdk = 36  // Updated to compile against Android 15
-
+    
     defaultConfig {
         applicationId = "com.akslabs.cloudgallery"
         minSdk = 29  // Keep Android 10 as minimum
         targetSdk = 36  // Updated to target Android 15 (latest stable)
-        versionCode = 5
-        versionName = "0.5"
+        versionCode = 6
+        versionName = "0.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -123,6 +123,7 @@ dependencies {
     implementation(libs.androidx.compose.runtime.saveable)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.foundation)
+    implementation(libs.foundation)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -192,6 +193,7 @@ dependencies {
 //    implementation("androidx.compose.material3:material3:1.3.1")     // UI
 
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
 
 }
