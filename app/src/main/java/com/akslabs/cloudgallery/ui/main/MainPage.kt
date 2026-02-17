@@ -216,7 +216,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         ) {
         val isSettingsScreen = currentRoute == Screens.Settings.route || isNavigatingToSettings
         val isViewerScreen = currentRoute?.startsWith("photo_viewer") ?: false
-        val showAppLayout = !isSettingsScreen && !isViewerScreen
+        val isManageUploadsScreen = currentRoute == Screens.ManageUploads.route
+        val showAppLayout = !isSettingsScreen && !isViewerScreen && !isManageUploadsScreen
 
         LaunchedEffect(isNavigatingToSettings) {
             if (isNavigatingToSettings) {
@@ -605,7 +606,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 }
             }
 
-        if (!isSettingsScreen && !isViewerScreen) {
+        if (!isSettingsScreen && !isViewerScreen && !isManageUploadsScreen) {
             Box(modifier = Modifier.fillMaxSize()) {
                 BottomToolbarFAB(
                     expanded = expanded,

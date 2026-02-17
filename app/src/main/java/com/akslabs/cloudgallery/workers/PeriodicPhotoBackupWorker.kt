@@ -44,8 +44,28 @@ class PeriodicPhotoBackupWorker(
             try {
                 Log.d("PeriodicBackup", "Found ${imageList.size} photos not uploaded")
                 lateinit var tempFile: File
+                
+                // Initial progress
+                setProgress(
+                    workDataOf(
+                        KEY_PROGRESS_CURRENT to 0,
+                        KEY_PROGRESS_MAX to imageList.size,
+                        KEY_CURRENT_FILE_URI to ""
+                    )
+                )
+
                 imageList.fastForEachIndexed { index, photo ->
                     Log.d("PeriodicBackup", "Processing ${index + 1}/${imageList.size}: ${photo.pathUri}")
+                    
+                    // Update progress
+                    setProgress(
+                        workDataOf(
+                            KEY_PROGRESS_CURRENT to index + 1,
+                            KEY_PROGRESS_MAX to imageList.size,
+                            KEY_CURRENT_FILE_URI to photo.pathUri
+                        )
+                    )
+
                     val uri = photo.pathUri.toUri()
                     try {
                         val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri)
@@ -116,5 +136,8 @@ class PeriodicPhotoBackupWorker(
         const val MIME_TYPE_WEBP = "image/webp"
         const val KEY_COMPRESSION_THRESHOLD = "KEY_COMPRESSION_THRESHOLD"
         const val KEY_RESULT_ERROR = "KEY_RESULT_ERROR"
+        const val KEY_PROGRESS_CURRENT = "progress_current"
+        const val KEY_PROGRESS_MAX = "progress_max"
+        const val KEY_CURRENT_FILE_URI = "current_file_uri"
     }
 }

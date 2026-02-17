@@ -7,6 +7,7 @@ import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
 import com.akslabs.cloudgallery.data.localdb.Preferences
@@ -33,6 +34,7 @@ class InstantPhotoUploadWorker(
         
         return withContext(Dispatchers.IO) {
             try {
+                setProgress(workDataOf("progress" to "started"))
                 val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
                 val photoUri = photoUriString.toUri()
                 

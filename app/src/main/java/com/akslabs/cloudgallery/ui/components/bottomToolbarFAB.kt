@@ -9,9 +9,12 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +31,7 @@ import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,7 +62,7 @@ import com.akslabs.cloudgallery.workers.WorkModule
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.ui.theme.AnimationConstants
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun BottomToolbarFAB(
     expanded: Boolean,
@@ -108,58 +112,68 @@ fun BottomToolbarFAB(
             val containerColor = if (isUploading) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer
             val contentColor = if (isUploading) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
 
-            FilledIconButton(
-                modifier = Modifier.width(66.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = containerColor,
-                    contentColor = contentColor
-                ),
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    if (isUploading) {
-                        try {
-                            workManager.cancelAllWorkByTag("manual_backup")
-                            workManager.cancelAllWorkByTag("instant_upload")
-                            workManager.cancelUniqueWork("InstantPhotoBackupWork")
-                            workManager.cancelUniqueWork(WorkModule.PERIODIC_PHOTO_BACKUP_WORK)
-                            
-                            val isAutoBackupEnabled = Preferences.getBoolean(Preferences.isAutoBackupEnabledKey, false)
-                            if (isAutoBackupEnabled) {
-                                WorkModule.PeriodicBackup.enqueue(onlySchedule = true)
-                            }
+            Surface(
+                modifier = Modifier
+                    .width(66.dp)
+                    .height(40.dp) // Standard IconButton height
+                    .clip(FloatingToolbarDefaults.ContainerShape)
+                    .combinedClickable(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (isUploading) {
+                                try {
+                                    workManager.cancelAllWorkByTag("manual_backup")
+                                    workManager.cancelAllWorkByTag("instant_upload")
+                                    workManager.cancelUniqueWork("InstantPhotoBackupWork")
+                                    workManager.cancelUniqueWork(WorkModule.PERIODIC_PHOTO_BACKUP_WORK)
+                                    
+                                    val isAutoBackupEnabled = Preferences.getBoolean(Preferences.isAutoBackupEnabledKey, false)
+                                    if (isAutoBackupEnabled) {
+                                        WorkModule.PeriodicBackup.enqueue(onlySchedule = true)
+                                    }
 
-                            Toast.makeText(context, "Upload stopped", Toast.LENGTH_SHORT).show()
-                            NotificationHelper.showBackupStoppedNotification(context)
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Error stopping upload", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Upload stopped", Toast.LENGTH_SHORT).show()
+                                    NotificationHelper.showBackupStoppedNotification(context)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Error stopping upload", Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                try {
+                                    workManager.enqueue(backupWorkRequest)
+                                    Toast.makeText(context, "Backup started", Toast.LENGTH_SHORT).show()
+                                    NotificationHelper.showBackupStartedNotification(context)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Error starting backup", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            navController.navigate(Screens.ManageUploads.route)
+                        }
+                    ),
+                shape = FloatingToolbarDefaults.ContainerShape,
+                color = containerColor,
+                contentColor = contentColor
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (isUploading) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowUpward,
+                                contentDescription = "Uploading",
+                                modifier = Modifier
+                                    .offset(y = offsetY.dp)
+                                    .graphicsLayer { this.alpha = alpha },
+                                tint = contentColor
+                            )
                         }
                     } else {
-                        try {
-                            workManager.enqueue(backupWorkRequest)
-                            Toast.makeText(context, "Backup started", Toast.LENGTH_SHORT).show()
-                            NotificationHelper.showBackupStartedNotification(context)
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Error starting backup", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            ) {
-                if (isUploading) {
-                    Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Rounded.ArrowUpward,
-                            contentDescription = "Uploading",
-                            modifier = Modifier
-                                .offset(y = offsetY.dp)
-                                .graphicsLayer { this.alpha = alpha },
-                            tint = contentColor
+                            contentDescription = "Upload"
                         )
                     }
-                } else {
-                    Icon(
-                        imageVector = Icons.Rounded.ArrowUpward,
-                        contentDescription = "Upload"
-                    )
                 }
             }
         },

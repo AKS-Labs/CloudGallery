@@ -245,6 +245,10 @@ fun AppNavHost(
                 animatedVisibilityScope = this@composable
             )
         }
+
+        composable(route = Screens.ManageUploads.route) {
+            com.akslabs.cloudgallery.ui.main.screens.uploads.ManageUploadsScreen(navController = navController)
+        }
     }
 }
 
