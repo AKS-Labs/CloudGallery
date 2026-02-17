@@ -1,19 +1,14 @@
 package com.akslabs.cloudgallery.ui.main.screens.uploads
 
 import android.text.format.DateUtils
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -24,15 +19,19 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,7 +40,6 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudDone
-import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudQueue
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -69,12 +67,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,13 +96,14 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
+import kotlinx.coroutines.launch
 
 // ─── Tab definitions ────────────────────────────────────────────────
 private enum class UploadTab(val label: String, val icon: ImageVector) {
     All("All", Icons.Rounded.CloudUpload),
     Manual("Manual", Icons.Rounded.Upload),
-    AutoBackup("Auto Backup", Icons.Rounded.Backup),
-    Queued("Queued", Icons.Rounded.Schedule),
+    AutoBackup("Queue & Backup", Icons.Rounded.Backup),
+    Synced("Synced", Icons.Rounded.CheckCircle),
     Failed("Failed", Icons.Rounded.ErrorOutline)
 }
 
@@ -117,22 +118,27 @@ fun ManageUploadsScreen(
     val manualUploads by viewModel.manualUploads.collectAsState()
     val autoBackupUploads by viewModel.autoBackupUploads.collectAsState()
     val failedUploads by viewModel.failedUploads.collectAsState()
+    val syncedUploads by viewModel.syncedUploads.collectAsState()
     val queuedPhotos by viewModel.queuedPhotos.collectAsState()
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
 
-    var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = UploadTab.entries
+    val pagerState = rememberPagerState(pageCount = { tabs.size })
 
     // Stats
     val activeCount = allUploads.count { it.status == UploadStatus.InProgress }
     val completedCount = allUploads.count { it.status == UploadStatus.Completed }
     val failedCount = failedUploads.size
 
+    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
             LargeTopAppBar(
+                modifier = Modifier.padding(top = statusBarHeight),
                 title = {
                     Column {
                         Text(
@@ -236,7 +242,7 @@ fun ManageUploadsScreen(
         ) {
             // ─── Scrollable Tab Row ──────────────────────────────
             ScrollableTabRow(
-                selectedTabIndex = selectedTab,
+                selectedTabIndex = pagerState.currentPage,
                 edgePadding = 16.dp,
                 containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.primary,
@@ -244,20 +250,20 @@ fun ManageUploadsScreen(
                 indicator = {}
             ) {
                 tabs.forEachIndexed { index, tab ->
-                    val isSelected = selectedTab == index
+                    val isSelected = pagerState.currentPage == index
                     // Count for badge
                     val count = when (tab) {
                         UploadTab.All -> allUploads.size + queuedPhotos.size
                         UploadTab.Manual -> manualUploads.size
-                        UploadTab.AutoBackup -> autoBackupUploads.size
-                        UploadTab.Queued -> queuedPhotos.size
+                        UploadTab.AutoBackup -> autoBackupUploads.size + queuedPhotos.size
+                        UploadTab.Synced -> syncedUploads.size
                         UploadTab.Failed -> failedCount
                     }
                     Tab(
                         selected = isSelected,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            selectedTab = index
+                            scope.launch { pagerState.animateScrollToPage(index) }
                         },
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
                     ) {
@@ -295,25 +301,22 @@ fun ManageUploadsScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // ─── Content per tab ─────────────────────────────────
-            AnimatedContent(
-                targetState = selectedTab,
-                transitionSpec = {
-                    (fadeIn(tween(200)) + slideInVertically { it / 8 }) togetherWith
-                            (fadeOut(tween(150)) + slideOutVertically { -it / 8 })
-                },
-                label = "tab_content"
-            ) { tab ->
-                when (tab) {
-                    0 -> UploadListContent( // All
+            // ─── Pager Content ───────────────────────────────────
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (tabs[page]) {
+                    UploadTab.All -> UploadListContent(
                         uploads = allUploads,
                         queuedPhotos = queuedPhotos,
                         showQueued = true,
                         onCancel = { viewModel.cancelUpload(it) },
                         onRetry = { viewModel.retryAllFailed() },
-                        navController = navController
+                        navController = navController,
+                        activeTitle = "Active & Recent"
                     )
-                    1 -> UploadListContent( // Manual
+                    UploadTab.Manual -> UploadListContent(
                         uploads = manualUploads,
                         queuedPhotos = emptyList(),
                         showQueued = false,
@@ -324,29 +327,30 @@ fun ManageUploadsScreen(
                         emptySubMessage = "Select photos and upload to cloud to see them here",
                         emptyIcon = Icons.Rounded.UploadFile
                     )
-                    2 -> UploadListContent( // Auto Backup
+                    UploadTab.AutoBackup -> UploadListContent(
                         uploads = autoBackupUploads,
-                        queuedPhotos = emptyList(),
-                        showQueued = false,
+                        queuedPhotos = queuedPhotos,
+                        showQueued = true,
                         onCancel = { viewModel.cancelUpload(it) },
                         onRetry = { viewModel.retryAllFailed() },
                         navController = navController,
-                        emptyMessage = "No automatic backups",
+                        emptyMessage = "No backup tasks",
                         emptySubMessage = "Enable auto backup in Settings to start",
                         emptyIcon = Icons.Rounded.Backup
                     )
-                    3 -> UploadListContent( // Queued
-                        uploads = emptyList(),
-                        queuedPhotos = queuedPhotos,
-                        showQueued = true,
-                        onCancel = {},
-                        onRetry = { viewModel.retryAllFailed() },
+                    UploadTab.Synced -> UploadListContent(
+                        uploads = syncedUploads,
+                        queuedPhotos = emptyList(),
+                        showQueued = false,
+                        onCancel = {}, // Synced items usually aren't cancellable
+                        onRetry = {},
                         navController = navController,
-                        emptyMessage = "All photos are uploaded!",
-                        emptySubMessage = "Every photo is safely backed up to the cloud",
-                        emptyIcon = Icons.Rounded.CloudDone
+                        emptyMessage = "No synced photos",
+                        emptySubMessage = "Uploaded photos will appear here",
+                        emptyIcon = Icons.Rounded.CheckCircle,
+                        activeTitle = "Synced Photos"
                     )
-                    4 -> UploadListContent( // Failed
+                    UploadTab.Failed -> UploadListContent(
                         uploads = failedUploads,
                         queuedPhotos = emptyList(),
                         showQueued = false,
@@ -397,7 +401,8 @@ private fun UploadListContent(
     navController: NavController,
     emptyMessage: String = "Nothing here yet",
     emptySubMessage: String = "",
-    emptyIcon: ImageVector = Icons.Rounded.CloudQueue
+    emptyIcon: ImageVector = Icons.Rounded.CloudQueue,
+    activeTitle: String = "Active & Recent"
 ) {
     val isEmpty = uploads.isEmpty() && (!showQueued || queuedPhotos.isEmpty())
 
@@ -448,7 +453,7 @@ private fun UploadListContent(
             if (uploads.isNotEmpty()) {
                 item(key = "header_active") {
                     SectionHeader(
-                        title = "Active & Recent",
+                        title = activeTitle,
                         icon = Icons.Rounded.CloudUpload
                     )
                 }
@@ -470,7 +475,7 @@ private fun UploadListContent(
                 item(key = "header_queued") {
                     Spacer(modifier = Modifier.height(4.dp))
                     SectionHeader(
-                        title = "Pending Upload (${queuedPhotos.size})",
+                        title = "Pending Queue (${queuedPhotos.size})",
                         icon = Icons.Rounded.HourglassTop
                     )
                 }

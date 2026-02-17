@@ -112,7 +112,10 @@ class PeriodicPhotoBackupWorker(
                         tempFile.deleteOnExit()
                     }
                 }
-                Result.success()
+                val lastUri = if (imageList.isNotEmpty()) imageList.last().pathUri else null
+                Result.success(
+                    if (lastUri != null) workDataOf(KEY_CURRENT_FILE_URI to lastUri) else workDataOf()
+                )
             } catch (e: Exception) {
                 Log.e("PeriodicBackup", "Backup failed, will retry: ${e.message}")
                 Result.retry()

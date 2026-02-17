@@ -101,6 +101,11 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         items.filter { it.status == UploadStatus.Failed }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Synced/Completed uploads only
+    val syncedUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
+        items.filter { it.status == UploadStatus.Completed }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private fun mapWorkInfoToUiItem(workInfo: WorkInfo, type: UploadType): UploadUiItem? {
         val status = when (workInfo.state) {
             WorkInfo.State.ENQUEUED -> UploadStatus.Queued
@@ -112,6 +117,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         }
 
         val progressData = workInfo.progress
+        val outputData = workInfo.outputData
         var progress = 0f
         var progressText = ""
         var thumbnailUri: String? = null
@@ -123,7 +129,9 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             UploadType.ManualBackup, UploadType.AutoBackup -> {
                 val current = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_CURRENT, 0)
                 val max = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_MAX, 0)
+                // Use progress URI if running, otherwise try output data (from success result)
                 val currentUri = progressData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)
+                    ?: outputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)
 
                 totalItems = if (max > 0) max else 1
                 progress = if (max > 0) current.toFloat() / max.toFloat() else 0f
@@ -181,8 +189,14 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
 
     fun retryAllFailed() {
         val failed = allUploads.value.filter { it.status == UploadStatus.Failed }
+        // Retry logic:
+        // 1. Enqueue periodic backup if any manual/auto backup failed
         if (failed.any { it.type == UploadType.ManualBackup || it.type == UploadType.AutoBackup }) {
             WorkModule.PeriodicBackup.enqueue()
         }
+        // 2. Retry instant uploads (WorkManager retry logic handles this, but if cancelled we might need to re-enqueue. 
+        // Simple retry for now is relying on WorkManager's auto-retry or re-enqueuing if we had the URI, 
+        // but re-enqueuing requires keeping track of URIs which we don't fully do here yet apart from observing.
+        // For now, retryAll primarily triggers the main backup worker which picks up queued items.)
     }
 }

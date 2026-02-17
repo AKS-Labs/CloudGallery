@@ -34,7 +34,12 @@ class InstantPhotoUploadWorker(
         
         return withContext(Dispatchers.IO) {
             try {
-                setProgress(workDataOf("progress" to "started"))
+                setProgress(
+                    workDataOf(
+                        "progress" to "started",
+                        KEY_PHOTO_URI to params.inputData.getString(KEY_PHOTO_URI)
+                    )
+                )
                 val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
                 val photoUri = photoUriString.toUri()
                 
@@ -43,7 +48,7 @@ class InstantPhotoUploadWorker(
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     setForeground(getForegroundInfo())
                 }
-                Result.success()
+                Result.success(workDataOf(KEY_PHOTO_URI to photoUriString))
             } catch (e: Throwable) {
                 Log.d("PhotoUpload", "FAILED, will retry: ${e.localizedMessage}")
                 Result.retry()
