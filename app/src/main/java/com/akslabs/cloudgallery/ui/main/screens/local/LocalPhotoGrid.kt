@@ -18,6 +18,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -83,7 +84,9 @@ import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.dao.SyncedPhotoTuple
+import com.akslabs.cloudgallery.data.mediastore.AlbumInfo
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
+import com.akslabs.cloudgallery.ui.components.AlbumChipBar
 import com.akslabs.cloudgallery.ui.components.ExpressiveEmptyState
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
@@ -227,6 +230,9 @@ fun LocalPhotoGrid(
     onSelectionModeChange: (Boolean) -> Unit,
     onSelectedPhotosChange: (Set<String>) -> Unit,
     deletedPhotoIds: List<String> = emptyList(),
+    albums: List<AlbumInfo> = emptyList(),
+    selectedAlbumId: Long = -1L,
+    onAlbumSelected: (Long) -> Unit = {},
     navController: NavController,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
@@ -248,6 +254,11 @@ fun LocalPhotoGrid(
             onSelectionModeChange(false)
             onSelectedPhotosChange(emptySet())
         }
+    }
+
+    // BackHandler to reset album selection (maps to reference BackHandler(selectedAlbumIndex != -1L))
+    BackHandler(selectedAlbumId != -1L) {
+        onAlbumSelected(-1L)
     }
 
     fun toggleSelection(photoId: String) {
@@ -520,9 +531,19 @@ fun LocalPhotoGrid(
         return java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(photo.displayDateMillis))
     }
 
-    Box(
+    Column(
         modifier = Modifier.fillMaxSize()
     ) {
+        // ── Album chip bar (maps to reference topBar) ──────────────────
+        AlbumChipBar(
+            albums = albums,
+            selectedAlbumId = selectedAlbumId,
+            onAlbumSelected = onAlbumSelected
+        )
+
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // Only show loading if we don't have cached photos
         if (localPhotos.loadState.refresh == LoadState.Loading && allPhotos.isEmpty()) {
             LoadAnimation(modifier = Modifier.align(Alignment.Center))
@@ -688,6 +709,7 @@ fun LocalPhotoGrid(
             }
         }
     }
+    } // end Column
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)

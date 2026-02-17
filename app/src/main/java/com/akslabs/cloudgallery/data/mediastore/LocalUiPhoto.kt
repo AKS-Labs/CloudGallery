@@ -10,7 +10,9 @@ data class LocalUiPhoto(
     val mimeType: String,
     val displayDateMillis: Long,
     val size: Long = 0,
-    val remoteId: String? = null
+    val remoteId: String? = null,
+    val bucketId: Long = -1L,
+    val bucketName: String = ""
 ) : Parcelable
 
 

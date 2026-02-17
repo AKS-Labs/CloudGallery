@@ -104,7 +104,11 @@ fun AppNavHost(
             
             // Sync grid position if returning from viewer
             val lastViewedId by viewModel.lastViewedPhotoId.collectAsStateWithLifecycle()
-            val allMediaStorePhotos by viewModel.mediaStorePhotos.collectAsStateWithLifecycle()
+            val allMediaStorePhotos by viewModel.filteredMediaStorePhotos.collectAsStateWithLifecycle()
+
+            // Album chip bar data
+            val albums by viewModel.albums.collectAsStateWithLifecycle()
+            val selectedAlbumId by viewModel.selectedAlbumId.collectAsStateWithLifecycle()
 
             LocalPhotoGrid(
                 localPhotos = localPhotos,
@@ -117,6 +121,9 @@ fun AppNavHost(
                 onSelectionModeChange = onSelectionModeChange,
                 onSelectedPhotosChange = onSelectedPhotosChange,
                 deletedPhotoIds = deletedPhotoIds,
+                albums = albums,
+                selectedAlbumId = selectedAlbumId,
+                onAlbumSelected = { viewModel.selectAlbum(it) },
                 navController = navController,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this@composable,

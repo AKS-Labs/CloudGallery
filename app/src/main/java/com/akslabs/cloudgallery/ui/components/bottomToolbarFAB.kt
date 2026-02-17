@@ -144,7 +144,7 @@ fun BottomToolbarFAB(
                         Text(
                             text = "Long press to manage uploads",
                             style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(12.dp)
+                            modifier = Modifier.padding(6.dp)
                         )
                     }
                 },
