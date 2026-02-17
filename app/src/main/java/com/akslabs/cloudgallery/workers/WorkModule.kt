@@ -144,6 +144,10 @@ object WorkModule {
                     workDataOf(InstantPhotoUploadWorker.KEY_PHOTO_URI to uri.toString())
                 )
                 .setConstraints(constraints)
+                .setBackoffCriteria(
+                    backoffPolicy = BackoffPolicy.LINEAR,
+                    duration = Duration.ofMinutes(2)
+                )
                 .addTag("instant_upload")
                 .build()
 

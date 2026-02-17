@@ -45,8 +45,8 @@ class InstantPhotoUploadWorker(
                 }
                 Result.success()
             } catch (e: Throwable) {
-                Log.d("PhotoUpload", "FAILED: ${e.localizedMessage}")
-                Result.failure()
+                Log.d("PhotoUpload", "FAILED, will retry: ${e.localizedMessage}")
+                Result.retry()
             }
         }
     }

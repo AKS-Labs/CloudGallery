@@ -27,7 +27,9 @@ data class UploadUiItem(
     val thumbnailUri: String? = null,
     val fileName: String? = null,
     val totalItems: Int = 1,
-    val isCancellable: Boolean = true
+    val isCancellable: Boolean = true,
+    val localPhotoId: String? = null, // For click-to-open navigation
+    val timestamp: Long = System.currentTimeMillis() // When the work was observed
 )
 
 enum class UploadType {
@@ -48,7 +50,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
 
     private val workManager = WorkManager.getInstance(application)
 
-    // Observe manual backups (tagged "manual_backup") using WorkManager's flow API
+    // Observe manual backups (tagged "manual_backup")
     private val manualBackupFlow = workManager.getWorkInfosByTagFlow("manual_backup")
 
     // Observe instant uploads (tagged "instant_upload")
@@ -84,7 +86,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             .thenByDescending { it.status == UploadStatus.Failed })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Manual uploads only (manual backup + instant)
+    // Manual uploads only (manual backup + instant uploads by user)
     val manualUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
         items.filter { it.type == UploadType.ManualBackup || it.type == UploadType.Instant }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -92,6 +94,11 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     // Auto backup uploads only
     val autoBackupUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
         items.filter { it.type == UploadType.AutoBackup }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Failed uploads only
+    val failedUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
+        items.filter { it.status == UploadStatus.Failed }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private fun mapWorkInfoToUiItem(workInfo: WorkInfo, type: UploadType): UploadUiItem? {
@@ -110,6 +117,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         var thumbnailUri: String? = null
         var totalItems = 1
         var fileName: String? = null
+        var localPhotoId: String? = null
 
         when (type) {
             UploadType.ManualBackup, UploadType.AutoBackup -> {
@@ -120,30 +128,32 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
                 totalItems = if (max > 0) max else 1
                 progress = if (max > 0) current.toFloat() / max.toFloat() else 0f
                 progressText = when {
-                    status == UploadStatus.InProgress && max > 0 -> "Uploading $current of $max"
+                    status == UploadStatus.InProgress && max > 0 -> "Uploading $current of $max photos"
                     status == UploadStatus.InProgress -> "Preparing..."
-                    status == UploadStatus.Completed -> "Completed"
-                    status == UploadStatus.Failed -> "Failed"
+                    status == UploadStatus.Completed -> "All photos uploaded"
+                    status == UploadStatus.Failed -> "Upload failed — tap to retry"
                     status == UploadStatus.Cancelled -> "Cancelled"
-                    else -> "Waiting..."
+                    else -> "Waiting to start..."
                 }
                 thumbnailUri = currentUri?.ifEmpty { null }
                 fileName = if (type == UploadType.ManualBackup) "Manual Backup" else "Auto Backup"
             }
             UploadType.Instant -> {
-                // Get the photo URI from progress data or output data
-                thumbnailUri = progressData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)
+                // Get the photo URI from input data via progress or output
+                val inputUri = workInfo.progress.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)
+                thumbnailUri = inputUri
                     ?: workInfo.outputData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)
+                localPhotoId = thumbnailUri // The URI can be used to look up the photo
 
                 progress = if (status == UploadStatus.Completed) 1f else 0f
                 progressText = when (status) {
-                    UploadStatus.InProgress -> "Uploading..."
-                    UploadStatus.Completed -> "Uploaded"
-                    UploadStatus.Failed -> "Failed"
+                    UploadStatus.InProgress -> "Uploading photo..."
+                    UploadStatus.Completed -> "Uploaded successfully"
+                    UploadStatus.Failed -> "Upload failed — will auto retry"
                     UploadStatus.Cancelled -> "Cancelled"
-                    else -> "Waiting..."
+                    else -> "Waiting to start..."
                 }
-                fileName = "Single Photo"
+                fileName = "Single Photo Upload"
             }
         }
 
@@ -156,7 +166,8 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             thumbnailUri = thumbnailUri,
             totalItems = totalItems,
             fileName = fileName,
-            isCancellable = status == UploadStatus.InProgress || status == UploadStatus.Queued
+            isCancellable = status == UploadStatus.InProgress || status == UploadStatus.Queued,
+            localPhotoId = localPhotoId
         )
     }
 

@@ -1,5 +1,6 @@
 package com.akslabs.cloudgallery.ui.main.screens.uploads
 
+import android.text.format.DateUtils
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudQueue
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Refresh
@@ -56,7 +58,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -96,12 +97,13 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 
-// ─── Tab definitions ─────────────────────────────────────────────
+// ─── Tab definitions ────────────────────────────────────────────────
 private enum class UploadTab(val label: String, val icon: ImageVector) {
     All("All", Icons.Rounded.CloudUpload),
     Manual("Manual", Icons.Rounded.Upload),
     AutoBackup("Auto Backup", Icons.Rounded.Backup),
-    Queued("Queued", Icons.Rounded.Schedule)
+    Queued("Queued", Icons.Rounded.Schedule),
+    Failed("Failed", Icons.Rounded.ErrorOutline)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -114,6 +116,7 @@ fun ManageUploadsScreen(
     val allUploads by viewModel.allUploads.collectAsState()
     val manualUploads by viewModel.manualUploads.collectAsState()
     val autoBackupUploads by viewModel.autoBackupUploads.collectAsState()
+    val failedUploads by viewModel.failedUploads.collectAsState()
     val queuedPhotos by viewModel.queuedPhotos.collectAsState()
     val haptic = LocalHapticFeedback.current
 
@@ -123,7 +126,7 @@ fun ManageUploadsScreen(
     // Stats
     val activeCount = allUploads.count { it.status == UploadStatus.InProgress }
     val completedCount = allUploads.count { it.status == UploadStatus.Completed }
-    val failedCount = allUploads.count { it.status == UploadStatus.Failed }
+    val failedCount = failedUploads.size
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -152,7 +155,7 @@ fun ManageUploadsScreen(
                             }
                             if (queuedPhotos.isNotEmpty()) {
                                 StatPill(
-                                    text = "${queuedPhotos.size} queued",
+                                    text = "${queuedPhotos.size} pending",
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
@@ -179,7 +182,9 @@ fun ManageUploadsScreen(
                         onClick = { navController.navigateUp() },
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         shape = CircleShape,
-                        modifier = Modifier.padding(start = 12.dp).size(40.dp)
+                        modifier = Modifier
+                            .padding(start = 12.dp)
+                            .size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -199,7 +204,9 @@ fun ManageUploadsScreen(
                             },
                             color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
                             shape = CircleShape,
-                            modifier = Modifier.padding(end = 8.dp).size(40.dp)
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .size(40.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
@@ -227,17 +234,25 @@ fun ManageUploadsScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            // ─── Scrollable Tab Row with pills ───────────────────
+            // ─── Scrollable Tab Row ──────────────────────────────
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 edgePadding = 16.dp,
                 containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.primary,
                 divider = {},
-                indicator = {} // We handle selection via Surface color on each tab
+                indicator = {}
             ) {
                 tabs.forEachIndexed { index, tab ->
                     val isSelected = selectedTab == index
+                    // Count for badge
+                    val count = when (tab) {
+                        UploadTab.All -> allUploads.size + queuedPhotos.size
+                        UploadTab.Manual -> manualUploads.size
+                        UploadTab.AutoBackup -> autoBackupUploads.size
+                        UploadTab.Queued -> queuedPhotos.size
+                        UploadTab.Failed -> failedCount
+                    }
                     Tab(
                         selected = isSelected,
                         onClick = {
@@ -248,19 +263,27 @@ fun ManageUploadsScreen(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                            else MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isSelected) {
+                                if (tab == UploadTab.Failed && failedCount > 0)
+                                    MaterialTheme.colorScheme.errorContainer
+                                else
+                                    MaterialTheme.colorScheme.primaryContainer
+                            } else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = if (isSelected) {
+                                if (tab == UploadTab.Failed && failedCount > 0)
+                                    MaterialTheme.colorScheme.onErrorContainer
+                                else
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                            } else MaterialTheme.colorScheme.onSurfaceVariant
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(tab.icon, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Text(
-                                    text = tab.label,
+                                    text = if (count > 0) "${tab.label} ($count)" else tab.label,
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
@@ -270,7 +293,7 @@ fun ManageUploadsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // ─── Content per tab ─────────────────────────────────
             AnimatedContent(
@@ -282,42 +305,56 @@ fun ManageUploadsScreen(
                 label = "tab_content"
             ) { tab ->
                 when (tab) {
-                    0 -> UploadListContent(
+                    0 -> UploadListContent( // All
                         uploads = allUploads,
                         queuedPhotos = queuedPhotos,
                         showQueued = true,
                         onCancel = { viewModel.cancelUpload(it) },
-                        onPhotoClick = { photoId -> navigateToViewer(navController, photoId) },
+                        onRetry = { viewModel.retryAllFailed() },
                         navController = navController
                     )
-                    1 -> UploadListContent(
+                    1 -> UploadListContent( // Manual
                         uploads = manualUploads,
                         queuedPhotos = emptyList(),
                         showQueued = false,
                         onCancel = { viewModel.cancelUpload(it) },
-                        onPhotoClick = { photoId -> navigateToViewer(navController, photoId) },
+                        onRetry = { viewModel.retryAllFailed() },
                         navController = navController,
-                        emptyMessage = "No manual uploads",
+                        emptyMessage = "No manual uploads yet",
+                        emptySubMessage = "Select photos and upload to cloud to see them here",
                         emptyIcon = Icons.Rounded.UploadFile
                     )
-                    2 -> UploadListContent(
+                    2 -> UploadListContent( // Auto Backup
                         uploads = autoBackupUploads,
                         queuedPhotos = emptyList(),
                         showQueued = false,
                         onCancel = { viewModel.cancelUpload(it) },
-                        onPhotoClick = { photoId -> navigateToViewer(navController, photoId) },
+                        onRetry = { viewModel.retryAllFailed() },
                         navController = navController,
                         emptyMessage = "No automatic backups",
+                        emptySubMessage = "Enable auto backup in Settings to start",
                         emptyIcon = Icons.Rounded.Backup
                     )
-                    3 -> UploadListContent(
+                    3 -> UploadListContent( // Queued
                         uploads = emptyList(),
                         queuedPhotos = queuedPhotos,
                         showQueued = true,
                         onCancel = {},
-                        onPhotoClick = { photoId -> navigateToViewer(navController, photoId) },
+                        onRetry = { viewModel.retryAllFailed() },
                         navController = navController,
                         emptyMessage = "All photos are uploaded!",
+                        emptySubMessage = "Every photo is safely backed up to the cloud",
+                        emptyIcon = Icons.Rounded.CloudDone
+                    )
+                    4 -> UploadListContent( // Failed
+                        uploads = failedUploads,
+                        queuedPhotos = emptyList(),
+                        showQueued = false,
+                        onCancel = { viewModel.cancelUpload(it) },
+                        onRetry = { viewModel.retryAllFailed() },
+                        navController = navController,
+                        emptyMessage = "No failed uploads",
+                        emptySubMessage = "Everything is running smoothly!",
                         emptyIcon = Icons.Rounded.CloudDone
                     )
                 }
@@ -326,15 +363,7 @@ fun ManageUploadsScreen(
     }
 }
 
-private fun navigateToViewer(navController: NavController, photoId: String) {
-    try {
-        navController.navigate("photo_viewer/$photoId/false")
-    } catch (e: Exception) {
-        // Silently handle navigation errors
-    }
-}
-
-// ─── Stat pill ───────────────────────────────────────────────────
+// ─── Stat Pill ───────────────────────────────────────────────────
 @Composable
 private fun StatPill(
     text: String,
@@ -364,15 +393,15 @@ private fun UploadListContent(
     queuedPhotos: List<Photo>,
     showQueued: Boolean,
     onCancel: (String) -> Unit,
-    onPhotoClick: (String) -> Unit,
+    onRetry: () -> Unit,
     navController: NavController,
     emptyMessage: String = "Nothing here yet",
+    emptySubMessage: String = "",
     emptyIcon: ImageVector = Icons.Rounded.CloudQueue
 ) {
     val isEmpty = uploads.isEmpty() && (!showQueued || queuedPhotos.isEmpty())
 
     if (isEmpty) {
-        // ─── Empty state ─────────────────────────────────────
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -391,26 +420,33 @@ private fun UploadListContent(
                             imageVector = emptyIcon,
                             contentDescription = null,
                             modifier = Modifier.size(36.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
                     }
                 }
                 Text(
                     text = emptyMessage,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Medium
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.SemiBold
                 )
+                if (emptySubMessage.isNotEmpty()) {
+                    Text(
+                        text = emptySubMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                    )
+                }
             }
         }
     } else {
         LazyColumn(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Active / worker uploads
             if (uploads.isNotEmpty()) {
-                item {
+                item(key = "header_active") {
                     SectionHeader(
                         title = "Active & Recent",
                         icon = Icons.Rounded.CloudUpload
@@ -420,10 +456,9 @@ private fun UploadListContent(
                     UploadItemCard(
                         item = item,
                         onCancel = { onCancel(item.id) },
+                        onRetry = onRetry,
                         onTap = {
-                            if (item.thumbnailUri != null) {
-                                onPhotoClick(item.id)
-                            }
+                            navigateToPhotoFromUri(navController, item.thumbnailUri)
                         },
                         modifier = Modifier.animateItem()
                     )
@@ -432,8 +467,8 @@ private fun UploadListContent(
 
             // Queued from DB
             if (showQueued && queuedPhotos.isNotEmpty()) {
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
+                item(key = "header_queued") {
+                    Spacer(modifier = Modifier.height(4.dp))
                     SectionHeader(
                         title = "Pending Upload (${queuedPhotos.size})",
                         icon = Icons.Rounded.HourglassTop
@@ -442,13 +477,26 @@ private fun UploadListContent(
                 items(queuedPhotos, key = { "queued_${it.localId}" }) { photo ->
                     QueuedPhotoCard(
                         photo = photo,
-                        onTap = { onPhotoClick(photo.localId) },
+                        onTap = {
+                            try {
+                                navController.navigate("photo_viewer/${photo.localId}/false")
+                            } catch (_: Exception) {}
+                        },
                         modifier = Modifier.animateItem()
                     )
                 }
             }
         }
     }
+}
+
+private fun navigateToPhotoFromUri(navController: NavController, uri: String?) {
+    if (uri.isNullOrEmpty()) return
+    try {
+        // Try to navigate using the URI as a localId path
+        // The photo viewer should handle content URIs
+        navController.navigate("photo_viewer/${java.net.URLEncoder.encode(uri, "UTF-8")}/false")
+    } catch (_: Exception) {}
 }
 
 // ─── Section Header ──────────────────────────────────────────────
@@ -475,12 +523,13 @@ private fun SectionHeader(title: String, icon: ImageVector) {
     }
 }
 
-// ─── Upload Item Card (worker-based) ─────────────────────────────
+// ─── Upload Item Card ────────────────────────────────────────────
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UploadItemCard(
     item: UploadUiItem,
     onCancel: () -> Unit,
+    onRetry: () -> Unit,
     onTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -489,7 +538,9 @@ private fun UploadItemCard(
 
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = if (item.status == UploadStatus.Failed)
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
+        else MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 1.dp,
         modifier = modifier
             .fillMaxWidth()
@@ -505,7 +556,7 @@ private fun UploadItemCard(
     ) {
         Column {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // ─── Thumbnail ───────────────────────────────
@@ -527,14 +578,14 @@ private fun UploadItemCard(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
-                        // Gradient scrim for status badge visibility
+                        // Gradient scrim
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
                                     Brush.verticalGradient(
                                         0f to Color.Transparent,
-                                        1f to Color.Black.copy(alpha = 0.15f)
+                                        1f to Color.Black.copy(alpha = 0.1f)
                                     )
                                 )
                         )
@@ -547,14 +598,16 @@ private fun UploadItemCard(
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(28.dp)
                         )
                     }
-                    // Small status badge
+                    // Status badge overlay
                     StatusBadge(
                         status = item.status,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(3.dp)
                     )
                 }
 
@@ -570,91 +623,151 @@ private fun UploadItemCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(2.dp))
+
+                    // Status text
                     Text(
                         text = item.progressText.ifEmpty { item.status.name },
                         style = MaterialTheme.typography.bodySmall,
                         color = statusColor(item.status),
                         fontWeight = FontWeight.Medium
                     )
-                    // Upload type label
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = typeColor(item.type).copy(alpha = 0.12f),
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(top = 4.dp)
                     ) {
+                        // Upload type chip
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = typeColor(item.type).copy(alpha = 0.12f),
+                        ) {
+                            Text(
+                                text = when (item.type) {
+                                    UploadType.ManualBackup -> "Manual"
+                                    UploadType.AutoBackup -> "Auto"
+                                    UploadType.Instant -> "Instant"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = typeColor(item.type),
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        // Item count chip (for batch uploads)
+                        if (item.totalItems > 1) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            ) {
+                                Text(
+                                    text = "${item.totalItems} photos",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        // Timestamp
                         Text(
-                            text = when (item.type) {
-                                UploadType.ManualBackup -> "Manual"
-                                UploadType.AutoBackup -> "Auto"
-                                UploadType.Instant -> "Instant"
-                            },
+                            text = DateUtils.getRelativeTimeSpanString(
+                                item.timestamp,
+                                System.currentTimeMillis(),
+                                DateUtils.MINUTE_IN_MILLIS,
+                                DateUtils.FORMAT_ABBREV_RELATIVE
+                            ).toString(),
                             style = MaterialTheme.typography.labelSmall,
-                            color = typeColor(item.type),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
                     }
                 }
 
-                // ─── Cancel button ───────────────────────────
-                AnimatedVisibility(
-                    visible = item.isCancellable,
-                    enter = fadeIn() + scaleIn(),
-                    exit = fadeOut()
-                ) {
+                // ─── Action button ───────────────────────────
+                if (item.status == UploadStatus.Failed) {
+                    // Retry button for failed
                     Surface(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onCancel()
+                            onRetry()
                         },
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.errorContainer,
                         modifier = Modifier.size(36.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Rounded.Cancel,
-                                contentDescription = "Cancel",
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = "Retry",
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
                     }
+                } else {
+                    AnimatedVisibility(
+                        visible = item.isCancellable,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut()
+                    ) {
+                        Surface(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onCancel()
+                            },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Cancel,
+                                    contentDescription = "Cancel",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            // ─── Progress bar ───────────────────────────────
+            // ─── Progress bar ────────────────────────────────
             AnimatedVisibility(visible = item.status == UploadStatus.InProgress) {
-                val animatedProgress by animateFloatAsState(
-                    targetValue = item.progress,
-                    animationSpec = spring(stiffness = Spring.StiffnessLow),
-                    label = "progress"
-                )
-                if (item.progress > 0f) {
-                    LinearProgressIndicator(
-                        progress = { animatedProgress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .padding(horizontal = 16.dp),
-                        strokeCap = StrokeCap.Round,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                Column {
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = item.progress,
+                        animationSpec = spring(stiffness = Spring.StiffnessLow),
+                        label = "progress"
                     )
-                } else {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .padding(horizontal = 16.dp),
-                        strokeCap = StrokeCap.Round,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    )
+                    if (item.progress > 0f) {
+                        LinearProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .padding(horizontal = 14.dp),
+                            strokeCap = StrokeCap.Round,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .padding(horizontal = 14.dp),
+                            strokeCap = StrokeCap.Round,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
         }
 
-        // ─── Long-press context menu ─────────────────────
+        // ─── Long-press context menu ─────────────────────────
         DropdownMenu(
             expanded = showContextMenu,
             onDismissRequest = { showContextMenu = false },
@@ -672,16 +785,29 @@ private fun UploadItemCard(
             }
             if (item.status == UploadStatus.Failed) {
                 DropdownMenuItem(
-                    text = { Text("Retry") },
+                    text = { Text("Retry Upload") },
                     leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                    onClick = { showContextMenu = false }
+                    onClick = {
+                        onRetry()
+                        showContextMenu = false
+                    }
+                )
+            }
+            if (item.thumbnailUri != null) {
+                DropdownMenuItem(
+                    text = { Text("View Photo") },
+                    leadingIcon = { Icon(Icons.Rounded.Image, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    onClick = {
+                        showContextMenu = false
+                        onTap()
+                    }
                 )
             }
         }
     }
 }
 
-// ─── Queued Photo Card (from database) ───────────────────────────
+// ─── Queued Photo Card ───────────────────────────────────────────
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun QueuedPhotoCard(
@@ -737,7 +863,7 @@ private fun QueuedPhotoCard(
                 Text(
                     text = "Waiting for upload",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
 
@@ -745,13 +871,24 @@ private fun QueuedPhotoCard(
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
             ) {
-                Text(
-                    text = "Queued",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = "Queued",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
             }
         }
     }
@@ -762,7 +899,7 @@ private fun QueuedPhotoCard(
 private fun StatusBadge(status: UploadStatus, modifier: Modifier = Modifier) {
     val (color, icon) = when (status) {
         UploadStatus.Queued -> MaterialTheme.colorScheme.secondary to Icons.Rounded.Schedule
-        UploadStatus.InProgress -> MaterialTheme.colorScheme.primary to null // Use spinner
+        UploadStatus.InProgress -> MaterialTheme.colorScheme.primary to null
         UploadStatus.Completed -> MaterialTheme.colorScheme.primary to Icons.Rounded.CheckCircle
         UploadStatus.Failed -> MaterialTheme.colorScheme.error to Icons.Rounded.Warning
         UploadStatus.Cancelled -> MaterialTheme.colorScheme.outline to Icons.Rounded.Cancel
@@ -792,7 +929,7 @@ private fun StatusBadge(status: UploadStatus, modifier: Modifier = Modifier) {
     }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────
+// ─── Color helpers ───────────────────────────────────────────────
 @Composable
 private fun statusColor(status: UploadStatus): Color = when (status) {
     UploadStatus.Queued -> MaterialTheme.colorScheme.onSurfaceVariant

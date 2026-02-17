@@ -106,18 +106,16 @@ class PeriodicPhotoBackupWorker(
                         tempFile.writeBytes(outputBytes)
                         sendFileApi(botApi, channelId, uri, tempFile, ext!!, appContext)
                     } catch (e: IOException) {
-                        return@withContext Result.failure(
-                            workDataOf(KEY_RESULT_ERROR to "${e.message}")
-                        )
+                        Log.e("PeriodicBackup", "IO error on photo ${index + 1}, will retry: ${e.message}")
+                        return@withContext Result.retry()
                     } finally {
                         tempFile.deleteOnExit()
                     }
                 }
                 Result.success()
             } catch (e: Exception) {
-                Result.failure(
-                    workDataOf(KEY_RESULT_ERROR to "${e.message}")
-                )
+                Log.e("PeriodicBackup", "Backup failed, will retry: ${e.message}")
+                Result.retry()
             }
         }
     }
