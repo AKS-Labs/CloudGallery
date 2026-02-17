@@ -74,8 +74,12 @@ import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
 import coil.compose.AsyncImage
 import com.akslabs.cloudgallery.data.mediastore.AlbumInfo
 
@@ -109,8 +113,8 @@ fun AlbumChipBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // Maps to reference: `.background(MaterialTheme.colorScheme.surfaceContainer)`
-                .background(MaterialTheme.colorScheme.surfaceContainer),
+                // Match app bar background
+                .background(MaterialTheme.colorScheme.surface),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // ── LazyRow of album chips ──────────────────────────────────
@@ -119,9 +123,9 @@ fun AlbumChipBar(
                 modifier = Modifier
                     .weight(1f)
                     .fadingEdges(listState)
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(start = 8.dp, end = 8.dp),
+                    .padding(vertical = 0.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(start = 17.dp, end = 8.dp),
                 state = listState
             ) {
                 items(
@@ -134,7 +138,7 @@ fun AlbumChipBar(
 
                     // Maps to reference `animateDpAsState` for content padding
                     val horizontalPadding by animateDpAsState(
-                        targetValue = if (isImageVisible) 8.dp else 12.dp,
+                        targetValue = if (isImageVisible) 0.dp else 0.dp,
                         label = "chip_h_padding"
                     )
                     val verticalPadding by animateDpAsState(
@@ -201,23 +205,23 @@ fun AlbumChipBar(
                                                     contentDescription = album.label,
                                                     contentScale = ContentScale.Crop,
                                                     modifier = Modifier
-                                                        .padding(top = 8.dp)
+                                                        .padding(top = 2.dp)
                                                         .height(100.dp)
                                                         .width(measuredWidth)
-                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .clip(RoundedCornerShape(12.dp))
                                                 )
                                             }
 
                                             // Maps to reference semi-transparent overlay with count
                                             Box(
                                                 modifier = Modifier
-                                                    .padding(top = 8.dp)
+                                                    .padding(top = 2.dp)
                                                     .height(100.dp)
                                                     .width(measuredWidth)
-                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clip(RoundedCornerShape(12.dp))
                                                     .background(
-                                                        MaterialTheme.colorScheme.surfaceContainer
-                                                            .copy(alpha = 0.6f)
+                                                        // Removed whitish tint, use subtle dark overlay for text readability
+                                                        Color.Black.copy(alpha = 0.0f)
                                                     ),
                                                 contentAlignment = Alignment.Center
                                             ) {
@@ -226,9 +230,16 @@ fun AlbumChipBar(
                                                     text = album.count.toString(),
                                                     style = MaterialTheme.typography.headlineLarge.copy(
                                                         fontSize = 20.sp,
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                        fontWeight = FontWeight.Bold
+                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        fontWeight = FontWeight.Bold,
+//                                                        shadow = Shadow(
+//                                                            color = Color.Black.copy(alpha = 0.6f),
+//                                                            offset = Offset(0f, 2f),
+//                                                            blurRadius = 6f
+//                                                        )
+
                                                     )
+
                                                 )
                                             }
                                         }
@@ -236,7 +247,7 @@ fun AlbumChipBar(
                                 }
                             }
                         },
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(24.dp),
                         colors = FilterChipDefaults.filterChipColors(
                             // Maps to reference `selectedColor = secondaryContainer`
                             selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -252,7 +263,17 @@ fun AlbumChipBar(
 
             // ── Expand/collapse toggle ──────────────────────────────────
             // Maps to reference `EnhancedIconButton(onClick = { showAlbumThumbnail = !showAlbumThumbnail })`
-            IconButton(onClick = { showThumbnails = !showThumbnails }) {
+            IconButton(
+                onClick = { showThumbnails = !showThumbnails },
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .then(
+                        if (showThumbnails) Modifier.background(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                            shape = CircleShape
+                        ) else Modifier
+                    )
+            ) {
                 // Maps to reference `animateFloatAsState(if (showAlbumThumbnail) 180f else 0f)`
                 val rotation by animateFloatAsState(
                     targetValue = if (showThumbnails) 180f else 0f,
@@ -265,12 +286,6 @@ fun AlbumChipBar(
                 )
             }
         }
-
-        // Maps to reference `drawHorizontalStroke()` — bottom divider
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant,
-            thickness = 0.5.dp
-        )
     }
 }
 
