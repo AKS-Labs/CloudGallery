@@ -83,7 +83,8 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     val allUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
         items.sortedWith(compareByDescending<UploadUiItem> { it.status == UploadStatus.InProgress }
             .thenByDescending { it.status == UploadStatus.Queued }
-            .thenByDescending { it.status == UploadStatus.Failed })
+            .thenByDescending { it.status == UploadStatus.Failed }
+            .thenByDescending { it.timestamp })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Manual uploads only (manual backup + instant uploads by user)

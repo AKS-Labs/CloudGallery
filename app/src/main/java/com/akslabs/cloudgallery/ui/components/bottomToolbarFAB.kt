@@ -38,12 +38,16 @@ import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.Text
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -118,14 +122,33 @@ fun BottomToolbarFAB(
             val containerColor = if (isUploading) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer
             val contentColor = if (isUploading) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
 
+            val tooltipState = rememberTooltipState()
+            val scope = rememberCoroutineScope()
+            
+            LaunchedEffect(isUploading) {
+                if (isUploading) {
+                    tooltipState.show()
+                }
+            }
+
             TooltipBox(
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(
+                    spacingBetweenTooltipAndAnchor = 56.dp
+                ),
                 tooltip = {
-                    PlainTooltip {
-                        Text("Long press to manage uploads")
+                    PlainTooltip(
+                        containerColor = MaterialTheme.colorScheme.inverseSurface,
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                    ) {
+                        Text(
+                            text = "Long press to manage uploads",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(12.dp)
+                        )
                     }
                 },
-                state = rememberTooltipState()
+                state = tooltipState
             ) {
                 Surface(
                     modifier = Modifier
@@ -134,6 +157,7 @@ fun BottomToolbarFAB(
                         .clip(FloatingToolbarDefaults.ContainerShape)
                         .combinedClickable(
                             onClick = {
+                                scope.launch { tooltipState.show() }
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 if (isUploading) {
                                     try {
