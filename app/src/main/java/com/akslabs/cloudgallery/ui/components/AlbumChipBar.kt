@@ -122,7 +122,7 @@ fun AlbumChipBar(
             LazyRow(
                 modifier = Modifier
                     .weight(1f)
-                    .fadingEdges(listState)
+//                    .fadingEdges(listState)
                     .padding(vertical = 0.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(start = 17.dp, end = 8.dp),
@@ -230,13 +230,14 @@ fun AlbumChipBar(
                                                     text = album.count.toString(),
                                                     style = MaterialTheme.typography.headlineLarge.copy(
                                                         fontSize = 20.sp,
-                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        color = Color.White,
+//                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
                                                         fontWeight = FontWeight.Bold,
-//                                                        shadow = Shadow(
-//                                                            color = Color.Black.copy(alpha = 0.6f),
-//                                                            offset = Offset(0f, 2f),
-//                                                            blurRadius = 6f
-//                                                        )
+                                                        shadow = Shadow(
+                                                            color = Color.Black,
+                                                            offset = Offset(0f, 0f), // center
+                                                            blurRadius = 22f
+                                                        )
 
                                                     )
 
@@ -295,7 +296,7 @@ fun AlbumChipBar(
 // ──────────────────────────────────────────────────────────────────────────────
 private fun Modifier.fadingEdges(
     listState: LazyListState,
-    edgeWidth: Float = 48f
+    edgeWidth: Float = 16f
 ): Modifier = this
     .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
     .drawWithContent {
