@@ -241,7 +241,8 @@ fun LocalPhotoGrid(
     savedIndex: Int = 0,
     savedOffset: Int = 0,
     onSaveScrollState: (String, Int, Int) -> Unit = { _, _, _ -> },
-    onLastViewedPhotoConsumed: () -> Unit = {}
+    onLastViewedPhotoConsumed: () -> Unit = {},
+    showTopBars: Boolean = true
 ) {
     val context = LocalContext.current
 
@@ -535,11 +536,17 @@ fun LocalPhotoGrid(
         modifier = Modifier.fillMaxSize()
     ) {
         // ── Album chip bar (maps to reference topBar) ──────────────────
-        AlbumChipBar(
-            albums = albums,
-            selectedAlbumId = selectedAlbumId,
-            onAlbumSelected = onAlbumSelected
-        )
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showTopBars,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            AlbumChipBar(
+                albums = albums,
+                selectedAlbumId = selectedAlbumId,
+                onAlbumSelected = onAlbumSelected
+            )
+        }
 
         Box(
             modifier = Modifier.fillMaxSize()

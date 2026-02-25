@@ -565,6 +565,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 contentWindowInsets = WindowInsets.navigationBars
             ) { paddingValues ->
                     CompositionLocalProvider(LocalGridState provides gridState) {
+                        val isAppBarVisible = scrollBehavior.state.heightOffset > -1f
                         AppNavHost(
                             modifier = Modifier
                                 .padding(paddingValues)
@@ -579,7 +580,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                             deletedPhotoIds = deletedPhotoIds,
                             sharedTransitionScope = this@SharedTransitionLayout,
                             animatedVisibilityScope = null,
-                            viewModel = viewModel
+                            viewModel = viewModel,
+                            showTopBars = isAppBarVisible
                         )
                     }
                 }

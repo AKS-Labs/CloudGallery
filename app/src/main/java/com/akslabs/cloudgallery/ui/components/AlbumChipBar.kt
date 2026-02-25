@@ -79,6 +79,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.Surface
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Shadow
 import coil.compose.AsyncImage
@@ -259,11 +260,19 @@ fun AlbumChipBar(
                 }
             }
 
-            // ── Expand/collapse toggle (Now an Overlapping Chip) ────────
-            FilterChip(
-                selected = showThumbnails,
+            // ── Expand/collapse toggle (Circular M3 Expressive Toggle) ──
+            Surface(
                 onClick = { showThumbnails = !showThumbnails },
-                label = {
+                modifier = Modifier
+                    .padding(end = 3.dp)
+                    .size(34.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceDim,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+//                tonalElevation = 2.dp,
+//                shadowElevation = 2.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
                     val rotation by animateFloatAsState(
                         targetValue = if (showThumbnails) 180f else 0f,
                         label = "arrow_rotation"
@@ -275,17 +284,8 @@ fun AlbumChipBar(
                             .rotate(rotation)
                             .size(24.dp)
                     )
-                },
-                modifier = Modifier.padding(end = 8.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f),
-                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
-                border = null
-            )
+                }
+            }
         }
     }
 }

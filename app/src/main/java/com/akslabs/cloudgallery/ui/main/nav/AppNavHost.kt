@@ -43,7 +43,8 @@ fun AppNavHost(
     deletedPhotoIds: List<String> = emptyList(),
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    viewModel: MainViewModel
+    viewModel: MainViewModel,
+    showTopBars: Boolean = true
 ) {
     val currentSelectionMode by rememberUpdatedState(selectionMode)
     val currentOnSelectionModeChange by rememberUpdatedState(onSelectionModeChange)
@@ -132,7 +133,8 @@ fun AppNavHost(
                 savedIndex = viewModel.savedScrollIndex,
                 savedOffset = viewModel.savedScrollOffset,
                 onSaveScrollState = { id, index, offset -> viewModel.saveScrollState(id, index, offset) },
-                onLastViewedPhotoConsumed = { viewModel.updateLastViewedPhotoId("") }
+                onLastViewedPhotoConsumed = { viewModel.updateLastViewedPhotoId("") },
+                showTopBars = showTopBars
             )
         }
 
