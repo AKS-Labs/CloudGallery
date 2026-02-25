@@ -402,7 +402,7 @@ private fun UploadListContent(
     emptyMessage: String = "Nothing here yet",
     emptySubMessage: String = "",
     emptyIcon: ImageVector = Icons.Rounded.CloudQueue,
-    activeTitle: String = "Active & Recent"
+    activeTitle: String = "Active"
 ) {
     val isEmpty = uploads.isEmpty() && (!showQueued || queuedPhotos.isEmpty())
 
@@ -446,22 +446,51 @@ private fun UploadListContent(
         }
     } else {
         LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp, 
+                end = 16.dp, 
+                top = 0.dp, // Reduced top padding to fix blank space
+                bottom = 16.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Active / worker uploads
-            if (uploads.isNotEmpty()) {
+            // ─── Active worker uploads ───────────────────────
+            val activeItems = uploads.filter { it.status != UploadStatus.Completed }
+            if (activeItems.isNotEmpty()) {
                 item(key = "header_active") {
                     SectionHeader(
                         title = activeTitle,
                         icon = Icons.Rounded.CloudUpload
                     )
                 }
-                items(uploads, key = { it.id }) { item ->
+                items(activeItems, key = { it.id }) { item ->
                     UploadItemCard(
                         item = item,
                         onCancel = { onCancel(item.id) },
                         onRetry = onRetry,
+                        onTap = {
+                            navigateToPhotoFromUri(navController, item.thumbnailUri)
+                        },
+                        modifier = Modifier.animateItem()
+                    )
+                }
+            }
+ 
+            // ─── Synced/History from DB ──────────────────────
+            val syncedItems = uploads.filter { it.status == UploadStatus.Completed }
+            if (syncedItems.isNotEmpty()) {
+                item(key = "header_synced") {
+                    if (activeItems.isNotEmpty()) Spacer(modifier = Modifier.height(8.dp))
+                    SectionHeader(
+                        title = "Recently Synced",
+                        icon = Icons.Rounded.CloudDone
+                    )
+                }
+                items(syncedItems, key = { it.id }) { item ->
+                    UploadItemCard(
+                        item = item,
+                        onCancel = {},
+                        onRetry = {},
                         onTap = {
                             navigateToPhotoFromUri(navController, item.thumbnailUri)
                         },
@@ -495,12 +524,16 @@ private fun UploadListContent(
     }
 }
 
-private fun navigateToPhotoFromUri(navController: NavController, uri: String?) {
-    if (uri.isNullOrEmpty()) return
+private fun navigateToPhotoFromUri(navController: NavController, uri: Any?) {
+    if (uri == null) return
     try {
-        // Try to navigate using the URI as a localId path
-        // The photo viewer should handle content URIs
-        navController.navigate("photo_viewer/${java.net.URLEncoder.encode(uri, "UTF-8")}/false")
+        val idToNavigate = when (uri) {
+            is com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto -> uri.remoteId
+            is String -> uri
+            else -> uri.toString()
+        }
+        val isRemote = uri is com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
+        navController.navigate("photo_viewer/${java.net.URLEncoder.encode(idToNavigate, "UTF-8")}/$isRemote")
     } catch (_: Exception) {}
 }
 
@@ -574,6 +607,7 @@ private fun UploadItemCard(
                 ) {
                     if (item.thumbnailUri != null) {
                         AsyncImage(
+                            imageLoader = com.akslabs.cloudgallery.utils.coil.ImageLoaderModule.thumbnailImageLoader,
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(item.thumbnailUri)
                                 .crossfade(true)

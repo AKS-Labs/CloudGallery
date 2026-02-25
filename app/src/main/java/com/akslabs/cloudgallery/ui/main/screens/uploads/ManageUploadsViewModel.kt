@@ -24,7 +24,7 @@ data class UploadUiItem(
     val status: UploadStatus,
     val progress: Float = 0f,
     val progressText: String = "",
-    val thumbnailUri: String? = null,
+    val thumbnailUri: Any? = null,
     val fileName: String? = null,
     val totalItems: Int = 1,
     val isCancellable: Boolean = true,
@@ -79,33 +79,71 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     val queuedPhotos: StateFlow<List<Photo>> = DbHolder.database.photoDao().getAllNotUploadedFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // All uploads sorted by status
-    val allUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
-        items.sortedWith(compareByDescending<UploadUiItem> { it.status == UploadStatus.InProgress }
-            .thenByDescending { it.status == UploadStatus.Queued }
-            .thenByDescending { it.status == UploadStatus.Failed }
-            .thenByDescending { it.timestamp })
+    // All uploads from DB (RemotePhoto table)
+    private val remotePhotosFlow = DbHolder.database.remotePhotoDao().getAllFlow()
+ 
+    // All uploads sorted by status and merging DB history
+    val allUploads: StateFlow<List<UploadUiItem>> = combine(allWorkFlow, remotePhotosFlow) { workItems, dbItems ->
+        val dbUploads = dbItems.map { mapRemotePhotoToUiItem(it) }
+        val activeIds = workItems.mapNotNull { it.id }.toSet()
+        // Deduplicate: If an item is active in WorkManager, don't show the DB record if it might be the same
+        val filteredDb = dbUploads.filter { it.id !in activeIds }
+        
+        (workItems + filteredDb).sortedWith(
+            compareByDescending<UploadUiItem> { it.status == UploadStatus.InProgress }
+                .thenByDescending { it.status == UploadStatus.Queued }
+                .thenByDescending { it.status == UploadStatus.Failed }
+                .thenByDescending { it.timestamp }
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    // Manual uploads only (manual backup + instant uploads by user)
-    val manualUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
-        items.filter { it.type == UploadType.ManualBackup || it.type == UploadType.Instant }
+ 
+    // Manual uploads only (manual backup + instant uploads + DB history of these types)
+    val manualUploads: StateFlow<List<UploadUiItem>> = combine(allWorkFlow, remotePhotosFlow) { workItems, dbItems ->
+        val manualWork = workItems.filter { it.type == UploadType.ManualBackup || it.type == UploadType.Instant }
+        val manualDb = dbItems
+            .filter { it.uploadType == "manual_backup" || it.uploadType == "instant" }
+            .map { mapRemotePhotoToUiItem(it) }
+        
+        val activeIds = manualWork.map { it.id }.toSet()
+        val filteredDb = manualDb.filter { it.id !in activeIds }
+        
+        (manualWork + filteredDb).sortedByDescending { it.timestamp }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    // Auto backup uploads only
+ 
+    // Auto backup uploads only (Active work)
     val autoBackupUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
         items.filter { it.type == UploadType.AutoBackup }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
+ 
     // Failed uploads only
     val failedUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
         items.filter { it.status == UploadStatus.Failed }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    // Synced/Completed uploads only
-    val syncedUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
-        items.filter { it.status == UploadStatus.Completed }
+ 
+    // Synced/Completed uploads history (All DB records)
+    val syncedUploads: StateFlow<List<UploadUiItem>> = remotePhotosFlow.map { items ->
+        items.map { mapRemotePhotoToUiItem(it) }
+            .sortedByDescending { it.timestamp }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+ 
+    private fun mapRemotePhotoToUiItem(remote: com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto): UploadUiItem {
+        return UploadUiItem(
+            id = remote.remoteId,
+            type = when (remote.uploadType) {
+                "manual_backup" -> UploadType.ManualBackup
+                "instant" -> UploadType.Instant
+                else -> UploadType.AutoBackup
+            },
+            status = UploadStatus.Completed,
+            progress = 1f,
+            progressText = "Synced to Cloud",
+            thumbnailUri = remote, // Pass the object so Coil uses the custom fetcher
+            totalItems = 1,
+            fileName = remote.fileName ?: "Uploaded Photo",
+            isCancellable = false,
+            timestamp = remote.uploadedAt
+        )
+    }
 
     private fun mapWorkInfoToUiItem(workInfo: WorkInfo, type: UploadType): UploadUiItem? {
         val status = when (workInfo.state) {
@@ -149,10 +187,10 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             }
             UploadType.Instant -> {
                 // Get the photo URI from input data via progress or output
-                val inputUri = workInfo.progress.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)
-                thumbnailUri = inputUri
+                val inputUriString = workInfo.progress.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)
                     ?: workInfo.outputData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)
-                localPhotoId = thumbnailUri // The URI can be used to look up the photo
+                thumbnailUri = inputUriString
+                localPhotoId = inputUriString // The URI string can be used to look up the photo
 
                 progress = if (status == UploadStatus.Completed) 1f else 0f
                 progressText = when (status) {

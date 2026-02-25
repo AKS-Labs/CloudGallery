@@ -93,7 +93,8 @@ suspend fun sendFileViaUri(
     contentResolver: ContentResolver,
     channelId: Long,
     botApi: BotApi,
-    context: android.content.Context
+    context: android.content.Context,
+    uploadType: String? = null
 ) {
     val mimeType: String? = getMimeTypeFromUri(contentResolver, uri)
     val fileExtension = getExtFromMimeType(mimeType!!)
@@ -108,7 +109,8 @@ suspend fun sendFileViaUri(
             uri,
             tempFile,
             fileExtension!!,
-            context
+            context,
+            uploadType
         )
         outputStream.close()
         Log.d(TAG, tempFile.name)
@@ -122,7 +124,8 @@ suspend fun sendFileApi(
     pathUri: Uri,
     file: File,
     extension: String,
-    context: android.content.Context
+    context: android.content.Context,
+    uploadType: String? = null
 ) {
     var message: com.github.kotlintelegrambot.entities.Message? = null
     
@@ -164,7 +167,8 @@ suspend fun sendFileApi(
                 fileSize = file.length(),
                 uploadedAt = System.currentTimeMillis(),
                 thumbnailCached = false,
-                messageId = message?.messageId
+                messageId = message?.messageId,
+                uploadType = uploadType
             )
         )
         Log.d(TAG, "sendFile: Success! Metadata included in caption.")

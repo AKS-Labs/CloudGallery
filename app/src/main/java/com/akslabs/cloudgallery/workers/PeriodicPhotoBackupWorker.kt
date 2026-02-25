@@ -39,6 +39,7 @@ class PeriodicPhotoBackupWorker(
             KEY_COMPRESSION_THRESHOLD,
             0L
         )
+        val uploadType = params.inputData.getString(KEY_UPLOAD_TYPE)
         val imageList = DbHolder.database.photoDao().getAllNotUploaded()
         return withContext(Dispatchers.IO) {
             try {
@@ -104,7 +105,7 @@ class PeriodicPhotoBackupWorker(
                             ".$ext"
                         )
                         tempFile.writeBytes(outputBytes)
-                        sendFileApi(botApi, channelId, uri, tempFile, ext!!, appContext)
+                        sendFileApi(botApi, channelId, uri, tempFile, ext!!, appContext, uploadType)
                     } catch (e: IOException) {
                         Log.e("PeriodicBackup", "IO error on photo ${index + 1}, will retry: ${e.message}")
                         return@withContext Result.retry()
@@ -140,5 +141,6 @@ class PeriodicPhotoBackupWorker(
         const val KEY_PROGRESS_CURRENT = "progress_current"
         const val KEY_PROGRESS_MAX = "progress_max"
         const val KEY_CURRENT_FILE_URI = "current_file_uri"
+        const val KEY_UPLOAD_TYPE = "upload_type"
     }
 }

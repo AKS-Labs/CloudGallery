@@ -43,7 +43,7 @@ class InstantPhotoUploadWorker(
                 val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
                 val photoUri = photoUriString.toUri()
                 
-                sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext)
+                sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, "instant")
 
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     setForeground(getForegroundInfo())

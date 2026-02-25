@@ -178,7 +178,7 @@ fun BottomToolbarFAB(
                                     }
                                 } else {
                                     try {
-                                        workManager.enqueue(backupWorkRequest)
+                                        WorkModule.PeriodicBackup.enqueue(type = "manual_backup")
                                         Toast.makeText(context, "Backup started", Toast.LENGTH_SHORT).show()
                                         NotificationHelper.showBackupStartedNotification(context)
                                     } catch (e: Exception) {

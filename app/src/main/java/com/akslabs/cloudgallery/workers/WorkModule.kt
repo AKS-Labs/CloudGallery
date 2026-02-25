@@ -46,7 +46,7 @@ object WorkModule {
             ).toLong()
         }
 
-        fun enqueue(forceUpdate: Boolean = false, onlySchedule: Boolean = false) {
+        fun enqueue(forceUpdate: Boolean = false, onlySchedule: Boolean = false, type: String? = null) {
             val constraints = getConstraints()
             val repeatIntervalDays = getRepeatIntervalDays()
 
@@ -55,7 +55,10 @@ object WorkModule {
                 val instantBackupRequest =
                     OneTimeWorkRequestBuilder<PeriodicPhotoBackupWorker>()
                         .setInputData(
-                            workDataOf(PeriodicPhotoBackupWorker.KEY_COMPRESSION_THRESHOLD to 1024 * 50L)
+                            workDataOf(
+                                PeriodicPhotoBackupWorker.KEY_COMPRESSION_THRESHOLD to 1024 * 50L,
+                                PeriodicPhotoBackupWorker.KEY_UPLOAD_TYPE to type
+                            )
                         )
                         .setConstraints(constraints)
                         .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
