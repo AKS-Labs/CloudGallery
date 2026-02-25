@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -110,22 +111,18 @@ fun AlbumChipBar(
     Column(modifier = modifier.fillMaxWidth()) {
         val listState = rememberLazyListState()
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                // Match app bar background
-                .background(MaterialTheme.colorScheme.surface),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.CenterEnd
         ) {
             // ── LazyRow of album chips ──────────────────────────────────
-            // Maps to reference LazyRow with fadingEdges, spacing, and contentPadding
             LazyRow(
                 modifier = Modifier
-                    .weight(1f)
-//                    .fadingEdges(listState)
-                    .padding(vertical = 0.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(start = 17.dp, end = 8.dp),
+                    .fillMaxWidth()
+                    .fadingEdges(listState)
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(start = 8.dp, end = 64.dp),
                 state = listState
             ) {
                 items(
@@ -220,8 +217,8 @@ fun AlbumChipBar(
                                                     .width(measuredWidth)
                                                     .clip(RoundedCornerShape(12.dp))
                                                     .background(
-                                                        // Removed whitish tint, use subtle dark overlay for text readability
-                                                        Color.Black.copy(alpha = 0.0f)
+                                                        // Subtle dark overlay for text readability
+                                                        Color.Black.copy(alpha = 0.2f)
                                                     ),
                                                 contentAlignment = Alignment.Center
                                             ) {
@@ -262,30 +259,33 @@ fun AlbumChipBar(
                 }
             }
 
-            // ── Expand/collapse toggle ──────────────────────────────────
-            // Maps to reference `EnhancedIconButton(onClick = { showAlbumThumbnail = !showAlbumThumbnail })`
-            IconButton(
+            // ── Expand/collapse toggle (Now an Overlapping Chip) ────────
+            FilterChip(
+                selected = showThumbnails,
                 onClick = { showThumbnails = !showThumbnails },
-                modifier = Modifier
-                    .padding(end = 4.dp)
-                    .then(
-                        if (showThumbnails) Modifier.background(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                            shape = CircleShape
-                        ) else Modifier
+                label = {
+                    val rotation by animateFloatAsState(
+                        targetValue = if (showThumbnails) 180f else 0f,
+                        label = "arrow_rotation"
                     )
-            ) {
-                // Maps to reference `animateFloatAsState(if (showAlbumThumbnail) 180f else 0f)`
-                val rotation by animateFloatAsState(
-                    targetValue = if (showThumbnails) 180f else 0f,
-                    label = "arrow_rotation"
-                )
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = if (showThumbnails) "Collapse albums" else "Expand albums",
-                    modifier = Modifier.rotate(rotation)
-                )
-            }
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = if (showThumbnails) "Collapse albums" else "Expand albums",
+                        modifier = Modifier
+                            .rotate(rotation)
+                            .size(24.dp)
+                    )
+                },
+                modifier = Modifier.padding(end = 8.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f),
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                border = null
+            )
         }
     }
 }
@@ -296,7 +296,7 @@ fun AlbumChipBar(
 // ──────────────────────────────────────────────────────────────────────────────
 private fun Modifier.fadingEdges(
     listState: LazyListState,
-    edgeWidth: Float = 16f
+    edgeWidth: Float = 48f
 ): Modifier = this
     .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
     .drawWithContent {
@@ -329,10 +329,11 @@ private fun Modifier.fadingEdges(
     val isLastFullyVisible = lastVisible.index == totalItems - 1 &&
             (lastVisible.offset + lastVisible.size) <= layoutInfo.viewportEndOffset
     if (!isLastFullyVisible) {
+        val endEdgeWidth = 16f
         drawRect(
             brush = Brush.horizontalGradient(
                 colors = listOf(Color.Black, Color.Transparent),
-                startX = size.width - edgeWidth,
+                startX = size.width - endEdgeWidth,
                 endX = size.width
             ),
             blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
