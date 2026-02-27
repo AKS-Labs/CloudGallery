@@ -203,7 +203,6 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
 
         val progressData = workInfo.progress
         val outputData = workInfo.outputData
-        val inputData = workInfo.inputData
         var progress = 0f
         var progressText = ""
         var thumbnailUri: String? = null
@@ -215,12 +214,10 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         when (type) {
             UploadType.Selective, UploadType.Instant -> {
                 // Check both possible keys for URIs (Instant uses KEY_PHOTO_URI, Periodic uses KEY_CURRENT_FILE_URI)
-                val extractedUri = progressData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.ifEmpty { null }
-                    ?: progressData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
-                    ?: inputData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.ifEmpty { null }
-                    ?: inputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
-                    ?: outputData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.ifEmpty { null }
-                    ?: outputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
+                val extractedUri = progressData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.takeIf<String> { it.isNotEmpty() }
+                    ?: progressData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.takeIf<String> { it.isNotEmpty() }
+                    ?: outputData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.takeIf<String> { it.isNotEmpty() }
+                    ?: outputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.takeIf<String> { it.isNotEmpty() }
                 
                 thumbnailUri = extractedUri
                 localPhotoId = extractedUri
@@ -232,9 +229,8 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
                     else -> "Queued..."
                 }
                 
-                fileName = progressData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.ifEmpty { null }
-                    ?: inputData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.ifEmpty { null }
-                    ?: outputData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.ifEmpty { null }
+                fileName = progressData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.takeIf<String> { it.isNotEmpty() }
+                    ?: outputData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.takeIf<String> { it.isNotEmpty() }
                     ?: "Photo Upload"
 
                 // Try to resolve thumbnail from localMap by filename if URI is missing
@@ -243,9 +239,8 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
                 }
             }
             UploadType.Background -> {
-                val extractedUri = progressData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
-                    ?: inputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
-                    ?: outputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
+                val extractedUri = progressData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.takeIf<String> { it.isNotEmpty() }
+                    ?: outputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.takeIf<String> { it.isNotEmpty() }
                 
                 thumbnailUri = extractedUri
                 localPhotoId = extractedUri
@@ -261,8 +256,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
                     else -> "Queued for backup..."
                 }
                 
-                fileName = progressData.getString("fileName")?.ifEmpty { null }
-                    ?: inputData.getString("fileName")?.ifEmpty { null }
+                fileName = progressData.getString("fileName")?.takeIf<String> { it.isNotEmpty() }
                     ?: (if (type == UploadType.Selective) "User Choice" else "Auto Backup")
                 
                 // Try to resolve thumbnail from localMap by filename if currentUri is missing
