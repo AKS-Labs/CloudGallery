@@ -853,7 +853,7 @@ fun SelectionTopAppBar(
                                                 selectedPhotos.forEach { localId ->
                                                     val photo = DbHolder.database.photoDao().getPhotoByLocalId(localId)
                                                     photo?.pathUri?.toUri()?.let { uri ->
-                                                        WorkModule.InstantUpload(uri).enqueue()
+                                                        WorkModule.InstantUpload(uri, type = "manual_backup").enqueue()
                                                     }
                                                 }
                                             }

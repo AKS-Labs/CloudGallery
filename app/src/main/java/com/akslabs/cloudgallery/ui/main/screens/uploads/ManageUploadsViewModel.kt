@@ -33,9 +33,9 @@ data class UploadUiItem(
 )
 
 enum class UploadType {
-    ManualBackup,
-    AutoBackup,
-    Instant
+    Selective,   // User manually chose these
+    Background,  // Auto backup running in background
+    Instant      // Expedited single photo sync
 }
 
 enum class UploadStatus {
@@ -59,37 +59,61 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     // Observe periodic/auto backups (by unique work name)
     private val periodicBackupFlow = workManager.getWorkInfosForUniqueWorkFlow(WorkModule.PERIODIC_PHOTO_BACKUP_WORK)
 
+    // All uploads from DB (RemotePhoto table)
+    private val remotePhotosFlow = DbHolder.database.remotePhotoDao().getAllFlow()
+ 
+    // Map of remoteId to local path for smart thumbnails
+    private val remoteToLocalPathMapFlow: StateFlow<Map<String, String>> = DbHolder.database.photoDao().getAllFlow()
+        .map { photos -> 
+            photos.filter { it.remoteId != null }.associate { it.remoteId!! to it.pathUri }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     // Combined active work
     private val allWorkFlow = combine(
         manualBackupFlow,
         instantUploadFlow,
-        periodicBackupFlow
-    ) { manual, instant, periodic ->
-        val manualIds = manual.map { it.id }.toSet()
-        val manualItems = manual.mapNotNull { mapWorkInfoToUiItem(it, UploadType.ManualBackup) }
-        val instantItems = instant.mapNotNull { mapWorkInfoToUiItem(it, UploadType.Instant) }
-        // Filter periodic to exclude items already in manual (they share the same worker class)
-        val periodicItems = periodic
-            .filter { it.id !in manualIds }
-            .mapNotNull { mapWorkInfoToUiItem(it, UploadType.AutoBackup) }
-        manualItems + instantItems + periodicItems
+        periodicBackupFlow,
+        remoteToLocalPathMapFlow
+    ) { manual, instant, periodic, localMap ->
+        // Use a map to deduplicate by ID, keeping the most specific type mapping if possible.
+        // We prioritize the lists in order: Manual -> Instant -> Periodic
+        val workMap = mutableMapOf<UUID, Pair<WorkInfo, UploadType>>()
+        
+        manual.forEach { workMap[it.id] = it to UploadType.Selective }
+        instant.forEach { if (!workMap.containsKey(it.id)) workMap[it.id] = it to UploadType.Instant }
+        periodic.forEach { if (!workMap.containsKey(it.id)) workMap[it.id] = it to UploadType.Background }
+
+        workMap.values.mapNotNull { (info, type) -> 
+            mapWorkInfoToUiItem(info, type, localMap) 
+        }
     }
 
     // Queued Photos (from DB — not yet uploaded)
     val queuedPhotos: StateFlow<List<Photo>> = DbHolder.database.photoDao().getAllNotUploadedFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // All uploads from DB (RemotePhoto table)
-    private val remotePhotosFlow = DbHolder.database.remotePhotoDao().getAllFlow()
- 
     // All uploads sorted by status and merging DB history
-    val allUploads: StateFlow<List<UploadUiItem>> = combine(allWorkFlow, remotePhotosFlow) { workItems, dbItems ->
-        val dbUploads = dbItems.map { mapRemotePhotoToUiItem(it) }
-        val activeIds = workItems.mapNotNull { it.id }.toSet()
-        // Deduplicate: If an item is active in WorkManager, don't show the DB record if it might be the same
-        val filteredDb = dbUploads.filter { it.id !in activeIds }
+    val allUploads: StateFlow<List<UploadUiItem>> = combine(
+        allWorkFlow, 
+        remotePhotosFlow,
+        remoteToLocalPathMapFlow
+    ) { workItems, dbItems, localMap ->
+        val dbUploads = dbItems.map { mapRemotePhotoToUiItem(it, localMap) }
+        val dbFileNames = dbItems.mapNotNull { it.fileName }.toSet()
+
+        // Deduplicate: Keep work items only if they are not yet in the DB
+        // or if they are still running/queued.
+        val filteredWork = workItems.filter { item ->
+            if (item.status == UploadStatus.Completed) {
+                // If recently completed, only keep if it hasn't reached the DB yet
+                return@filter item.fileName !in dbFileNames
+            }
+            // Keep all active/failed/queued items
+            true
+        }
         
-        (workItems + filteredDb).sortedWith(
+        (filteredWork + dbUploads).sortedWith(
             compareByDescending<UploadUiItem> { it.status == UploadStatus.InProgress }
                 .thenByDescending { it.status == UploadStatus.Queued }
                 .thenByDescending { it.status == UploadStatus.Failed }
@@ -98,21 +122,31 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
  
     // Manual uploads only (manual backup + instant uploads + DB history of these types)
-    val manualUploads: StateFlow<List<UploadUiItem>> = combine(allWorkFlow, remotePhotosFlow) { workItems, dbItems ->
-        val manualWork = workItems.filter { it.type == UploadType.ManualBackup || it.type == UploadType.Instant }
+    val manualUploads: StateFlow<List<UploadUiItem>> = combine(
+        allWorkFlow, 
+        remotePhotosFlow,
+        remoteToLocalPathMapFlow
+    ) { workItems, dbItems, localMap ->
+        val manualWork = workItems.filter { it.type == UploadType.Selective || it.type == UploadType.Instant }
         val manualDb = dbItems
             .filter { it.uploadType == "manual_backup" || it.uploadType == "instant" }
-            .map { mapRemotePhotoToUiItem(it) }
+            .map { mapRemotePhotoToUiItem(it, localMap) }
         
-        val activeIds = manualWork.map { it.id }.toSet()
-        val filteredDb = manualDb.filter { it.id !in activeIds }
+        val dbFileNames = manualDb.mapNotNull { it.fileName }.toSet()
+        val filteredWork = manualWork.filter { 
+            if (it.status == UploadStatus.Completed) it.fileName !in dbFileNames else true
+        }
         
-        (manualWork + filteredDb).sortedByDescending { it.timestamp }
+        val result: List<UploadUiItem> = (filteredWork + manualDb).sortedWith(
+            compareByDescending<UploadUiItem> { it.status == UploadStatus.InProgress }
+                .thenByDescending { it.timestamp }
+        )
+        result
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
  
     // Auto backup uploads only (Active work)
     val autoBackupUploads: StateFlow<List<UploadUiItem>> = allWorkFlow.map { items ->
-        items.filter { it.type == UploadType.AutoBackup }
+        items.filter { it.type == UploadType.Background }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
  
     // Failed uploads only
@@ -121,31 +155,43 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
  
     // Synced/Completed uploads history (All DB records)
-    val syncedUploads: StateFlow<List<UploadUiItem>> = remotePhotosFlow.map { items ->
-        items.map { mapRemotePhotoToUiItem(it) }
+    val syncedUploads: StateFlow<List<UploadUiItem>> = combine(
+        remotePhotosFlow,
+        remoteToLocalPathMapFlow
+    ) { items, localMap ->
+        items.map { mapRemotePhotoToUiItem(it, localMap) }
             .sortedByDescending { it.timestamp }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
  
-    private fun mapRemotePhotoToUiItem(remote: com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto): UploadUiItem {
+    private fun mapRemotePhotoToUiItem(
+        remote: com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto,
+        localMap: Map<String, String>
+    ): UploadUiItem {
+        val localPath = localMap[remote.remoteId]
         return UploadUiItem(
             id = remote.remoteId,
             type = when (remote.uploadType) {
-                "manual_backup" -> UploadType.ManualBackup
+                "manual_backup" -> UploadType.Selective
                 "instant" -> UploadType.Instant
-                else -> UploadType.AutoBackup
+                else -> UploadType.Background
             },
             status = UploadStatus.Completed,
             progress = 1f,
             progressText = "Synced to Cloud",
-            thumbnailUri = remote, // Pass the object so Coil uses the custom fetcher
+            thumbnailUri = localPath ?: remote, // Smart Thumbnail: Use local path if available, else RemotePhoto object
             totalItems = 1,
             fileName = remote.fileName ?: "Uploaded Photo",
             isCancellable = false,
+            localPhotoId = localPath, // Allow clicking to open local if available
             timestamp = remote.uploadedAt
         )
     }
 
-    private fun mapWorkInfoToUiItem(workInfo: WorkInfo, type: UploadType): UploadUiItem? {
+    private fun mapWorkInfoToUiItem(
+        workInfo: WorkInfo, 
+        type: UploadType,
+        localMap: Map<String, String> = emptyMap()
+    ): UploadUiItem? {
         val status = when (workInfo.state) {
             WorkInfo.State.ENQUEUED -> UploadStatus.Queued
             WorkInfo.State.RUNNING -> UploadStatus.InProgress
@@ -157,6 +203,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
 
         val progressData = workInfo.progress
         val outputData = workInfo.outputData
+        val inputData = workInfo.inputData
         var progress = 0f
         var progressText = ""
         var thumbnailUri: String? = null
@@ -164,43 +211,64 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         var fileName: String? = null
         var localPhotoId: String? = null
 
+        // Support for dynamic filename and URI across all types
         when (type) {
-            UploadType.ManualBackup, UploadType.AutoBackup -> {
-                val current = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_CURRENT, 0)
-                val max = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_MAX, 0)
-                // Use progress URI if running, otherwise try output data (from success result)
-                val currentUri = progressData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)
-                    ?: outputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)
-
-                totalItems = if (max > 0) max else 1
-                progress = if (max > 0) current.toFloat() / max.toFloat() else 0f
-                progressText = when {
-                    status == UploadStatus.InProgress && max > 0 -> "Uploading $current of $max photos"
-                    status == UploadStatus.InProgress -> "Preparing..."
-                    status == UploadStatus.Completed -> "All photos uploaded"
-                    status == UploadStatus.Failed -> "Upload failed — tap to retry"
-                    status == UploadStatus.Cancelled -> "Cancelled"
-                    else -> "Waiting to start..."
-                }
-                thumbnailUri = currentUri?.ifEmpty { null }
-                fileName = if (type == UploadType.ManualBackup) "Manual Backup" else "Auto Backup"
-            }
-            UploadType.Instant -> {
-                // Get the photo URI from input data via progress or output
-                val inputUriString = workInfo.progress.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)
-                    ?: workInfo.outputData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)
-                thumbnailUri = inputUriString
-                localPhotoId = inputUriString // The URI string can be used to look up the photo
-
-                progress = if (status == UploadStatus.Completed) 1f else 0f
+            UploadType.Selective, UploadType.Instant -> {
+                // Check both possible keys for URIs (Instant uses KEY_PHOTO_URI, Periodic uses KEY_CURRENT_FILE_URI)
+                val extractedUri = progressData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.ifEmpty { null }
+                    ?: progressData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
+                    ?: inputData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.ifEmpty { null }
+                    ?: inputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
+                    ?: outputData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.ifEmpty { null }
+                    ?: outputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
+                
+                thumbnailUri = extractedUri
+                localPhotoId = extractedUri
+                
                 progressText = when (status) {
-                    UploadStatus.InProgress -> "Uploading photo..."
-                    UploadStatus.Completed -> "Uploaded successfully"
-                    UploadStatus.Failed -> "Upload failed — will auto retry"
-                    UploadStatus.Cancelled -> "Cancelled"
-                    else -> "Waiting to start..."
+                    UploadStatus.InProgress -> if (type == UploadType.Instant) "Syncing..." else "Uploading..."
+                    UploadStatus.Completed -> "Synced"
+                    UploadStatus.Failed -> "Failed — will retry"
+                    else -> "Queued..."
                 }
-                fileName = "Single Photo Upload"
+                
+                fileName = progressData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.ifEmpty { null }
+                    ?: inputData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.ifEmpty { null }
+                    ?: outputData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.ifEmpty { null }
+                    ?: "Photo Upload"
+
+                // Try to resolve thumbnail from localMap by filename if URI is missing
+                if (thumbnailUri == null && fileName != null) {
+                    thumbnailUri = localMap.values.find { it.substringAfterLast("/") == fileName || it.endsWith(fileName!!) }
+                }
+            }
+            UploadType.Background -> {
+                val extractedUri = progressData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
+                    ?: inputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
+                    ?: outputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.ifEmpty { null }
+                
+                thumbnailUri = extractedUri
+                localPhotoId = extractedUri
+                
+                progressText = when (status) {
+                    UploadStatus.InProgress -> {
+                        val current = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_CURRENT, 0)
+                        val total = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_MAX, 0)
+                        if (total > 0) "Backing up $current of $total..." else "Calculating..."
+                    }
+                    UploadStatus.Completed -> "Backup complete"
+                    UploadStatus.Failed -> "Backup failed"
+                    else -> "Queued for backup..."
+                }
+                
+                fileName = progressData.getString("fileName")?.ifEmpty { null }
+                    ?: inputData.getString("fileName")?.ifEmpty { null }
+                    ?: (if (type == UploadType.Selective) "User Choice" else "Auto Backup")
+                
+                // Try to resolve thumbnail from localMap by filename if currentUri is missing
+                if (thumbnailUri == null && fileName != null) {
+                    thumbnailUri = localMap.values.find { it.substringAfterLast("/") == fileName || it.endsWith(fileName!!) }
+                }
             }
         }
 
@@ -230,7 +298,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         val failed = allUploads.value.filter { it.status == UploadStatus.Failed }
         // Retry logic:
         // 1. Enqueue periodic backup if any manual/auto backup failed
-        if (failed.any { it.type == UploadType.ManualBackup || it.type == UploadType.AutoBackup }) {
+        if (failed.any { it.type == UploadType.Selective || it.type == UploadType.Background }) {
             WorkModule.PeriodicBackup.enqueue()
         }
         // 2. Retry instant uploads (WorkManager retry logic handles this, but if cancelled we might need to re-enqueue. 

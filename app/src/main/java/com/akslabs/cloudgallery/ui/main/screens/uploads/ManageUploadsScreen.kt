@@ -91,11 +91,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
+import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import kotlinx.coroutines.launch
 
 // ─── Tab definitions ────────────────────────────────────────────────
@@ -114,12 +116,12 @@ fun ManageUploadsScreen(
     viewModel: ManageUploadsViewModel = viewModel()
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-    val allUploads by viewModel.allUploads.collectAsState()
-    val manualUploads by viewModel.manualUploads.collectAsState()
-    val autoBackupUploads by viewModel.autoBackupUploads.collectAsState()
-    val failedUploads by viewModel.failedUploads.collectAsState()
-    val syncedUploads by viewModel.syncedUploads.collectAsState()
-    val queuedPhotos by viewModel.queuedPhotos.collectAsState()
+    val allUploads by viewModel.allUploads.collectAsStateWithLifecycle()
+    val manualUploads by viewModel.manualUploads.collectAsStateWithLifecycle()
+    val autoBackupUploads by viewModel.autoBackupUploads.collectAsStateWithLifecycle()
+    val failedUploads by viewModel.failedUploads.collectAsStateWithLifecycle()
+    val syncedUploads by viewModel.syncedUploads.collectAsStateWithLifecycle()
+    val queuedPhotos by viewModel.queuedPhotos.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
@@ -299,7 +301,7 @@ fun ManageUploadsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            // Removed Spacer to reduce top gap
 
             // ─── Pager Content ───────────────────────────────────
             HorizontalPager(
@@ -348,7 +350,8 @@ fun ManageUploadsScreen(
                         emptyMessage = "No synced photos",
                         emptySubMessage = "Uploaded photos will appear here",
                         emptyIcon = Icons.Rounded.CheckCircle,
-                        activeTitle = "Synced Photos"
+                        activeTitle = "Synced Photos",
+                        isSyncedTab = true
                     )
                     UploadTab.Failed -> UploadListContent(
                         uploads = failedUploads,
@@ -402,7 +405,8 @@ private fun UploadListContent(
     emptyMessage: String = "Nothing here yet",
     emptySubMessage: String = "",
     emptyIcon: ImageVector = Icons.Rounded.CloudQueue,
-    activeTitle: String = "Active"
+    activeTitle: String = "Active",
+    isSyncedTab: Boolean = false
 ) {
     val isEmpty = uploads.isEmpty() && (!showQueued || queuedPhotos.isEmpty())
 
@@ -449,7 +453,6 @@ private fun UploadListContent(
             contentPadding = PaddingValues(
                 start = 16.dp, 
                 end = 16.dp, 
-                top = 0.dp, // Reduced top padding to fix blank space
                 bottom = 16.dp
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -477,12 +480,11 @@ private fun UploadListContent(
             }
  
             // ─── Synced/History from DB ──────────────────────
-            val syncedItems = uploads.filter { it.status == UploadStatus.Completed }
+            val syncedItems = if (isSyncedTab) uploads else uploads.filter { it.status == UploadStatus.Completed }
             if (syncedItems.isNotEmpty()) {
                 item(key = "header_synced") {
-                    if (activeItems.isNotEmpty()) Spacer(modifier = Modifier.height(8.dp))
                     SectionHeader(
-                        title = "Recently Synced",
+                        title = if (isSyncedTab) activeTitle else "Recently Synced",
                         icon = Icons.Rounded.CloudDone
                     )
                 }
@@ -502,7 +504,6 @@ private fun UploadListContent(
             // Queued from DB
             if (showQueued && queuedPhotos.isNotEmpty()) {
                 item(key = "header_queued") {
-                    Spacer(modifier = Modifier.height(4.dp))
                     SectionHeader(
                         title = "Pending Queue (${queuedPhotos.size})",
                         icon = Icons.Rounded.HourglassTop
@@ -527,12 +528,19 @@ private fun UploadListContent(
 private fun navigateToPhotoFromUri(navController: NavController, uri: Any?) {
     if (uri == null) return
     try {
-        val idToNavigate = when (uri) {
-            is com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto -> uri.remoteId
-            is String -> uri
-            else -> uri.toString()
+        val (idToNavigate, isRemote) = when (uri) {
+            is com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto -> uri.remoteId to true
+            is String -> {
+                // If it's a string, it could be a local path or a remote ID string.
+                // We'll treat it as local if it looks like a path (starts with / or content://)
+                if (uri.startsWith("/") || uri.startsWith("content://")) {
+                    uri to false
+                } else {
+                    uri to true
+                }
+            }
+            else -> uri.toString() to true
         }
-        val isRemote = uri is com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
         navController.navigate("photo_viewer/${java.net.URLEncoder.encode(idToNavigate, "UTF-8")}/$isRemote")
     } catch (_: Exception) {}
 }
@@ -542,7 +550,7 @@ private fun navigateToPhotoFromUri(navController: NavController, uri: Any?) {
 private fun SectionHeader(title: String, icon: ImageVector) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(vertical = 8.dp)
+        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
     ) {
         Icon(
             imageVector = icon,
@@ -608,31 +616,30 @@ private fun UploadItemCard(
                     if (item.thumbnailUri != null) {
                         AsyncImage(
                             imageLoader = com.akslabs.cloudgallery.utils.coil.ImageLoaderModule.thumbnailImageLoader,
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(item.thumbnailUri)
-                                .crossfade(true)
-                                .size(256)
-                                .build(),
+                            model = let {
+                                val thumb = item.thumbnailUri
+                                val builder = ImageRequest.Builder(LocalContext.current)
+                                    .data(thumb)
+                                    .crossfade(true)
+                                    .size(256)
+                                
+                                if (thumb is RemotePhoto) {
+                                    builder.memoryCacheKey("rt_thumb_${thumb.remoteId}")
+                                        .diskCacheKey("rt_thumb_${thumb.remoteId}")
+                                }
+                                builder.build()
+                            },
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
-                        // Gradient scrim
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        0f to Color.Transparent,
-                                        1f to Color.Black.copy(alpha = 0.1f)
-                                    )
-                                )
-                        )
                     } else {
-                        val icon = when (item.type) {
-                            UploadType.ManualBackup -> Icons.Rounded.Upload
-                            UploadType.AutoBackup -> Icons.Rounded.Backup
-                            UploadType.Instant -> Icons.Rounded.Image
+                        val icon = when {
+                            item.status == UploadStatus.Completed -> Icons.Rounded.CloudDone
+                            item.status == UploadStatus.Failed -> Icons.Rounded.Warning
+                            item.type == UploadType.Selective -> Icons.Rounded.Upload
+                            item.type == UploadType.Background -> Icons.Rounded.Backup
+                            else -> Icons.Rounded.Image
                         }
                         Icon(
                             imageVector = icon,
@@ -683,9 +690,9 @@ private fun UploadItemCard(
                         ) {
                             Text(
                                 text = when (item.type) {
-                                    UploadType.ManualBackup -> "Manual"
-                                    UploadType.AutoBackup -> "Auto"
-                                    UploadType.Instant -> "Instant"
+                                    UploadType.Selective -> "User Selected"
+                                    UploadType.Background -> "Auto Backup"
+                                    UploadType.Instant -> "Quick Sync"
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = typeColor(item.type),
@@ -980,7 +987,7 @@ private fun statusColor(status: UploadStatus): Color = when (status) {
 
 @Composable
 private fun typeColor(type: UploadType): Color = when (type) {
-    UploadType.ManualBackup -> MaterialTheme.colorScheme.primary
-    UploadType.AutoBackup -> MaterialTheme.colorScheme.tertiary
+    UploadType.Selective -> MaterialTheme.colorScheme.primary
+    UploadType.Background -> MaterialTheme.colorScheme.tertiary
     UploadType.Instant -> MaterialTheme.colorScheme.secondary
 }

@@ -59,11 +59,13 @@ class PeriodicPhotoBackupWorker(
                     Log.d("PeriodicBackup", "Processing ${index + 1}/${imageList.size}: ${photo.pathUri}")
                     
                     // Update progress
+                    val fileName = com.akslabs.cloudgallery.utils.getFileName(appContext.contentResolver, photo.pathUri.toUri())
                     setProgress(
                         workDataOf(
                             KEY_PROGRESS_CURRENT to index + 1,
                             KEY_PROGRESS_MAX to imageList.size,
-                            KEY_CURRENT_FILE_URI to photo.pathUri
+                            KEY_CURRENT_FILE_URI to photo.pathUri,
+                            "fileName" to fileName // Explicitly using "fileName" key to match worker constant
                         )
                     )
 
@@ -105,7 +107,7 @@ class PeriodicPhotoBackupWorker(
                             ".$ext"
                         )
                         tempFile.writeBytes(outputBytes)
-                        sendFileApi(botApi, channelId, uri, tempFile, ext!!, appContext, uploadType)
+                        sendFileApi(botApi, channelId, uri, tempFile, ext!!, appContext, uploadType, fileName)
                     } catch (e: IOException) {
                         Log.e("PeriodicBackup", "IO error on photo ${index + 1}, will retry: ${e.message}")
                         return@withContext Result.retry()

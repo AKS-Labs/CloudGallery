@@ -31,24 +31,30 @@ class InstantPhotoUploadWorker(
             Log.d("PhotoUpload", "FAILED: ${e.localizedMessage}")
             return Result.failure()
         }
-        
+
         return withContext(Dispatchers.IO) {
             try {
+                val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
+                val photoUri = photoUriString.toUri()
+                val fileName = com.akslabs.cloudgallery.utils.getFileName(appContext.contentResolver, photoUri)
+                val uploadType = params.inputData.getString(KEY_UPLOAD_TYPE) ?: "instant"
+
                 setProgress(
                     workDataOf(
                         "progress" to "started",
-                        KEY_PHOTO_URI to params.inputData.getString(KEY_PHOTO_URI)
+                        KEY_PHOTO_URI to photoUriString,
+                        KEY_FILE_NAME to fileName,
+                        KEY_UPLOAD_TYPE to uploadType
                     )
                 )
-                val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
-                val photoUri = photoUriString.toUri()
-                
-                sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, "instant")
 
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                    setForeground(getForegroundInfo())
-                }
-                Result.success(workDataOf(KEY_PHOTO_URI to photoUriString))
+                sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName)
+
+                Result.success(workDataOf(
+                    KEY_PHOTO_URI to photoUriString,
+                    KEY_FILE_NAME to fileName,
+                    KEY_UPLOAD_TYPE to uploadType
+                ))
             } catch (e: Throwable) {
                 Log.d("PhotoUpload", "FAILED, will retry: ${e.localizedMessage}")
                 Result.retry()
@@ -66,5 +72,7 @@ class InstantPhotoUploadWorker(
 
     companion object {
         const val KEY_PHOTO_URI = "photoUri"
+        const val KEY_FILE_NAME = "fileName"
+        const val KEY_UPLOAD_TYPE = "upload_type"
     }
 }

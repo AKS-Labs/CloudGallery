@@ -94,10 +94,12 @@ suspend fun sendFileViaUri(
     channelId: Long,
     botApi: BotApi,
     context: android.content.Context,
-    uploadType: String? = null
+    uploadType: String? = null,
+    fileName: String? = null
 ) {
     val mimeType: String? = getMimeTypeFromUri(contentResolver, uri)
     val fileExtension = getExtFromMimeType(mimeType!!)
+    val originalFileName = fileName ?: getFileName(contentResolver, uri)
     val inputStream = contentResolver.openInputStream(uri)
     inputStream?.use { ipStream ->
         val tempFile = File.createTempFile(Random.nextLong().toString(), ".$fileExtension")
@@ -110,7 +112,8 @@ suspend fun sendFileViaUri(
             tempFile,
             fileExtension!!,
             context,
-            uploadType
+            uploadType,
+            originalFileName
         )
         outputStream.close()
         Log.d(TAG, tempFile.name)
@@ -125,7 +128,8 @@ suspend fun sendFileApi(
     file: File,
     extension: String,
     context: android.content.Context,
-    uploadType: String? = null
+    uploadType: String? = null,
+    fileName: String? = null
 ) {
     var message: com.github.kotlintelegrambot.entities.Message? = null
     
@@ -163,7 +167,7 @@ suspend fun sendFileApi(
             RemotePhoto(
                 remoteId = fileId,
                 photoType = resolvedExt,
-                fileName = file.name,
+                fileName = fileName,
                 fileSize = file.length(),
                 uploadedAt = System.currentTimeMillis(),
                 thumbnailCached = false,
