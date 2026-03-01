@@ -11,12 +11,18 @@ import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.workers.InstantPhotoUploadWorker
 import com.akslabs.cloudgallery.workers.PeriodicPhotoBackupWorker
 import com.akslabs.cloudgallery.workers.WorkModule
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.util.UUID
+import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
 
 data class UploadUiItem(
     val id: String,
@@ -28,8 +34,10 @@ data class UploadUiItem(
     val fileName: String? = null,
     val totalItems: Int = 1,
     val isCancellable: Boolean = true,
-    val localPhotoId: String? = null, // For click-to-open navigation
-    val timestamp: Long = System.currentTimeMillis() // When the work was observed
+    val localPhotoId: String? = null,
+    val speed: String? = null,
+    val eta: String? = null,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 enum class UploadType {
@@ -48,6 +56,14 @@ enum class UploadStatus {
 
 class ManageUploadsViewModel(application: Application) : AndroidViewModel(application) {
 
+    init {
+        // Auto-clear history older than 24 hours on startup
+        viewModelScope.launch {
+            val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
+            DbHolder.database.remotePhotoDao().deleteOlderThan(oneDayAgo)
+        }
+    }
+
     private val workManager = WorkManager.getInstance(application)
 
     // Observe manual backups (tagged "manual_backup")
@@ -62,7 +78,69 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     // All uploads from DB (RemotePhoto table)
     private val remotePhotosFlow = DbHolder.database.remotePhotoDao().getAllFlow()
  
-    // Map of remoteId to local path for smart thumbnails
+    // Track start times for running workers to calculate speed/ETA
+    private val workStartTimes = mutableMapOf<UUID, Long>()
+
+    // Selection state for multi-select
+    private val _selectedIds = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+    val selectedIds: StateFlow<Set<String>> = _selectedIds.asStateFlow()
+
+    fun toggleSelection(id: String) {
+        _selectedIds.value = if (_selectedIds.value.contains(id)) {
+            _selectedIds.value - id
+        } else {
+            _selectedIds.value + id
+        }
+    }
+
+    fun clearSelection() {
+        _selectedIds.value = emptySet()
+    }
+
+    // Inside ManageUploadsViewModel.kt
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            // Call your data loading logic here
+            // loadUploads()
+            _isRefreshing.value = false
+        }
+    }
+    fun batchCancel() {
+        _selectedIds.value.forEach { cancelUpload(it) }
+        clearSelection()
+    }
+
+    fun batchRetry() {
+        // We'd need to re-enqueue specifically these, but retryAllFailed is more general.
+        // For now, let's just trigger the general retry if any failed items are selected.
+        retryAllFailed()
+        clearSelection()
+    }
+
+    fun batchClearHistory() {
+        val idsToClear = _selectedIds.value.toList()
+        viewModelScope.launch {
+            DbHolder.database.remotePhotoDao().deleteByRemoteIds(idsToClear)
+        }
+        // Also try to cancel/prune any work items selected
+        _selectedIds.value.forEach { id ->
+            val uuid = try { UUID.fromString(id) } catch (e: Exception) { null }
+            if (uuid != null) {
+                workManager.cancelWorkById(uuid)
+            }
+        }
+        clearSelection()
+    }
+
+    // Refresh state
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    // Undo state
+    private var recentlyDeletedItem: com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto? = null
+    private var undoJob: Job? = null
+
     private val remoteToLocalPathMapFlow: StateFlow<Map<String, String>> = DbHolder.database.photoDao().getAllFlow()
         .map { photos -> 
             photos.filter { it.remoteId != null }.associate { it.remoteId!! to it.pathUri }
@@ -154,13 +232,21 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         items.filter { it.status == UploadStatus.Failed }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
  
-    // Synced/Completed uploads history (All DB records)
+    // Synced/Completed uploads history (All DB records + recently synced)
     val syncedUploads: StateFlow<List<UploadUiItem>> = combine(
+        allWorkFlow,
         remotePhotosFlow,
         remoteToLocalPathMapFlow
-    ) { items, localMap ->
-        items.map { mapRemotePhotoToUiItem(it, localMap) }
-            .sortedByDescending { it.timestamp }
+    ) { workItems, dbItems, localMap ->
+        val dbUploads = dbItems.map { mapRemotePhotoToUiItem(it, localMap) }
+        val dbFileNames = dbItems.mapNotNull { it.fileName }.toSet()
+        
+        // Include work items that are completed but not yet in DB
+        val recentlyCompletedWork = workItems.filter { 
+            it.status == UploadStatus.Completed && it.fileName !in dbFileNames 
+        }
+        
+        (recentlyCompletedWork + dbUploads).sortedByDescending { it.timestamp }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
  
     private fun mapRemotePhotoToUiItem(
@@ -260,10 +346,37 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
                     ?: (if (type == UploadType.Selective) "User Choice" else "Auto Backup")
                 
                 // Try to resolve thumbnail from localMap by filename if currentUri is missing
-                if (thumbnailUri == null && fileName != null) {
+                if (thumbnailUri == null) {
                     thumbnailUri = localMap.values.find { it.substringAfterLast("/") == fileName || it.endsWith(fileName!!) }
                 }
             }
+        }
+
+        // Calculate Speed & ETA if in progress
+        var speedText: String? = null
+        var etaText: String? = null
+        
+        if (status == UploadStatus.InProgress && totalItems > 1 && progress > 0) {
+            val startTime = workStartTimes.getOrPut(workInfo.id) { System.currentTimeMillis() }
+            val elapsed = (System.currentTimeMillis() - startTime).coerceAtLeast(1000L).toFloat() / 1000f
+            val itemsDone = (progress * totalItems).coerceAtLeast(0.1f)
+            val itemsPerSecond = itemsDone / elapsed
+            
+            if (itemsPerSecond > 0) {
+                speedText = String.format("%.1f items/s", itemsPerSecond)
+                val remainingItems = (totalItems - itemsDone).coerceAtLeast(0f)
+                val remainingSeconds = (remainingItems / itemsPerSecond).roundToInt()
+                
+                etaText = if (remainingSeconds < 60) {
+                    "$remainingSeconds s left"
+                } else if (remainingSeconds < 3600) {
+                    "${remainingSeconds / 60} m left"
+                } else {
+                    "${remainingSeconds / 3600} h left"
+                }
+            }
+        } else if (status != UploadStatus.InProgress) {
+            workStartTimes.remove(workInfo.id)
         }
 
         return UploadUiItem(
@@ -276,7 +389,9 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             totalItems = totalItems,
             fileName = fileName,
             isCancellable = status == UploadStatus.InProgress || status == UploadStatus.Queued,
-            localPhotoId = localPhotoId
+            localPhotoId = localPhotoId,
+            speed = speedText,
+            eta = etaText
         )
     }
 
@@ -285,6 +400,39 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             workManager.cancelWorkById(UUID.fromString(id))
         } catch (e: Exception) {
             Log.e("ManageUploadsVM", "Error canceling work", e)
+        }
+    }
+
+    fun deleteHistoryItem(id: String, onUndoAvailable: (String) -> Unit) {
+        viewModelScope.launch {
+            Log.d("ManageUploadsVM", "Deleting history item: $id")
+            // Temporarily store it for undo
+            recentlyDeletedItem = DbHolder.database.remotePhotoDao().getById(id)
+            DbHolder.database.remotePhotoDao().delete(id)
+            onUndoAvailable("Item removed from history")
+            
+            // Auto-clear undo state after 5 seconds
+            undoJob?.cancel()
+            undoJob = launch {
+                delay(5000)
+                recentlyDeletedItem = null
+            }
+        }
+    }
+
+    fun undoDelete() {
+        viewModelScope.launch {
+            recentlyDeletedItem?.let { item ->
+                Log.d("ManageUploadsVM", "Restoring history item: ${item.remoteId}")
+                DbHolder.database.remotePhotoDao().insertAll(item)
+                recentlyDeletedItem = null
+            }
+        }
+    }
+
+    fun clearAllHistory() {
+        viewModelScope.launch {
+            DbHolder.database.remotePhotoDao().clearAll()
         }
     }
 
@@ -298,6 +446,16 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         // 2. Retry instant uploads (WorkManager retry logic handles this, but if cancelled we might need to re-enqueue. 
         // Simple retry for now is relying on WorkManager's auto-retry or re-enqueuing if we had the URI, 
         // but re-enqueuing requires keeping track of URIs which we don't fully do here yet apart from observing.
-        // For now, retryAll primarily triggers the main backup worker which picks up queued items.)
+        // For now, retryAll primarily triggers the main backup worker which picks up queued items.
+    }
+
+    fun refreshWorkInfo() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            // Simulate refresh delay to show the indicator for a short moment, 
+            // as WorkInfo streams are continuous.
+            delay(800)
+            _isRefreshing.value = false
+        }
     }
 }

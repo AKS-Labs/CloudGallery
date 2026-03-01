@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.CloudQueue
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.Image
@@ -56,15 +57,23 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -122,6 +131,7 @@ fun ManageUploadsScreen(
     val failedUploads by viewModel.failedUploads.collectAsStateWithLifecycle()
     val syncedUploads by viewModel.syncedUploads.collectAsStateWithLifecycle()
     val queuedPhotos by viewModel.queuedPhotos.collectAsStateWithLifecycle()
+    val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
@@ -134,107 +144,232 @@ fun ManageUploadsScreen(
     val failedCount = failedUploads.size
 
     val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    
+    val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets.navigationBars,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         topBar = {
-            LargeTopAppBar(
-                modifier = Modifier.padding(top = statusBarHeight),
-                title = {
-                    Column {
-                        Text(
-                            "Uploads",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = (-0.5).sp
-                        )
-                        // Stats row with pill badges
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(top = 4.dp)
-                        ) {
-                            if (activeCount > 0) {
-                                StatPill(
-                                    text = "$activeCount active",
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                            if (queuedPhotos.isNotEmpty()) {
-                                StatPill(
-                                    text = "${queuedPhotos.size} pending",
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                            if (failedCount > 0) {
-                                StatPill(
-                                    text = "$failedCount failed",
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                            if (completedCount > 0) {
-                                StatPill(
-                                    text = "$completedCount done",
-                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
-                            }
-                        }
-                    }
-                },
-                navigationIcon = {
-                    Surface(
-                        onClick = { navController.navigateUp() },
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .padding(start = 12.dp)
-                            .size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back",
-                                modifier = Modifier.size(20.dp)
+            if (selectedIds.isEmpty()) {
+                LargeTopAppBar(
+                    modifier = Modifier.padding(top = statusBarHeight),
+                    title = {
+                        Column {
+                            Text(
+                                "Uploads",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = (-0.5).sp
                             )
+                            // Stats row with pill badges
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                if (activeCount > 0) {
+                                    StatPill(
+                                        text = "$activeCount active",
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                if (queuedPhotos.isNotEmpty()) {
+                                    StatPill(
+                                        text = "${queuedPhotos.size} pending",
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                                if (failedCount > 0) {
+                                    StatPill(
+                                        text = "$failedCount failed",
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                                if (completedCount > 0) {
+                                    StatPill(
+                                        text = "$completedCount done",
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
+                            }
                         }
-                    }
-                },
-                actions = {
-                    if (failedCount > 0) {
+                    },
+                    navigationIcon = {
                         Surface(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.retryAllFailed()
-                            },
-                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+                            onClick = { navController.navigateUp() },
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             shape = CircleShape,
                             modifier = Modifier
-                                .padding(end = 8.dp)
+                                .padding(start = 12.dp)
                                 .size(40.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Refresh,
-                                    contentDescription = "Retry All Failed",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back",
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
-                ),
-                expandedHeight = 140.dp,
-                windowInsets = WindowInsets(0, 0, 0, 0)
-            )
+                    },
+                    actions = {
+                        if (failedCount > 0) {
+                            Surface(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.retryAllFailed()
+                                },
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Refresh,
+                                        contentDescription = "Retry All Failed",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+                        
+                        if (completedCount > 0) {
+                            Surface(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.clearAllHistory()
+                                },
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CheckCircle, // Or a sweep icon
+                                        contentDescription = "Clear All Completed",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                    colors = TopAppBarDefaults.largeTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                    expandedHeight = 140.dp,
+                    windowInsets = WindowInsets(0, 0, 0, 0)
+                )
+            } else {
+                // Multi-select header (Matching LocalPhotoGrid / MainPage.kt)
+                androidx.compose.material3.TopAppBar(
+                    expandedHeight = 95.dp,
+                    windowInsets = WindowInsets(0, 0, 0, 0),
+                    title = {
+                        Box(modifier = Modifier.padding(top = 30.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    shape = CircleShape,
+                                    onClick = { 
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.clearSelection() 
+                                    },
+                                    modifier = Modifier.height(40.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(horizontal = 12.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Close,
+                                            contentDescription = "Close selection mode",
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                
+                                Box(
+                                    modifier = Modifier.padding(horizontal = 16.dp).height(40.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${selectedIds.size} Selected",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        letterSpacing = 0.sp
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    actions = {
+                        if (selectedIds.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.padding(top = 30.dp, end = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { 
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.batchCancel() 
+                                    },
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Cancel,
+                                        contentDescription = "Cancel Selected",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                
+                                IconButton(
+                                    onClick = { 
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.batchClearHistory() 
+                                    },
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CloudDone,
+                                        contentDescription = "Delete from history",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
+                )
+            }
         }
     ) { innerPadding ->
         Column(
@@ -303,67 +438,122 @@ fun ManageUploadsScreen(
 
             // Removed Spacer to reduce top gap
 
-            // ─── Pager Content ───────────────────────────────────
-            HorizontalPager(
-                state = pagerState,
+            var isRefreshing by remember { mutableStateOf(false) }
+            val pullToRefreshState = rememberPullToRefreshState()
+
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    scope.launch {
+                        isRefreshing = true
+                        viewModel.refreshWorkInfo() // Implementing this in VM
+                        kotlinx.coroutines.delay(1000)
+                        isRefreshing = false
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
-            ) { page ->
-                when (tabs[page]) {
-                    UploadTab.All -> UploadListContent(
-                        uploads = allUploads,
-                        queuedPhotos = queuedPhotos,
-                        showQueued = true,
-                        onCancel = { viewModel.cancelUpload(it) },
-                        onRetry = { viewModel.retryAllFailed() },
-                        navController = navController,
-                        activeTitle = "Active & Recent"
-                    )
-                    UploadTab.Manual -> UploadListContent(
-                        uploads = manualUploads,
-                        queuedPhotos = emptyList(),
-                        showQueued = false,
-                        onCancel = { viewModel.cancelUpload(it) },
-                        onRetry = { viewModel.retryAllFailed() },
-                        navController = navController,
-                        emptyMessage = "No manual uploads yet",
-                        emptySubMessage = "Select photos and upload to cloud to see them here",
-                        emptyIcon = Icons.Rounded.UploadFile
-                    )
-                    UploadTab.AutoBackup -> UploadListContent(
-                        uploads = autoBackupUploads,
-                        queuedPhotos = queuedPhotos,
-                        showQueued = true,
-                        onCancel = { viewModel.cancelUpload(it) },
-                        onRetry = { viewModel.retryAllFailed() },
-                        navController = navController,
-                        emptyMessage = "No backup tasks",
-                        emptySubMessage = "Enable auto backup in Settings to start",
-                        emptyIcon = Icons.Rounded.Backup
-                    )
-                    UploadTab.Synced -> UploadListContent(
-                        uploads = syncedUploads,
-                        queuedPhotos = emptyList(),
-                        showQueued = false,
-                        onCancel = {}, // Synced items usually aren't cancellable
-                        onRetry = {},
-                        navController = navController,
-                        emptyMessage = "No synced photos",
-                        emptySubMessage = "Uploaded photos will appear here",
-                        emptyIcon = Icons.Rounded.CheckCircle,
-                        activeTitle = "Synced Photos",
-                        isSyncedTab = true
-                    )
-                    UploadTab.Failed -> UploadListContent(
-                        uploads = failedUploads,
-                        queuedPhotos = emptyList(),
-                        showQueued = false,
-                        onCancel = { viewModel.cancelUpload(it) },
-                        onRetry = { viewModel.retryAllFailed() },
-                        navController = navController,
-                        emptyMessage = "No failed uploads",
-                        emptySubMessage = "Everything is running smoothly!",
-                        emptyIcon = Icons.Rounded.CloudDone
-                    )
+            ) {
+                // ─── Pager Content ───────────────────────────────────
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    when (tabs[page]) {
+                        UploadTab.All -> UploadListContent(
+                            uploads = allUploads,
+                            queuedPhotos = queuedPhotos,
+                            showQueued = true,
+                            onCancel = { viewModel.cancelUpload(it) },
+                            onRetry = { viewModel.retryAllFailed() },
+                            onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
+                            selectedIds = selectedIds,
+                            onToggleSelection = { viewModel.toggleSelection(it) },
+                            navController = navController,
+                            activeTitle = "Active & Recent",
+                            snackbarHostState = snackbarHostState,
+                            viewModel = viewModel
+                        )
+                        UploadTab.Manual -> UploadListContent(
+                            uploads = manualUploads,
+                            queuedPhotos = emptyList(),
+                            showQueued = false,
+                            onCancel = { viewModel.cancelUpload(it) },
+                            onRetry = { viewModel.retryAllFailed() },
+                            onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
+                            selectedIds = selectedIds,
+                            onToggleSelection = { viewModel.toggleSelection(it) },
+                            navController = navController,
+                            emptyMessage = "No manual uploads yet",
+                            emptySubMessage = "Select photos and upload to cloud to see them here",
+                            emptyIcon = Icons.Rounded.UploadFile,
+                            activeTitle = "Manual & Quick Uploads",
+                            snackbarHostState = snackbarHostState,
+                            viewModel = viewModel
+                        )
+                        UploadTab.AutoBackup -> UploadListContent(
+                            uploads = autoBackupUploads,
+                            queuedPhotos = queuedPhotos,
+                            showQueued = true,
+                            onCancel = { viewModel.cancelUpload(it) },
+                            onRetry = { viewModel.retryAllFailed() },
+                            onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
+                            selectedIds = selectedIds,
+                            onToggleSelection = { viewModel.toggleSelection(it) },
+                            navController = navController,
+                            emptyMessage = "No backup tasks",
+                            emptySubMessage = "Enable auto backup in Settings to start",
+                            emptyIcon = Icons.Rounded.Backup,
+                            snackbarHostState = snackbarHostState,
+                            viewModel = viewModel
+                        )
+                        UploadTab.Synced -> UploadListContent(
+                            uploads = syncedUploads,
+                            queuedPhotos = emptyList(),
+                            showQueued = false,
+                            onCancel = {}, // Synced items usually aren't cancellable
+                            onRetry = {},
+                            onDelete = { id -> 
+                                viewModel.deleteHistoryItem(id) { message ->
+                                    scope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = message,
+                                            actionLabel = "Undo",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            viewModel.undoDelete()
+                                        }
+                                    }
+                                }
+                            },
+                            selectedIds = selectedIds,
+                            onToggleSelection = { viewModel.toggleSelection(it) },
+                            navController = navController,
+                            emptyMessage = "No synced photos",
+                            emptySubMessage = "Uploaded photos will appear here",
+                            emptyIcon = Icons.Rounded.CheckCircle,
+                            activeTitle = "Synced Photos",
+                            isSyncedTab = true,
+                            snackbarHostState = snackbarHostState,
+                            viewModel = viewModel
+                        )
+                        UploadTab.Failed -> UploadListContent(
+                            uploads = failedUploads,
+                            queuedPhotos = emptyList(),
+                            showQueued = false,
+                            onCancel = { viewModel.cancelUpload(it) },
+                            onRetry = { viewModel.retryAllFailed() },
+                            onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
+                            selectedIds = selectedIds,
+                            onToggleSelection = { viewModel.toggleSelection(it) },
+                            navController = navController,
+                            emptyMessage = "No failed uploads",
+                            emptySubMessage = "Everything is running smoothly!",
+                            emptyIcon = Icons.Rounded.CloudDone,
+                            snackbarHostState = snackbarHostState,
+                            viewModel = viewModel
+                        )
+                    }
                 }
             }
         }
@@ -393,7 +583,7 @@ private fun StatPill(
 }
 
 // ─── Upload List Content ─────────────────────────────────────────
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun UploadListContent(
     uploads: List<UploadUiItem>,
@@ -401,14 +591,54 @@ private fun UploadListContent(
     showQueued: Boolean,
     onCancel: (String) -> Unit,
     onRetry: () -> Unit,
+    onDelete: (String) -> Unit,
+    selectedIds: Set<String>,
+    onToggleSelection: (String) -> Unit,
     navController: NavController,
     emptyMessage: String = "Nothing here yet",
     emptySubMessage: String = "",
     emptyIcon: ImageVector = Icons.Rounded.CloudQueue,
     activeTitle: String = "Active",
-    isSyncedTab: Boolean = false
+    isSyncedTab: Boolean = false,
+    snackbarHostState: SnackbarHostState? = null,
+    viewModel: ManageUploadsViewModel? = null
 ) {
     val isEmpty = uploads.isEmpty() && (!showQueued || queuedPhotos.isEmpty())
+    val scope = rememberCoroutineScope()
+    
+    // Refreshing state tied to ViewModel
+    val isRefreshing by viewModel?.isRefreshing?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
+    
+    // State for Error Dialog
+    var errorToShow by remember { mutableStateOf<UploadUiItem?>(null) }
+    
+    if (errorToShow != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { errorToShow = null },
+            icon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Upload Failed") },
+            text = { 
+                Column {
+                    Text(errorToShow?.fileName ?: "Unknown File", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(errorToShow?.progressText ?: "An unexpected error occurred during upload. Check your internet connection and try again.")
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { 
+                    onRetry()
+                    errorToShow = null 
+                }) {
+                    Text("Retry All")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { errorToShow = null }) {
+                    Text("Dismiss")
+                }
+            }
+        )
+    }
 
     if (isEmpty) {
         Box(
@@ -449,11 +679,17 @@ private fun UploadListContent(
             }
         }
     } else {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel?.refresh() }
+        ) {
         LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp, 
                 end = 16.dp, 
-                bottom = 16.dp
+                top = 8.dp,
+                bottom = 100.dp // Extra space at bottom
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -471,8 +707,17 @@ private fun UploadListContent(
                         item = item,
                         onCancel = { onCancel(item.id) },
                         onRetry = onRetry,
+                        isSelected = selectedIds.contains(item.id),
+                        onToggleSelection = { onToggleSelection(item.id) },
+                        isSelectionMode = selectedIds.isNotEmpty(),
                         onTap = {
-                            navigateToPhotoFromUri(navController, item.thumbnailUri)
+                            if (selectedIds.isNotEmpty()) {
+                                onToggleSelection(item.id)
+                            } else if (item.status == UploadStatus.Failed) {
+                                errorToShow = item
+                            } else {
+                                navigateToPhotoFromUri(navController, item.thumbnailUri)
+                            }
                         },
                         modifier = Modifier.animateItem()
                     )
@@ -489,15 +734,71 @@ private fun UploadListContent(
                     )
                 }
                 items(syncedItems, key = { it.id }) { item ->
-                    UploadItemCard(
-                        item = item,
-                        onCancel = {},
-                        onRetry = {},
-                        onTap = {
-                            navigateToPhotoFromUri(navController, item.thumbnailUri)
-                        },
-                        modifier = Modifier.animateItem()
-                    )
+                    if (isSyncedTab) {
+                        val swipeState = androidx.compose.material3.rememberSwipeToDismissBoxState(
+                            confirmValueChange = {
+                                if (it == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
+                                    onDelete(item.id)
+                                    true
+                                } else false
+                            }
+                        )
+                        
+                        androidx.compose.material3.SwipeToDismissBox(
+                            state = swipeState,
+                            enableDismissFromStartToEnd = false,
+                            backgroundContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(MaterialTheme.colorScheme.errorContainer)
+                                        .padding(horizontal = 20.dp),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Cancel, // Or Delete icon
+                                        contentDescription = "Delete from history",
+                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        ) {
+                            UploadItemCard(
+                                item = item,
+                                onCancel = {},
+                                onRetry = {},
+                                isSelected = selectedIds.contains(item.id),
+                                onToggleSelection = { onToggleSelection(item.id) },
+                                isSelectionMode = selectedIds.isNotEmpty(),
+                                onTap = {
+                                    if (selectedIds.isNotEmpty()) {
+                                        onToggleSelection(item.id)
+                                    } else {
+                                        navigateToPhotoFromUri(navController, item.thumbnailUri)
+                                    }
+                                },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                    } else {
+                        UploadItemCard(
+                            item = item,
+                            onCancel = {},
+                            onRetry = {},
+                            isSelected = selectedIds.contains(item.id),
+                            onToggleSelection = { onToggleSelection(item.id) },
+                            isSelectionMode = selectedIds.isNotEmpty(),
+                            onTap = {
+                                if (selectedIds.isNotEmpty()) {
+                                    onToggleSelection(item.id)
+                                } else {
+                                    navigateToPhotoFromUri(navController, item.thumbnailUri)
+                                }
+                            },
+                            modifier = Modifier.animateItem()
+                        )
+                    }
                 }
             }
 
@@ -520,6 +821,7 @@ private fun UploadListContent(
                         modifier = Modifier.animateItem()
                     )
                 }
+            }
             }
         }
     }
@@ -569,13 +871,15 @@ private fun SectionHeader(title: String, icon: ImageVector) {
     }
 }
 
-// ─── Upload Item Card ────────────────────────────────────────────
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UploadItemCard(
     item: UploadUiItem,
     onCancel: () -> Unit,
     onRetry: () -> Unit,
+    isSelected: Boolean = false,
+    onToggleSelection: () -> Unit = {},
+    isSelectionMode: Boolean = false,
     onTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -584,10 +888,12 @@ private fun UploadItemCard(
 
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = if (item.status == UploadStatus.Failed)
-            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
-        else MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp,
+        color = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            item.status == UploadStatus.Failed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        tonalElevation = if (isSelected) 4.dp else 1.dp,
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize(spring(stiffness = Spring.StiffnessMediumLow))
@@ -596,7 +902,7 @@ private fun UploadItemCard(
                 onClick = onTap,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showContextMenu = true
+                    onToggleSelection()
                 }
             )
     ) {
@@ -655,6 +961,23 @@ private fun UploadItemCard(
                             .align(Alignment.BottomEnd)
                             .padding(3.dp)
                     )
+                    
+                    // Selection indicator
+                    if (isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(14.dp))
@@ -690,9 +1013,9 @@ private fun UploadItemCard(
                         ) {
                             Text(
                                 text = when (item.type) {
-                                    UploadType.Selective -> "User Selected"
+                                    UploadType.Selective -> "Synced by User"
                                     UploadType.Background -> "Auto Backup"
-                                    UploadType.Instant -> "Quick Sync"
+                                    UploadType.Instant -> "Synced by User"
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = typeColor(item.type),
@@ -728,6 +1051,24 @@ private fun UploadItemCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
+                        
+                        // Speed & ETA
+                        if (item.speed != null) {
+                            Text(
+                                text = "• ${item.speed}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (item.eta != null) {
+                            Text(
+                                text = "• ${item.eta}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
