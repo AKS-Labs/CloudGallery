@@ -51,6 +51,8 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -108,6 +110,7 @@ import coil.request.ImageRequest
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import kotlinx.coroutines.launch
+import com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel
 
 // ─── Tab definitions ────────────────────────────────────────────────
 private enum class UploadTab(val label: String, val icon: ImageVector) {
@@ -115,6 +118,7 @@ private enum class UploadTab(val label: String, val icon: ImageVector) {
     Manual("Manual", Icons.Rounded.Upload),
     AutoBackup("Queue & Backup", Icons.Rounded.Backup),
     Synced("Synced", Icons.Rounded.CheckCircle),
+    Cancelled("Cancelled", Icons.Rounded.Close),
     Failed("Failed", Icons.Rounded.ErrorOutline)
 }
 
@@ -137,6 +141,9 @@ fun ManageUploadsScreen(
 
     val tabs = UploadTab.entries
     val pagerState = rememberPagerState(pageCount = { tabs.size })
+
+    // Derived lists
+    val cancelledUploads by remember { mutableStateOf(allUploads.filter { it.status == UploadStatus.Cancelled }) }
 
     // Stats
     val activeCount = allUploads.count { it.status == UploadStatus.InProgress }
@@ -326,42 +333,31 @@ fun ManageUploadsScreen(
                     },
                     actions = {
                         if (selectedIds.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier.padding(top = 30.dp, end = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            val remoteViewModel: RemoteViewModel = viewModel()
+                            var showExtraActions by remember { mutableStateOf(false) }
+                            IconButton(
+                                onClick = { showExtraActions = true },
+                                modifier = Modifier.padding(top = 30.dp, end = 8.dp)
                             ) {
-                                IconButton(
-                                    onClick = { 
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        viewModel.batchCancel() 
-                                    },
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Cancel,
-                                        contentDescription = "Cancel Selected",
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                
-                                IconButton(
-                                    onClick = { 
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        viewModel.batchClearHistory() 
-                                    },
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.CloudDone,
-                                        contentDescription = "Delete from history",
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
+                                Icon(Icons.Filled.MoreVert, contentDescription = "More")
+                            }
+                            DropdownMenu(
+                                expanded = showExtraActions,
+                                onDismissRequest = { showExtraActions = false },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Move to Trash Bin", fontWeight = FontWeight.SemiBold) },
+                                    leadingIcon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                    onClick = {
+                                        showExtraActions = false
+                                        scope.launch {
+                                            remoteViewModel.moveToTrash(selectedIds)
+                                            snackbarHostState.showSnackbar("Moved ${selectedIds.size} photos to Trash Bin")
+                                            viewModel.clearSelection()
+                                        }
+                                    }
+                                )
                             }
                         }
                     },
@@ -389,11 +385,13 @@ fun ManageUploadsScreen(
                 tabs.forEachIndexed { index, tab ->
                     val isSelected = pagerState.currentPage == index
                     // Count for badge
+                    val cancelledCount = allUploads.count { it.status == UploadStatus.Cancelled }
                     val count = when (tab) {
                         UploadTab.All -> allUploads.size + queuedPhotos.size
                         UploadTab.Manual -> manualUploads.size
                         UploadTab.AutoBackup -> autoBackupUploads.size + queuedPhotos.size
                         UploadTab.Synced -> syncedUploads.size
+                        UploadTab.Cancelled -> cancelledCount
                         UploadTab.Failed -> failedCount
                     }
                     Tab(
@@ -534,6 +532,22 @@ fun ManageUploadsScreen(
                             emptyIcon = Icons.Rounded.CheckCircle,
                             activeTitle = "Synced Photos",
                             isSyncedTab = true,
+                            snackbarHostState = snackbarHostState,
+                            viewModel = viewModel
+                        )
+                        UploadTab.Cancelled -> UploadListContent(
+                            uploads = allUploads.filter { it.status == UploadStatus.Cancelled },
+                            queuedPhotos = emptyList(),
+                            showQueued = false,
+                            onCancel = { /* Cancelled items not cancellable */ },
+                            onRetry = {},
+                            onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
+                            selectedIds = selectedIds,
+                            onToggleSelection = { viewModel.toggleSelection(it) },
+                            navController = navController,
+                            emptyMessage = "No cancelled uploads",
+                            emptySubMessage = "Uploads you cancelled will appear here",
+                            emptyIcon = Icons.Rounded.Cancel,
                             snackbarHostState = snackbarHostState,
                             viewModel = viewModel
                         )
@@ -740,6 +754,7 @@ private fun UploadListContent(
                 }
                 items(syncedItems, key = { it.id }) { item ->
                     if (isSyncedTab) {
+                        /* Swipe-to-dismiss disabled for Synced tab. Kept for reference.
                         val swipeState = androidx.compose.material3.rememberSwipeToDismissBoxState(
                             confirmValueChange = {
                                 if (it == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
@@ -749,7 +764,7 @@ private fun UploadListContent(
                                 } else false
                             }
                         )
-                        
+
                         androidx.compose.material3.SwipeToDismissBox(
                             state = swipeState,
                             enableDismissFromStartToEnd = false,
@@ -787,6 +802,25 @@ private fun UploadListContent(
                                 modifier = Modifier.animateItem()
                             )
                         }
+                        */
+
+                        // Render the item without swipe-to-dismiss
+                        UploadItemCard(
+                            item = item,
+                            onCancel = {},
+                            onRetry = {},
+                            isSelected = selectedIds.contains(item.id),
+                            onToggleSelection = { onToggleSelection(item.id) },
+                            isSelectionMode = selectedIds.isNotEmpty(),
+                            onTap = {
+                                if (selectedIds.isNotEmpty()) {
+                                    onToggleSelection(item.id)
+                                } else {
+                                    navigateToPhotoFromUri(navController, item.thumbnailUri)
+                                }
+                            },
+                            modifier = Modifier.animateItem()
+                        )
                     } else {
                         UploadItemCard(
                             item = item,
