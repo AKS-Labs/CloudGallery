@@ -449,6 +449,28 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         // For now, retryAll primarily triggers the main backup worker which picks up queued items.
     }
 
+    fun retryUpload(id: String) {
+        viewModelScope.launch {
+            val item = allUploads.value.find { it.id == id }
+            if (item != null) {
+                // Try to enqueue using localPhotoId or thumbnailUri if available
+                val uriStr = item.localPhotoId ?: (item.thumbnailUri as? String)
+                if (!uriStr.isNullOrEmpty()) {
+                    try {
+                        val uri = android.net.Uri.parse(uriStr)
+                        WorkModule.InstantUpload(uri, type = "manual_backup").enqueue()
+                        return@launch
+                    } catch (e: Exception) {
+                        // fallback
+                    }
+                }
+
+                // Fallback: retryAllFailed as a broad attempt
+                retryAllFailed()
+            }
+        }
+    }
+
     fun refreshWorkInfo() {
         viewModelScope.launch {
             _isRefreshing.value = true

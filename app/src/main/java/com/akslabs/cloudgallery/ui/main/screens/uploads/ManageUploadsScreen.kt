@@ -111,6 +111,9 @@ import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import kotlinx.coroutines.launch
 import com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel
+import com.akslabs.cloudgallery.workers.WorkModule
+import androidx.core.net.toUri
+import android.net.Uri
 
 // ─── Tab definitions ────────────────────────────────────────────────
 private enum class UploadTab(val label: String, val icon: ImageVector) {
@@ -335,6 +338,11 @@ fun ManageUploadsScreen(
                         if (selectedIds.isNotEmpty()) {
                             val remoteViewModel: RemoteViewModel = viewModel()
                             var showExtraActions by remember { mutableStateOf(false) }
+                            // Determine selected item statuses
+                            val selectedItems = allUploads.filter { selectedIds.contains(it.id) }
+                            val allCancelled = selectedItems.isNotEmpty() && selectedItems.all { it.status == UploadStatus.Cancelled }
+                            val allSynced = selectedItems.isNotEmpty() && selectedItems.all { it.status == UploadStatus.Completed }
+
                             IconButton(
                                 onClick = { showExtraActions = true },
                                 modifier = Modifier.padding(top = 30.dp, end = 8.dp)
@@ -346,18 +354,45 @@ fun ManageUploadsScreen(
                                 onDismissRequest = { showExtraActions = false },
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                DropdownMenuItem(
-                                    text = { Text("Move to Trash Bin", fontWeight = FontWeight.SemiBold) },
-                                    leadingIcon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                                    onClick = {
-                                        showExtraActions = false
-                                        scope.launch {
-                                            remoteViewModel.moveToTrash(selectedIds)
-                                            snackbarHostState.showSnackbar("Moved ${selectedIds.size} photos to Trash Bin")
-                                            viewModel.clearSelection()
+                                if (allCancelled) {
+                                    // Upload to Cloud (similar to LocalPhotos behavior)
+                                    DropdownMenuItem(
+                                        text = { Text("Upload to Cloud", fontWeight = FontWeight.SemiBold) },
+                                        leadingIcon = { Icon(Icons.Rounded.CloudUpload, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                        onClick = {
+                                            showExtraActions = false
+                                            scope.launch {
+                                                // Enqueue InstantUpload for each cancelled item that has a local URI
+                                                selectedItems.forEach { item ->
+                                                    val uriStr = item.localPhotoId ?: (item.thumbnailUri as? String)
+                                                    if (!uriStr.isNullOrEmpty()) {
+                                                        try {
+                                                            val uri: Uri = uriStr.toUri()
+                                                            WorkModule.InstantUpload(uri, type = "manual_backup").enqueue()
+                                                        } catch (_: Exception) { }
+                                                    }
+                                                }
+                                                snackbarHostState.showSnackbar("Uploading ${selectedItems.size} photos to Cloud")
+                                                viewModel.clearSelection()
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                }
+
+                                if (allSynced) {
+                                    DropdownMenuItem(
+                                        text = { Text("Move to Trash Bin", fontWeight = FontWeight.SemiBold) },
+                                        leadingIcon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                        onClick = {
+                                            showExtraActions = false
+                                            scope.launch {
+                                                remoteViewModel.moveToTrash(selectedIds)
+                                                snackbarHostState.showSnackbar("Moved ${selectedIds.size} photos to Trash Bin")
+                                                viewModel.clearSelection()
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     },
@@ -458,11 +493,11 @@ fun ManageUploadsScreen(
                 ) { page ->
                     when (tabs[page]) {
                         UploadTab.All -> UploadListContent(
-                            uploads = allUploads,
+                            uploads = allUploads.filter { it.status != UploadStatus.Cancelled },
                             queuedPhotos = queuedPhotos,
                             showQueued = true,
                             onCancel = { viewModel.cancelUpload(it) },
-                            onRetry = { viewModel.retryAllFailed() },
+                            onRetry = { id -> viewModel.retryUpload(id) },
                             onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
                             selectedIds = selectedIds,
                             onToggleSelection = { viewModel.toggleSelection(it) },
@@ -476,7 +511,7 @@ fun ManageUploadsScreen(
                             queuedPhotos = emptyList(),
                             showQueued = false,
                             onCancel = { viewModel.cancelUpload(it) },
-                            onRetry = { viewModel.retryAllFailed() },
+                            onRetry = { id -> viewModel.retryUpload(id) },
                             onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
                             selectedIds = selectedIds,
                             onToggleSelection = { viewModel.toggleSelection(it) },
@@ -493,7 +528,7 @@ fun ManageUploadsScreen(
                             queuedPhotos = queuedPhotos,
                             showQueued = true,
                             onCancel = { viewModel.cancelUpload(it) },
-                            onRetry = { viewModel.retryAllFailed() },
+                            onRetry = { id -> viewModel.retryUpload(id) },
                             onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
                             selectedIds = selectedIds,
                             onToggleSelection = { viewModel.toggleSelection(it) },
@@ -509,7 +544,7 @@ fun ManageUploadsScreen(
                             queuedPhotos = emptyList(),
                             showQueued = false,
                             onCancel = {}, // Synced items usually aren't cancellable
-                            onRetry = {},
+                            onRetry = { id -> viewModel.retryUpload(id) },
                             onDelete = { id -> 
                                 viewModel.deleteHistoryItem(id) { message ->
                                     scope.launch {
@@ -540,7 +575,7 @@ fun ManageUploadsScreen(
                             queuedPhotos = emptyList(),
                             showQueued = false,
                             onCancel = { /* Cancelled items not cancellable */ },
-                            onRetry = {},
+                            onRetry = { id -> viewModel.retryUpload(id) },
                             onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
                             selectedIds = selectedIds,
                             onToggleSelection = { viewModel.toggleSelection(it) },
@@ -556,7 +591,7 @@ fun ManageUploadsScreen(
                             queuedPhotos = emptyList(),
                             showQueued = false,
                             onCancel = { viewModel.cancelUpload(it) },
-                            onRetry = { viewModel.retryAllFailed() },
+                            onRetry = { id -> viewModel.retryUpload(id) },
                             onDelete = { id -> viewModel.deleteHistoryItem(id) {} },
                             selectedIds = selectedIds,
                             onToggleSelection = { viewModel.toggleSelection(it) },
@@ -604,7 +639,7 @@ private fun UploadListContent(
     queuedPhotos: List<Photo>,
     showQueued: Boolean,
     onCancel: (String) -> Unit,
-    onRetry: () -> Unit,
+    onRetry: (String) -> Unit,
     onDelete: (String) -> Unit,
     selectedIds: Set<String>,
     onToggleSelection: (String) -> Unit,
@@ -645,7 +680,7 @@ private fun UploadListContent(
             },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { 
-                    onRetry()
+                    errorToShow?.id?.let { onRetry(it) }
                     errorToShow = null 
                 }) {
                     Text("Retry All")
@@ -722,24 +757,24 @@ private fun UploadListContent(
                     )
                 }
                 items(activeItems, key = { it.id }) { item ->
-                    UploadItemCard(
-                        item = item,
-                        onCancel = { onCancel(item.id) },
-                        onRetry = onRetry,
-                        isSelected = selectedIds.contains(item.id),
-                        onToggleSelection = { onToggleSelection(item.id) },
-                        isSelectionMode = selectedIds.isNotEmpty(),
-                        onTap = {
-                            if (selectedIds.isNotEmpty()) {
-                                onToggleSelection(item.id)
-                            } else if (item.status == UploadStatus.Failed) {
-                                errorToShow = item
-                            } else {
-                                navigateToPhotoFromUri(navController, item.thumbnailUri)
-                            }
-                        },
-                        modifier = Modifier.animateItem()
-                    )
+                            UploadItemCard(
+                                item = item,
+                                onCancel = { onCancel(item.id) },
+                                onRetry = { onRetry(item.id) },
+                                isSelected = selectedIds.contains(item.id),
+                                onToggleSelection = { onToggleSelection(item.id) },
+                                isSelectionMode = selectedIds.isNotEmpty(),
+                                onTap = {
+                                    if (selectedIds.isNotEmpty()) {
+                                        onToggleSelection(item.id)
+                                    } else if (item.status == UploadStatus.Failed) {
+                                        errorToShow = item
+                                    } else {
+                                        navigateToPhotoFromUri(navController, item.localPhotoId ?: item.thumbnailUri)
+                                    }
+                                },
+                                modifier = Modifier.animateItem()
+                            )
                 }
             }
  
@@ -788,7 +823,7 @@ private fun UploadListContent(
                             UploadItemCard(
                                 item = item,
                                 onCancel = {},
-                                onRetry = {},
+                                onRetry = { onRetry(item.id) },
                                 isSelected = selectedIds.contains(item.id),
                                 onToggleSelection = { onToggleSelection(item.id) },
                                 isSelectionMode = selectedIds.isNotEmpty(),
@@ -796,7 +831,7 @@ private fun UploadListContent(
                                     if (selectedIds.isNotEmpty()) {
                                         onToggleSelection(item.id)
                                     } else {
-                                        navigateToPhotoFromUri(navController, item.thumbnailUri)
+                                        navigateToPhotoFromUri(navController, item.localPhotoId ?: item.thumbnailUri)
                                     }
                                 },
                                 modifier = Modifier.animateItem()
@@ -916,7 +951,7 @@ private fun SectionHeader(title: String, icon: ImageVector) {
 private fun UploadItemCard(
     item: UploadUiItem,
     onCancel: () -> Unit,
-    onRetry: () -> Unit,
+    onRetry: (String) -> Unit,
     isSelected: Boolean = false,
     onToggleSelection: () -> Unit = {},
     isSelectionMode: Boolean = false,
@@ -1052,7 +1087,7 @@ private fun UploadItemCard(
                             color = typeColor(item.type).copy(alpha = 0.12f),
                         ) {
                             Text(
-                                text = when (item.type) {
+                                text = if (item.status == UploadStatus.Cancelled) "Cancelled by User" else when (item.type) {
                                     UploadType.Selective -> "Synced by User"
                                     UploadType.Background -> "Auto Backup"
                                     UploadType.Instant -> "Synced by User"
@@ -1113,12 +1148,12 @@ private fun UploadItemCard(
                 }
 
                 // ─── Action button ───────────────────────────
-                if (item.status == UploadStatus.Failed) {
-                    // Retry button for failed
+                if (item.status == UploadStatus.Failed || item.status == UploadStatus.Cancelled) {
+                    // Retry button for failed or cancelled
                     Surface(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onRetry()
+                            onRetry(item.id)
                         },
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.errorContainer,
@@ -1210,12 +1245,12 @@ private fun UploadItemCard(
                     }
                 )
             }
-            if (item.status == UploadStatus.Failed) {
+            if (item.status == UploadStatus.Failed || item.status == UploadStatus.Cancelled) {
                 DropdownMenuItem(
                     text = { Text("Retry Upload") },
                     leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(20.dp)) },
                     onClick = {
-                        onRetry()
+                        onRetry(item.id)
                         showContextMenu = false
                     }
                 )
