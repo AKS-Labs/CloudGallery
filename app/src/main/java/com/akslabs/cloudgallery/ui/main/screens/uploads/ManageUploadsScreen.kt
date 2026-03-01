@@ -603,7 +603,12 @@ private fun UploadListContent(
     snackbarHostState: SnackbarHostState? = null,
     viewModel: ManageUploadsViewModel? = null
 ) {
-    val isEmpty = uploads.isEmpty() && (!showQueued || queuedPhotos.isEmpty())
+    val (localUploads, setLocalUploads) = remember { mutableStateOf(uploads) }
+    LaunchedEffect(uploads) {
+        setLocalUploads(uploads)
+    }
+
+    val isEmpty = localUploads.isEmpty() && (!showQueued || queuedPhotos.isEmpty())
     val scope = rememberCoroutineScope()
     
     // Refreshing state tied to ViewModel
@@ -694,7 +699,7 @@ private fun UploadListContent(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // ─── Active worker uploads ───────────────────────
-            val activeItems = uploads.filter { it.status != UploadStatus.Completed }
+            val activeItems = localUploads.filter { it.status != UploadStatus.Completed }
             if (activeItems.isNotEmpty()) {
                 item(key = "header_active") {
                     SectionHeader(
@@ -725,7 +730,7 @@ private fun UploadListContent(
             }
  
             // ─── Synced/History from DB ──────────────────────
-            val syncedItems = if (isSyncedTab) uploads else uploads.filter { it.status == UploadStatus.Completed }
+            val syncedItems = if (isSyncedTab) localUploads else localUploads.filter { it.status == UploadStatus.Completed }
             if (syncedItems.isNotEmpty()) {
                 item(key = "header_synced") {
                     SectionHeader(
@@ -739,6 +744,7 @@ private fun UploadListContent(
                             confirmValueChange = {
                                 if (it == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
                                     onDelete(item.id)
+                                    setLocalUploads(localUploads.filterNot { it.id == item.id })
                                     true
                                 } else false
                             }
