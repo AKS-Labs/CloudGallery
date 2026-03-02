@@ -46,8 +46,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-
 
         // Initialize notification channels
         NotificationHelper.createNotificationChannels(this)

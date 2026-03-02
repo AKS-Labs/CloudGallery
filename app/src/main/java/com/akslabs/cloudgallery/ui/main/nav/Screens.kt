@@ -2,6 +2,7 @@ package com.akslabs.cloudgallery.ui.main.nav
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
@@ -23,6 +24,8 @@ sealed class Screens(val displayTitle: String, val route: String, val icon: Imag
     data object TrashBin : Screens(displayTitle = "Trash Bin", route = "trash_bin", icon = Icons.Default.DeleteOutline)
 
     data object PhotoViewer : Screens(displayTitle = "Viewer", route = "photo_viewer/{id}/{isRemote}")
+
+    data object ManageUploads : Screens(displayTitle = "Manage Uploads", route = "manage_uploads", icon = Icons.Default.CloudUpload)
 
     companion object {
         val drawerScreens by lazy { listOf(LocalPhotos, RemotePhotos, Settings) }

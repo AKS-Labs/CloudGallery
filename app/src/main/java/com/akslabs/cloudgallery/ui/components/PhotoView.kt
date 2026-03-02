@@ -138,7 +138,7 @@ fun PhotoView(
     // Helper function to handle upload
     fun handleUploadClick() {
         android.util.Log.d("PhotoView", "Starting upload for photo: ${photo.localId}")
-        WorkModule.InstantUpload(photo.pathUri.toUri()).enqueue()
+        WorkModule.InstantUpload(photo.pathUri.toUri(), type = "manual_backup").enqueue()
         photoUploadState = UploadState.ENQUEUED
     }
 

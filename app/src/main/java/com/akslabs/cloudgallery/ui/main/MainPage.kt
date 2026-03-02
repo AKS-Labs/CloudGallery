@@ -216,7 +216,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         ) {
         val isSettingsScreen = currentRoute == Screens.Settings.route || isNavigatingToSettings
         val isViewerScreen = currentRoute?.startsWith("photo_viewer") ?: false
-        val showAppLayout = !isSettingsScreen && !isViewerScreen
+        val isManageUploadsScreen = currentRoute == Screens.ManageUploads.route
+        val showAppLayout = !isSettingsScreen && !isViewerScreen && !isManageUploadsScreen
 
         LaunchedEffect(isNavigatingToSettings) {
             if (isNavigatingToSettings) {
@@ -564,6 +565,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 contentWindowInsets = WindowInsets.navigationBars
             ) { paddingValues ->
                     CompositionLocalProvider(LocalGridState provides gridState) {
+                        val isAppBarVisible = scrollBehavior.state.heightOffset > -1f
                         AppNavHost(
                             modifier = Modifier
                                 .padding(paddingValues)
@@ -578,7 +580,8 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                             deletedPhotoIds = deletedPhotoIds,
                             sharedTransitionScope = this@SharedTransitionLayout,
                             animatedVisibilityScope = null,
-                            viewModel = viewModel
+                            viewModel = viewModel,
+                            showTopBars = isAppBarVisible
                         )
                     }
                 }
@@ -605,7 +608,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 }
             }
 
-        if (!isSettingsScreen && !isViewerScreen) {
+        if (!isSettingsScreen && !isViewerScreen && !isManageUploadsScreen) {
             Box(modifier = Modifier.fillMaxSize()) {
                 BottomToolbarFAB(
                     expanded = expanded,
@@ -850,7 +853,7 @@ fun SelectionTopAppBar(
                                                 selectedPhotos.forEach { localId ->
                                                     val photo = DbHolder.database.photoDao().getPhotoByLocalId(localId)
                                                     photo?.pathUri?.toUri()?.let { uri ->
-                                                        WorkModule.InstantUpload(uri).enqueue()
+                                                        WorkModule.InstantUpload(uri, type = "manual_backup").enqueue()
                                                     }
                                                 }
                                             }

@@ -102,7 +102,7 @@ class LocalViewModel(application: Application) : AndroidViewModel(application) {
     fun uploadMultiplePhotos(uris: List<Uri>) {
         viewModelScope.launch(Dispatchers.IO) {
             uris.fastForEach { uri ->
-                WorkModule.InstantUpload(uri).enqueue()
+                WorkModule.InstantUpload(uri, type = "manual_backup").enqueue()
             }
         }
     }

@@ -43,7 +43,8 @@ fun AppNavHost(
     deletedPhotoIds: List<String> = emptyList(),
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    viewModel: MainViewModel
+    viewModel: MainViewModel,
+    showTopBars: Boolean = true
 ) {
     val currentSelectionMode by rememberUpdatedState(selectionMode)
     val currentOnSelectionModeChange by rememberUpdatedState(onSelectionModeChange)
@@ -104,7 +105,11 @@ fun AppNavHost(
             
             // Sync grid position if returning from viewer
             val lastViewedId by viewModel.lastViewedPhotoId.collectAsStateWithLifecycle()
-            val allMediaStorePhotos by viewModel.mediaStorePhotos.collectAsStateWithLifecycle()
+            val allMediaStorePhotos by viewModel.filteredMediaStorePhotos.collectAsStateWithLifecycle()
+
+            // Album chip bar data
+            val albums by viewModel.albums.collectAsStateWithLifecycle()
+            val selectedAlbumId by viewModel.selectedAlbumId.collectAsStateWithLifecycle()
 
             LocalPhotoGrid(
                 localPhotos = localPhotos,
@@ -117,6 +122,9 @@ fun AppNavHost(
                 onSelectionModeChange = onSelectionModeChange,
                 onSelectedPhotosChange = onSelectedPhotosChange,
                 deletedPhotoIds = deletedPhotoIds,
+                albums = albums,
+                selectedAlbumId = selectedAlbumId,
+                onAlbumSelected = { viewModel.selectAlbum(it) },
                 navController = navController,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this@composable,
@@ -125,7 +133,8 @@ fun AppNavHost(
                 savedIndex = viewModel.savedScrollIndex,
                 savedOffset = viewModel.savedScrollOffset,
                 onSaveScrollState = { id, index, offset -> viewModel.saveScrollState(id, index, offset) },
-                onLastViewedPhotoConsumed = { viewModel.updateLastViewedPhotoId("") }
+                onLastViewedPhotoConsumed = { viewModel.updateLastViewedPhotoId("") },
+                showTopBars = showTopBars
             )
         }
 
@@ -244,6 +253,10 @@ fun AppNavHost(
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this@composable
             )
+        }
+
+        composable(route = Screens.ManageUploads.route) {
+            com.akslabs.cloudgallery.ui.main.screens.uploads.ManageUploadsScreen(navController = navController)
         }
     }
 }

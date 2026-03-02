@@ -48,6 +48,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE remoteId IS NULL")
     suspend fun getAllNotUploaded(): List<Photo>
 
+    @Query("SELECT * FROM photos WHERE remoteId IS NULL")
+    fun getAllNotUploadedFlow(): Flow<List<Photo>>
+
     @Query("SELECT * FROM photos WHERE remoteId = :remoteId")
     suspend fun getByRemoteId(remoteId: String): Photo?
 

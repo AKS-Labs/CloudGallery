@@ -35,11 +35,17 @@ interface RemotePhotoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vararg remotePhotos: RemotePhoto)
 
+    @Query("DELETE FROM remote_photos")
+    suspend fun clearAll()
+
+    @Query("DELETE FROM remote_photos WHERE remoteId IN (:remoteIds)")
+    suspend fun deleteByRemoteIds(remoteIds: List<String>)
+
     @Query("DELETE FROM remote_photos WHERE remoteId = :remoteId")
     suspend fun delete(remoteId: String)
 
-    @Query("DELETE FROM remote_photos")
-    suspend fun clearAll()
+    @Query("DELETE FROM remote_photos WHERE uploadedAt < :timestamp")
+    suspend fun deleteOlderThan(timestamp: Long)
 
     @Query("SELECT * FROM remote_photos WHERE remoteId = :remoteId")
     suspend fun getById(remoteId: String): RemotePhoto?

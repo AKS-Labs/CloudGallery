@@ -15,6 +15,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkInfo
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
+import com.akslabs.cloudgallery.data.mediastore.AlbumInfo
 import com.akslabs.cloudgallery.data.mediastore.LocalPhotoSource
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.ui.main.nav.Screens
@@ -167,6 +168,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _mediaStorePhotos = MutableStateFlow<List<LocalUiPhoto>>(emptyList())
     val mediaStorePhotos: StateFlow<List<LocalUiPhoto>> = _mediaStorePhotos.asStateFlow()
 
+    // Album chip bar state — derived from loaded photos
+    private val _albums = MutableStateFlow<List<AlbumInfo>>(emptyList())
+    val albums: StateFlow<List<AlbumInfo>> = _albums.asStateFlow()
+
+    private val _selectedAlbumId = MutableStateFlow(-1L) // -1L = "All"
+    val selectedAlbumId: StateFlow<Long> = _selectedAlbumId.asStateFlow()
+
+    fun selectAlbum(id: Long) {
+        _selectedAlbumId.value = id
+    }
+
+    // Filtered photos based on selected album
+    val filteredMediaStorePhotos: StateFlow<List<LocalUiPhoto>> =
+        combine(_mediaStorePhotos, _selectedAlbumId) { photos, albumId ->
+            if (albumId == -1L) photos
+            else photos.filter { it.bucketId == albumId }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private fun loadMediaStorePhotos() {
         viewModelScope.launch(Dispatchers.IO) {
             val context = getApplication<Application>()
@@ -178,7 +197,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 android.provider.MediaStore.Images.ImageColumns.DATE_ADDED,
                 android.provider.MediaStore.Images.ImageColumns.DATE_MODIFIED,
                 android.provider.MediaStore.Images.ImageColumns.MIME_TYPE,
-                android.provider.MediaStore.Images.ImageColumns.SIZE
+                android.provider.MediaStore.Images.ImageColumns.SIZE,
+                android.provider.MediaStore.Images.ImageColumns.BUCKET_ID,
+                android.provider.MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME
             )
             val photos = ArrayList<LocalUiPhoto>(4096)
             try {
@@ -189,6 +210,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val modIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.DATE_MODIFIED)
                     val mimeIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.MIME_TYPE)
                     val sizeIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.SIZE)
+                    val bucketIdIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.BUCKET_ID)
+                    val bucketNameIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME)
 
                     while (cursor.moveToNext()) {
                         val id = cursor.getLong(idIdx).toString()
@@ -197,6 +220,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val modified = runCatching { cursor.getLong(modIdx) }.getOrDefault(0L)
                         val mimeType = cursor.getString(mimeIdx) ?: "image/jpeg"
                         val size = cursor.getLong(sizeIdx)
+                        val bId = runCatching { cursor.getLong(bucketIdIdx) }.getOrDefault(-1L)
+                        val bName = cursor.getString(bucketNameIdx) ?: ""
 
                         val tsMillis = when {
                             taken > 0L -> taken
@@ -213,7 +238,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             mimeType = mimeType,
                             displayDateMillis = tsMillis,
                             size = size,
-                            remoteId = null
+                            remoteId = null,
+                            bucketId = bId,
+                            bucketName = bName
                         ))
                     }
                 }
@@ -233,6 +260,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // photos.sortByDescending { it.displayDateMillis }
                 
                 _mediaStorePhotos.value = photos
+
+                // Derive album list from loaded photos ("All" + per-bucket)
+                val bucketGroups = photos.groupBy { it.bucketId }
+                val albumList = mutableListOf(
+                    AlbumInfo(
+                        id = -1L,
+                        label = "All",
+                        count = photos.size,
+                        coverUri = photos.firstOrNull()?.pathUri ?: ""
+                    )
+                )
+                bucketGroups.entries
+                    .sortedByDescending { it.value.size }
+                    .forEach { (bucketId, bucketPhotos) ->
+                        val name = bucketPhotos.first().bucketName.ifEmpty { "Unknown" }
+                        albumList.add(
+                            AlbumInfo(
+                                id = bucketId,
+                                label = name,
+                                count = bucketPhotos.size,
+                                coverUri = bucketPhotos.first().pathUri
+                            )
+                        )
+                    }
+                _albums.value = albumList
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error loading MediaStore photos", e)
             }

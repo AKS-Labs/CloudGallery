@@ -46,7 +46,7 @@ object WorkModule {
             ).toLong()
         }
 
-        fun enqueue(forceUpdate: Boolean = false, onlySchedule: Boolean = false) {
+        fun enqueue(forceUpdate: Boolean = false, onlySchedule: Boolean = false, type: String? = null) {
             val constraints = getConstraints()
             val repeatIntervalDays = getRepeatIntervalDays()
 
@@ -55,7 +55,10 @@ object WorkModule {
                 val instantBackupRequest =
                     OneTimeWorkRequestBuilder<PeriodicPhotoBackupWorker>()
                         .setInputData(
-                            workDataOf(PeriodicPhotoBackupWorker.KEY_COMPRESSION_THRESHOLD to 1024 * 50L)
+                            workDataOf(
+                                PeriodicPhotoBackupWorker.KEY_COMPRESSION_THRESHOLD to 1024 * 50L,
+                                PeriodicPhotoBackupWorker.KEY_UPLOAD_TYPE to type
+                            )
                         )
                         .setConstraints(constraints)
                         .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
@@ -131,7 +134,7 @@ object WorkModule {
         }
     }
 
-    class InstantUpload(private val uri: Uri) {
+    class InstantUpload(private val uri: Uri, private val type: String? = null) {
 
         private val constraints: Constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -141,10 +144,20 @@ object WorkModule {
             OneTimeWorkRequestBuilder<InstantPhotoUploadWorker>()
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setInputData(
-                    workDataOf(InstantPhotoUploadWorker.KEY_PHOTO_URI to uri.toString())
+                    workDataOf(
+                        InstantPhotoUploadWorker.KEY_PHOTO_URI to uri.toString(),
+                        InstantPhotoUploadWorker.KEY_UPLOAD_TYPE to type
+                    )
                 )
                 .setConstraints(constraints)
+                .setBackoffCriteria(
+                    backoffPolicy = BackoffPolicy.LINEAR,
+                    duration = Duration.ofMinutes(2)
+                )
                 .addTag("instant_upload")
+                .apply {
+                    if (type != null) addTag(type)
+                }
                 .build()
 
         fun enqueue() {
