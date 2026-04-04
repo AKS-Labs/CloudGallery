@@ -38,7 +38,7 @@ import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.backup.BackupHelper
-import com.akslabs.cloudgallery.services.CloudPhotoSyncService
+
 import com.akslabs.cloudgallery.utils.Constants
 import com.akslabs.cloudgallery.utils.MetadataConfig
 import com.akslabs.cloudgallery.utils.toastFromMainThread
@@ -617,21 +617,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                         }
                     )
 
-                    SettingsItem(
-                        icon = Icons.Rounded.CloudSync,
-                        title = "Sync Cloud Photos",
-                        subtitle = "Sync Manually Uploaded images from Telegram Channel",
-                        onClick = {
-                            scope.launch {
-                                context.toastFromMainThread("Syncing...")
-                                CloudPhotoSyncService.forceSync(context).collect { progress ->
-                                    if (progress.isComplete) {
-                                        context.toastFromMainThread(if (progress.errorMessage != null) "Sync failed" else "Sync complete!")
-                                    }
-                                }
-                            }
-                        }
-                    )
+
 
                     SettingsItem(
                         icon = Icons.Rounded.CloudDownload,

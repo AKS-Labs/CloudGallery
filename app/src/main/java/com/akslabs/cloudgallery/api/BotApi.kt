@@ -84,12 +84,33 @@ object BotApi {
         caption: String? = null
     ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
         return withContext(Dispatchers.IO) {
-            bot.sendDocument(
-                chatId = ChatId.fromId(channelId),
-                document = TelegramFile.ByFile(file),
-                caption = caption,
-                disableContentTypeDetection = false
-            )
+            Log.d(TAG, "📤 sendFile: file=${file.name}, size=${file.length()}, channel=$channelId, captionLen=${caption?.length ?: 0}")
+            if (!file.exists()) {
+                Log.e(TAG, "❌ sendFile: File does not exist: ${file.absolutePath}")
+                return@withContext Pair(null, java.io.FileNotFoundException("File not found: ${file.absolutePath}"))
+            }
+            if (channelId == 0L) {
+                Log.e(TAG, "❌ sendFile: Invalid channel ID: $channelId")
+                return@withContext Pair(null, IllegalArgumentException("Invalid channel ID: $channelId"))
+            }
+            try {
+                val result = bot.sendDocument(
+                    chatId = ChatId.fromId(channelId),
+                    document = TelegramFile.ByFile(file),
+                    caption = caption,
+                    disableContentTypeDetection = false
+                )
+                val (response, error) = result
+                if (error != null) {
+                    Log.e(TAG, "❌ sendFile: API error", error)
+                } else {
+                    Log.d(TAG, "📤 sendFile: Response code=${response?.code()}, isSuccessful=${response?.isSuccessful}")
+                }
+                result
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ sendFile: Exception during upload", e)
+                Pair(null, e)
+            }
         }
     }
 
@@ -112,88 +133,22 @@ object BotApi {
     }
 
     /**
-     * Scan Telegram channel/chat for all media files (documents and photos)
-     * Returns a list of discovered media files with their metadata
+     * Get file metadata from Telegram (for individual file size lookups).
+     * Returns the file size in bytes, or null if not available.
      */
-    suspend fun scanChannelForMedia(
-        channelId: Long,
-        limit: Int = 100,
-        offsetMessageId: Long? = null
-    ): ChannelScanResult {
+    suspend fun getFileSize(fileId: String): Long? {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d(TAG, "=== SCANNING CHANNEL FOR MEDIA ===")
-                Log.d(TAG, "Channel ID: $channelId, Limit: $limit, Offset: $offsetMessageId")
-
-                val updates = bot.getUpdates(
-                    offset = offsetMessageId,
-                    limit = limit,
-                    timeout = 30
-                )
-
-                val mediaFiles = mutableListOf<DiscoveredMediaFile>()
-                var lastMessageId: Long? = null
-
-                if (updates.isSuccess) {
-                    val updateList = updates.get()
-                    Log.i(TAG, "Received ${updateList.size} updates from Telegram")
-
-                    updateList.forEach { update ->
-                        update.message?.let { message ->
-                            // Only process messages from the target channel
-                            if (message.chat.id == channelId) {
-                                lastMessageId = message.messageId.toLong()
-
-                                // Check for document attachments
-                                message.document?.let { document ->
-                                    val mediaFile = DiscoveredMediaFile(
-                                        fileId = document.fileId,
-                                        fileName = document.fileName,
-                                        fileSize = document.fileSize?.toLong(),
-                                        mimeType = document.mimeType,
-                                        uploadDate = message.date * 1000L, // Convert to milliseconds
-                                        messageId = message.messageId.toInt(),
-                                        mediaType = MediaType.DOCUMENT
-                                    )
-                                    mediaFiles.add(mediaFile)
-                                    Log.d(TAG, "Found document: ${document.fileName} (${document.fileId})")
-                                }
-
-                                // Check for photo attachments
-                                message.photo?.let { photos ->
-                                    // Get the largest photo size
-                                    val largestPhoto = photos.maxByOrNull { it.fileSize ?: 0 }
-                                    largestPhoto?.let { photo ->
-                                        val mediaFile = DiscoveredMediaFile(
-                                            fileId = photo.fileId,
-                                            fileName = "photo_${message.messageId}.jpg",
-                                            fileSize = photo.fileSize?.toLong(),
-                                            mimeType = "image/jpeg",
-                                            uploadDate = message.date * 1000L,
-                                            messageId = message.messageId.toInt(),
-                                            mediaType = MediaType.PHOTO
-                                        )
-                                        mediaFiles.add(mediaFile)
-                                        Log.d(TAG, "Found photo: ${photo.fileId}")
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Log.i(TAG, "Scan complete: Found ${mediaFiles.size} media files")
-                    ChannelScanResult.Success(
-                        mediaFiles = mediaFiles,
-                        hasMore = updateList.size == limit,
-                        nextOffset = lastMessageId?.plus(1)
-                    )
-                } else {
-                    Log.e(TAG, "Failed to get updates from Telegram")
-                    ChannelScanResult.Error("Failed to fetch updates from Telegram")
+                val result = bot.getFile(fileId)
+                val (response, error) = result
+                if (error != null) {
+                    Log.e(TAG, "Error getting file size for $fileId", error)
+                    return@withContext null
                 }
+                response?.body()?.result?.fileSize?.toLong()
             } catch (e: Exception) {
-                Log.e(TAG, "Exception during channel scan", e)
-                ChannelScanResult.Error("Exception during channel scan: ${e.message}")
+                Log.e(TAG, "Error getting file size for $fileId", e)
+                null
             }
         }
     }

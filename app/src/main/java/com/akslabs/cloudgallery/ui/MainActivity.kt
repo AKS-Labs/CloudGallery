@@ -55,8 +55,8 @@ class MainActivity : ComponentActivity() {
             DatabaseDebugHelper.debugDatabaseState(this@MainActivity)
         }
 
-        // Initialize cloud photo sync on app startup
-        initializeCloudPhotoSync()
+        // Initialize hash backfill for content dedup
+        initializeHashBackfill()
 
         // Start daily database backup
         WorkModule.DailyDatabaseBackup.enqueuePeriodic()
@@ -154,37 +154,18 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Initialize cloud photo sync workers for automatic background sync
+     * Initialize hash backfill worker for content-based dedup
      */
-    private fun initializeCloudPhotoSync() {
+    private fun initializeHashBackfill() {
         lifecycleScope.launch {
             try {
-                // Start periodic cloud photo sync (daily)
-                WorkModule.CloudPhotoSync.enqueue()
+                // Start hash backfill for existing photos without hashes
+                WorkModule.HashBackfill.enqueue()
 
-                // Start quick sync (every 6 hours)
-                WorkModule.QuickCloudSync.enqueue()
-
-                // Trigger an immediate one-time sync if this is a fresh install
-                // or if it's been a while since last sync
-                val lastSyncTime = try {
-                    Preferences.getLong("last_cloud_photo_sync_timestamp", 0L)
-                } catch (e: ClassCastException) {
-                    Log.w("MainActivity", "Invalid sync timestamp format, resetting to 0", e)
-                    // Clear the invalid value and set default
-                    Preferences.edit { remove("last_cloud_photo_sync_timestamp") }
-                    0L
-                }
-                val daysSinceLastSync = (System.currentTimeMillis() - lastSyncTime) / (1000 * 60 * 60 * 24)
-
-                if (lastSyncTime == 0L || daysSinceLastSync > 1) {
-                    // Trigger immediate sync for new installs or if it's been more than a day
-                    WorkModule.CloudPhotoSync.enqueueOneTime()
-                }
-
+                // Clean up old upload queue entries
+                WorkModule.UploadQueueCleanup.cleanup()
             } catch (e: Exception) {
-                // Log error but don't crash the app
-                android.util.Log.e("MainActivity", "Error initializing cloud photo sync", e)
+                Log.e("MainActivity", "Error initializing hash backfill", e)
             }
         }
     }

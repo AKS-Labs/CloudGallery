@@ -18,10 +18,9 @@ import androidx.compose.animation.scaleOut
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
 import com.akslabs.cloudgallery.data.localdb.DbHolder
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
-import com.github.kotlintelegrambot.entities.files.Document
-import com.github.kotlintelegrambot.network.fold
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.random.Random
@@ -95,17 +94,19 @@ suspend fun sendFileViaUri(
     botApi: BotApi,
     context: android.content.Context,
     uploadType: String? = null,
-    fileName: String? = null
-) {
+    fileName: String? = null,
+    contentHash: String? = null
+): Boolean {
     val mimeType: String? = getMimeTypeFromUri(contentResolver, uri)
     val fileExtension = getExtFromMimeType(mimeType!!)
     val originalFileName = fileName ?: getFileName(contentResolver, uri)
     val inputStream = contentResolver.openInputStream(uri)
+    var success = false
     inputStream?.use { ipStream ->
         val tempFile = File.createTempFile(Random.nextLong().toString(), ".$fileExtension")
         val outputStream = FileOutputStream(tempFile)
         ipStream.copyTo(outputStream)
-        sendFileApi(
+        success = sendFileApi(
             botApi,
             channelId,
             uri,
@@ -113,14 +114,21 @@ suspend fun sendFileViaUri(
             fileExtension!!,
             context,
             uploadType,
-            originalFileName
+            originalFileName,
+            contentHash
         )
         outputStream.close()
         Log.d(TAG, tempFile.name)
         tempFile.deleteOnExit()
     }
+    return success
 }
 
+/**
+ * Sends a file to Telegram and records it in the database.
+ * Returns true if the upload was successful, false otherwise.
+ * Throws IOException if the upload fails so callers can handle it.
+ */
 suspend fun sendFileApi(
     botApi: BotApi,
     channelId: Long,
@@ -129,23 +137,56 @@ suspend fun sendFileApi(
     extension: String,
     context: android.content.Context,
     uploadType: String? = null,
-    fileName: String? = null
-) {
+    fileName: String? = null,
+    contentHash: String? = null
+): Boolean {
+    val deviceId = Preferences.getOrCreateDeviceId()
     var message: com.github.kotlintelegrambot.entities.Message? = null
+    var uploadError: Exception? = null
     
-    // Extract metadata and create caption if enabled
-    val caption = if (MetadataConfig.shouldIncludeMetadata()) {
+    // Build caption: metadata + device/hash tags
+    val metadataCaption = if (MetadataConfig.shouldIncludeMetadata()) {
         val metadata = ImageMetadataExtractor.extractMetadata(context, pathUri)
         metadata?.toTelegramCaption()
     } else {
         null
     }
     
-    botApi.sendFile(file, channelId, caption).fold(
-        { apiResponse ->
-            message = apiResponse?.result
+    // Append device and hash tags
+    val deviceTag = "#device:$deviceId"
+    val hashTag = if (contentHash != null) " #hash:$contentHash" else ""
+    val caption = buildString {
+        if (metadataCaption != null) {
+            append(metadataCaption)
+            append("\n")
         }
-    )
+        append(deviceTag)
+        append(hashTag)
+    }
+    
+    Log.d(TAG, "⬆️ sendFileApi: Uploading file=${file.name} (${file.length()} bytes) to channel=$channelId")
+    Log.d(TAG, "⬆️ sendFileApi: caption=$caption")
+    
+    val result = botApi.sendFile(file, channelId, caption)
+    val (response, error) = result
+    
+    if (error != null) {
+        Log.e(TAG, "❌ sendFileApi: Network/API error during upload", error)
+        uploadError = error
+    } else if (response != null) {
+        val body = response.body()
+        if (response.isSuccessful && body?.result != null) {
+            message = body.result
+            Log.d(TAG, "✅ sendFileApi: Telegram API returned success, messageId=${message?.messageId}")
+        } else {
+            val errorBody = response.errorBody()?.string()
+            Log.e(TAG, "❌ sendFileApi: Telegram API error - code=${response.code()}, body=$errorBody")
+            uploadError = java.io.IOException("Telegram API error ${response.code()}: $errorBody")
+        }
+    } else {
+        Log.e(TAG, "❌ sendFileApi: Both response and error are null")
+        uploadError = java.io.IOException("Upload returned null response")
+    }
 
     val doc = message?.document
     val photoSize = message?.photo?.maxByOrNull { it.fileSize ?: 0 }
@@ -162,7 +203,7 @@ suspend fun sendFileApi(
         // Atomically update the remoteId for the photo using its pathUri
         DbHolder.database.photoDao().updateRemoteIdForPath(pathUri.toString(), fileId)
 
-        // Insert/replace RemotePhoto so Cloud screen picks it up immediately
+        // Insert/replace RemotePhoto with device metadata
         DbHolder.database.remotePhotoDao().insertAll(
             RemotePhoto(
                 remoteId = fileId,
@@ -172,12 +213,17 @@ suspend fun sendFileApi(
                 uploadedAt = System.currentTimeMillis(),
                 thumbnailCached = false,
                 messageId = message?.messageId,
-                uploadType = uploadType
+                uploadType = uploadType,
+                contentHash = contentHash,
+                uploadedByDevice = deviceId
             )
         )
-        Log.d(TAG, "sendFile: Success! Metadata included in caption.")
+        Log.d(TAG, "✅ sendFile: Success! fileId=$fileId, Device: $deviceId, Hash: ${contentHash?.take(8) ?: "none"}")
+        return true
     } else {
-        Log.d(TAG, "sendFile: Failed!")
+        Log.e(TAG, "❌ sendFile: Upload FAILED - no fileId in response. Error: ${uploadError?.message}")
+        // Throw so callers know the upload failed
+        throw uploadError ?: java.io.IOException("Upload failed: no fileId in Telegram response")
     }
 }
 

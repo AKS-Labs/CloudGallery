@@ -10,9 +10,11 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
+import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
+import com.akslabs.cloudgallery.data.localdb.entities.UploadQueue
+import com.akslabs.cloudgallery.utils.ContentHasher
 import com.akslabs.cloudgallery.utils.sendFileViaUri
-import com.akslabs.cloudgallery.workers.WorkModule.NOTIFICATION_ID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -34,21 +36,94 @@ class InstantPhotoUploadWorker(
 
         return withContext(Dispatchers.IO) {
             try {
+                val deviceId = Preferences.getOrCreateDeviceId()
+                val photoDao = DbHolder.database.photoDao()
+                val remotePhotoDao = DbHolder.database.remotePhotoDao()
+                val uploadQueueDao = DbHolder.database.uploadQueueDao()
+
                 val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
                 val photoUri = photoUriString.toUri()
                 val fileName = com.akslabs.cloudgallery.utils.getFileName(appContext.contentResolver, photoUri)
                 val uploadType = params.inputData.getString(KEY_UPLOAD_TYPE) ?: "instant"
 
-                setProgress(
-                    workDataOf(
-                        "progress" to "started",
-                        KEY_PHOTO_URI to photoUriString,
-                        KEY_FILE_NAME to fileName,
-                        KEY_UPLOAD_TYPE to uploadType
-                    )
-                )
+                // Find the photo in database by path URI
+                val photo = photoDao.getAll().find { it.pathUri == photoUriString }
 
-                sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName)
+                if (photo != null) {
+                    // 1. Check if already uploaded
+                    if (photo.uploadStatus == "DONE" || photo.remoteId != null) {
+                        Log.d("PhotoUpload", "Skipping: already uploaded (${photo.localId})")
+                        return@withContext Result.success()
+                    }
+
+                    // 2. Check for active queue entry
+                    val activeEntry = uploadQueueDao.getActiveForPhoto(photo.localId)
+                    if (activeEntry != null) {
+                        Log.d("PhotoUpload", "Skipping: active queue entry (${photo.localId})")
+                        return@withContext Result.success()
+                    }
+
+                    // 3. Compute content hash
+                    val hash = photo.contentHash ?: ContentHasher.computeHash(appContext, photoUri)
+                    if (hash != null && photo.contentHash == null) {
+                        photoDao.updateContentHash(photo.localId, hash)
+                    }
+
+                    // 4. Content-based dedup
+                    if (hash != null) {
+                        val existing = remotePhotoDao.getByContentHash(hash)
+                        if (existing != null) {
+                            Log.d("PhotoUpload", "Dedup: content already in cloud (hash match)")
+                            photoDao.updateRemoteIdForLocalId(photo.localId, existing.remoteId)
+                            photoDao.updateUploadStatus(photo.localId, "DONE", System.currentTimeMillis())
+                            return@withContext Result.success()
+                        }
+                    }
+
+                    // 5. Create queue entry and mark uploading
+                    val queueId = uploadQueueDao.insert(UploadQueue(
+                        localId = photo.localId,
+                        pathUri = photo.pathUri,
+                        contentHash = hash,
+                        workerType = "instant",
+                        deviceId = deviceId
+                    ))
+                    photoDao.updateUploadStatus(photo.localId, "UPLOADING", System.currentTimeMillis())
+                    uploadQueueDao.markInProgress(queueId)
+
+                    setProgress(
+                        workDataOf(
+                            "progress" to "started",
+                            KEY_PHOTO_URI to photoUriString,
+                            KEY_FILE_NAME to fileName,
+                            KEY_UPLOAD_TYPE to uploadType
+                        )
+                    )
+
+                    // 6. Upload with hash
+                    try {
+                        sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash)
+                        photoDao.updateUploadStatus(photo.localId, "DONE", System.currentTimeMillis())
+                        uploadQueueDao.markDone(queueId)
+                    } catch (e: Exception) {
+                        photoDao.updateUploadStatus(photo.localId, "FAILED", System.currentTimeMillis())
+                        uploadQueueDao.markFailed(queueId, e.message)
+                        throw e
+                    }
+                } else {
+                    // Photo not in our database (e.g. direct share) — upload without dedup
+                    setProgress(
+                        workDataOf(
+                            "progress" to "started",
+                            KEY_PHOTO_URI to photoUriString,
+                            KEY_FILE_NAME to fileName,
+                            KEY_UPLOAD_TYPE to uploadType
+                        )
+                    )
+
+                    val hash = ContentHasher.computeHash(appContext, photoUri)
+                    sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash)
+                }
 
                 Result.success(workDataOf(
                     KEY_PHOTO_URI to photoUriString,

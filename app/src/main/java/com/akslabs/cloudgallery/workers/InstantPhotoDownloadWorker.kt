@@ -12,7 +12,9 @@ import androidx.work.workDataOf
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
 import com.akslabs.cloudgallery.data.localdb.DbHolder
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
+import com.akslabs.cloudgallery.utils.ContentHasher
 import com.akslabs.cloudgallery.utils.getMimeTypeFromExt
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import kotlinx.coroutines.Dispatchers
@@ -40,8 +42,9 @@ class InstantPhotoDownloadWorker(
 
         return withContext(Dispatchers.IO) {
             try {
+                val deviceId = Preferences.getOrCreateDeviceId()
+
                 Log.d(TAG, "Getting remote photo from database for remoteId: $remoteId")
-                // Get remote photo details from database
                 val remotePhoto = DbHolder.database.remotePhotoDao().getById(remoteId)
                     ?: return@withContext Result.failure(workDataOf(KEY_RESULT_ERROR to "Remote photo not found"))
                 
@@ -55,11 +58,13 @@ class InstantPhotoDownloadWorker(
                 }
                 
                 Log.d(TAG, "Starting download from Telegram for remoteId: $remoteId")
-                // Download file from Telegram
                 val byteArray = BotApi.getFile(remoteId)
                     ?: return@withContext Result.failure(workDataOf(KEY_RESULT_ERROR to "Failed to download file"))
                 
                 Log.d(TAG, "Downloaded ${byteArray.size} bytes")
+
+                // Compute content hash for the downloaded file
+                val contentHash = ContentHasher.computeHash(byteArray)
 
                 val inStream = ByteArrayInputStream(byteArray)
                 val contentValues = ContentValues().apply {
@@ -87,21 +92,30 @@ class InstantPhotoDownloadWorker(
                     contentValues
                 ) ?: return@withContext Result.failure(workDataOf(KEY_RESULT_ERROR to "Failed to create file"))
 
-                // Copy data to file
                 resolver.openOutputStream(uri).use { outStream ->
                     inStream.copyTo(outStream!!)
                 }
 
-                // Insert photo into local database
+                // Insert photo with device-aware metadata
                 val photo = Photo(
                     localId = uri.lastPathSegment!!,
                     remoteId = remotePhoto.remoteId,
                     photoType = remotePhoto.photoType,
-                    pathUri = uri.toString()
+                    pathUri = uri.toString(),
+                    contentHash = contentHash,
+                    uploadStatus = "DONE",
+                    deviceId = deviceId
                 )
                 DbHolder.database.photoDao().insertPhotos(photo)
+
+                // Also update content hash on the remote photo if missing
+                if (remotePhoto.contentHash == null) {
+                    DbHolder.database.remotePhotoDao().insertAll(
+                        remotePhoto.copy(contentHash = contentHash)
+                    )
+                }
                 
-                Log.d(TAG, "Download completed successfully for remoteId: $remoteId")
+                Log.d(TAG, "Download completed successfully for remoteId: $remoteId (hash: ${contentHash.take(8)})")
                 context.toastFromMainThread("Photo downloaded successfully!")
                 Result.success()
             } catch (e: Exception) {

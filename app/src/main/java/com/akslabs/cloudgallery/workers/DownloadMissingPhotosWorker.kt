@@ -11,8 +11,10 @@ import androidx.work.WorkerParameters
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
 import com.akslabs.cloudgallery.data.localdb.DbHolder
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
+import com.akslabs.cloudgallery.utils.ContentHasher
 import com.akslabs.cloudgallery.utils.getMimeTypeFromExt
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import java.io.ByteArrayInputStream
@@ -31,19 +33,28 @@ class DownloadMissingPhotosWorker(
         }
         return withContext(Dispatchers.IO) {
             try {
-                // Get all remote photos and filter for those not on device
+                val deviceId = Preferences.getOrCreateDeviceId()
+
+                // Only get ACTIVE remote photos (not DELETED ones)
                 val allRemotePhotos = DbHolder.database.remotePhotoDao().getAll()
                 val allLocalPhotos = DbHolder.database.photoDao().getAll()
                 val localRemoteIds = allLocalPhotos.mapNotNull { it.remoteId }.toSet()
+                val localContentHashes = allLocalPhotos.mapNotNull { it.contentHash }.toSet()
 
                 val remotePhotosNotOnDevice = allRemotePhotos.filter { remotePhoto ->
-                    remotePhoto.remoteId !in localRemoteIds
+                    remotePhoto.remoteId !in localRemoteIds &&
+                    // Content-hash dedup: skip if same content already on device
+                    (remotePhoto.contentHash == null || remotePhoto.contentHash !in localContentHashes)
                 }
 
                 val photosToInsert = mutableListOf<Photo>()
 
                 remotePhotosNotOnDevice.forEach { remotePhoto ->
                         val byteArray = BotApi.getFile(remotePhoto.remoteId)!!
+
+                        // Compute content hash for the downloaded file
+                        val contentHash = ContentHasher.computeHash(byteArray)
+
                         val inStream = ByteArrayInputStream(byteArray)
                         val contentValues = ContentValues().apply {
                             put(
@@ -81,7 +92,10 @@ class DownloadMissingPhotosWorker(
                                     localId = uri.lastPathSegment!!,
                                     remoteId = remotePhoto.remoteId,
                                     photoType = remotePhoto.photoType,
-                                    pathUri = uri.toString()
+                                    pathUri = uri.toString(),
+                                    contentHash = contentHash,
+                                    uploadStatus = "DONE",
+                                    deviceId = deviceId
                                 )
                             )
                         }

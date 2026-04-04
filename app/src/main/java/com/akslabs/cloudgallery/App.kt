@@ -24,6 +24,7 @@ class App : Application() {
         super.onCreate()
 
         Preferences.init(applicationContext)
+        Preferences.getOrCreateDeviceId() // Generate device ID on first launch
         DbHolder.create(applicationContext)
 
         WorkModule.create(applicationContext)

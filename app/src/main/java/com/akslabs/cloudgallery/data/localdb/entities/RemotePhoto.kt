@@ -4,6 +4,7 @@ import android.os.Parcelable
 import androidx.annotation.Keep
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -11,7 +12,15 @@ import kotlinx.parcelize.Parcelize
 
 @Keep
 @Parcelize
-@Entity(tableName = "remote_photos")
+@Entity(
+    tableName = "remote_photos",
+    indices = [
+        Index(value = ["uploadedAt"]),
+        Index(value = ["contentHash"]),
+        Index(value = ["localId"]),
+        Index(value = ["status"])
+    ]
+)
 data class RemotePhoto(
     @PrimaryKey val remoteId: String,
     @ColumnInfo val photoType: String,
@@ -21,6 +30,12 @@ data class RemotePhoto(
     @ColumnInfo val thumbnailCached: Boolean = false,
     @ColumnInfo val messageId: Long? = null,
     @ColumnInfo val uploadType: String? = null,
+    @ColumnInfo val localId: String? = null,
+    @ColumnInfo val contentHash: String? = null,
+    @ColumnInfo val status: String = "ACTIVE",
+    @ColumnInfo val deletedAt: Long? = null,
+    @ColumnInfo val uploadedByDevice: String? = null,
+    @ColumnInfo val deletedByDevice: String? = null
 ) : Parcelable {
 
     fun toPhoto(): Photo = Photo("", remoteId, photoType, "")
@@ -37,6 +52,16 @@ data class RemotePhoto(
             @JsonProperty("thumbnailCached") thumbnailCached: Boolean = false,
             @JsonProperty("messageId") messageId: Long? = null,
             @JsonProperty("uploadType") uploadType: String? = null,
-        ): RemotePhoto = RemotePhoto(remoteId, photoType, fileName, fileSize, uploadedAt, thumbnailCached, messageId, uploadType)
+            @JsonProperty("localId") localId: String? = null,
+            @JsonProperty("contentHash") contentHash: String? = null,
+            @JsonProperty("status") status: String = "ACTIVE",
+            @JsonProperty("deletedAt") deletedAt: Long? = null,
+            @JsonProperty("uploadedByDevice") uploadedByDevice: String? = null,
+            @JsonProperty("deletedByDevice") deletedByDevice: String? = null
+        ): RemotePhoto = RemotePhoto(
+            remoteId, photoType, fileName, fileSize, uploadedAt, thumbnailCached,
+            messageId, uploadType, localId, contentHash, status, deletedAt,
+            uploadedByDevice, deletedByDevice
+        )
     }
 }

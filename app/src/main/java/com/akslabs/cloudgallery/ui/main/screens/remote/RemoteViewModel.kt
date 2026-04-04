@@ -8,6 +8,7 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.akslabs.cloudgallery.data.localdb.DbHolder
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -76,26 +77,17 @@ class RemoteViewModel : ViewModel() {
     fun moveToTrash(selectedIds: Set<String>) {
         viewModelScope.launch {
             val dao = DbHolder.database.remotePhotoDao()
-            val deletedDao = DbHolder.database.deletedPhotoDao()
-            val channelId = com.akslabs.cloudgallery.data.localdb.Preferences.getEncryptedLong(com.akslabs.cloudgallery.data.localdb.Preferences.channelId, 0L)
+            val deviceId = Preferences.getOrCreateDeviceId()
+            val channelId = Preferences.getEncryptedLong(Preferences.channelId, 0L)
 
             selectedIds.forEach { id ->
                 val photo = dao.getById(id)
                 if (photo != null) {
-                    // Move to DeletedPhoto
-                    val deletedPhoto = com.akslabs.cloudgallery.data.localdb.entities.DeletedPhoto(
-                        remoteId = photo.remoteId,
-                        photoType = photo.photoType,
-                        fileName = photo.fileName,
-                        fileSize = photo.fileSize,
-                        uploadedAt = photo.uploadedAt,
-                        deletedAt = System.currentTimeMillis(),
-                        messageId = photo.messageId
+                    // Soft-delete in remote_photos (status → DELETED)
+                    dao.softDelete(
+                        remoteId = id,
+                        deletedByDevice = deviceId
                     )
-                    deletedDao.insert(deletedPhoto)
-
-                    // Delete from RemotePhoto
-                    dao.delete(id)
 
                     // Delete from Telegram if possible
                     if (channelId != 0L && photo.messageId != null) {
