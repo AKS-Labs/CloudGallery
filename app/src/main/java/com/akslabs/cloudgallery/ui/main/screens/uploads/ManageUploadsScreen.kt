@@ -776,9 +776,9 @@ private fun UploadListContent(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Rounded.CloudUpload, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Backing up photos...", style = MaterialTheme.typography.titleSmall)
+                                Text(if (total > 0 && current > 0) "Uploading $current of $total" else "Preparing backup...", style = MaterialTheme.typography.titleSmall)
                                 Spacer(Modifier.weight(1f))
-                                Text("${queuedPhotos.size} remaining", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${queuedPhotos.size} remaining • batch $current/$total", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Spacer(Modifier.height(8.dp))
                             LinearProgressIndicator(
