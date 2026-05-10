@@ -1,5 +1,6 @@
 package com.akslabs.cloudgallery.ui.components
 import androidx.compose.material.icons.rounded.Share
+import com.akslabs.cloudgallery.api.BotApi
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -268,23 +269,43 @@ fun PhotoView(
         ) {
             androidx.compose.material3.FloatingActionButton(
                 onClick = {
-                    // Share the photo via Android share intent
-                    try {
-                        val photoUri = android.net.Uri.parse(photo.pathUri)
-                        // Cloud-only photos need to be downloaded first
-                        if (isOnlyRemote && (photo.remoteId != null && photo.pathUri.startsWith("content://") == false)) {
-                            android.widget.Toast.makeText(context, "Download the photo first to share it", android.widget.Toast.LENGTH_SHORT).show()
-                            return@FloatingActionButton
+                    scope.launch {
+                        try {
+                            if (isOnlyRemote && photo.remoteId != null) {
+                                // Cloud photo: download to temp, then share
+                                android.widget.Toast.makeText(context, "Preparing to share...", android.widget.Toast.LENGTH_SHORT).show()
+                                val bytes = BotApi.getFile(photo.remoteId!!)
+                                if (bytes != null) {
+                                    val tempFile = java.io.File(context.cacheDir, "share_${System.currentTimeMillis()}.${photo.photoType}")
+                                    tempFile.writeBytes(bytes)
+                                    val shareUri = androidx.core.content.FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.provider",
+                                        tempFile
+                                    )
+                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "image/${photo.photoType}"
+                                        putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
+                                } else {
+                                    android.widget.Toast.makeText(context, "Failed to download photo", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                // Local photo: share directly
+                                val photoUri = android.net.Uri.parse(photo.pathUri)
+                                val mimeType = context.contentResolver.getType(photoUri) ?: "image/*"
+                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = mimeType
+                                    putExtra(android.content.Intent.EXTRA_STREAM, photoUri)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
+                            }
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "Share failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                         }
-                        val mimeType = context.contentResolver.getType(photoUri) ?: "image/*"
-                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = mimeType
-                            putExtra(android.content.Intent.EXTRA_STREAM, photoUri)
-                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
-                    } catch (e: Exception) {
-                        android.widget.Toast.makeText(context, "Cannot share this photo: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
