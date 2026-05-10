@@ -84,10 +84,10 @@ object ImageLoaderModule {
             }
             .okHttpClient(okHttpClient)
             .components { 
-                add(NetworkFetcher.Factory()) 
+                add(LocalThumbnailFetcher.Factory()) 
             }
             .build()
-        Log.i(TAG, "thumbnailImageLoader created successfully")
+        Log.i(TAG, "thumbnailImageLoader created successfully (LocalThumbnailFetcher)")
 
         // Register memory trimmer
         appContext.registerComponentCallbacks(object : ComponentCallbacks2 {

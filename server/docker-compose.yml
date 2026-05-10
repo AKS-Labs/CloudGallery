@@ -1,0 +1,14 @@
+services:
+  cloudgallery-server:
+    build: .
+    container_name: cloudgallery-server
+    ports:
+      - "8100:8100"
+    volumes:
+      - cloudgallery-data:/data
+    env_file:
+      - .env
+    restart: unless-stopped
+
+volumes:
+  cloudgallery-data:

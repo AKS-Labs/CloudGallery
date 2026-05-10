@@ -8,6 +8,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Place
 
 sealed class Screens(val displayTitle: String, val route: String, val icon: ImageVector? = null) {
     data object RemotePhotos :
@@ -27,7 +29,13 @@ sealed class Screens(val displayTitle: String, val route: String, val icon: Imag
 
     data object ManageUploads : Screens(displayTitle = "Manage Uploads", route = "manage_uploads", icon = Icons.Default.CloudUpload)
 
+    data object ServerFeatures : Screens(displayTitle = "Server Features", route = "server_features")
+
+    data object People : Screens(displayTitle = "People", route = "people", icon = Icons.Default.People)
+
+    data object Places : Screens(displayTitle = "Places", route = "places", icon = Icons.Default.Place)
+
     companion object {
-        val drawerScreens by lazy { listOf(LocalPhotos, RemotePhotos, Settings) }
+        val drawerScreens by lazy { listOf(LocalPhotos, RemotePhotos, People, Places, Settings) }
     }
 }

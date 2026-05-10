@@ -238,7 +238,7 @@ fun AppNavHost(
         }
 
         composable(route = Screens.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(navController = navController)
         }
 
         composable(route = Screens.TrashBin.route) {
@@ -257,6 +257,26 @@ fun AppNavHost(
 
         composable(route = Screens.ManageUploads.route) {
             com.akslabs.cloudgallery.ui.main.screens.uploads.ManageUploadsScreen(navController = navController)
+        }
+
+        composable(route = Screens.ServerFeatures.route) {
+            com.akslabs.cloudgallery.ui.main.screens.server.ServerFeaturesScreen()
+        }
+
+        composable(route = Screens.People.route) {
+            com.akslabs.cloudgallery.ui.main.screens.people.PeopleScreen(
+                onPersonClick = { person ->
+                    // TODO: Navigate to filtered cloud grid for this person
+                }
+            )
+        }
+
+        composable(route = Screens.Places.route) {
+            com.akslabs.cloudgallery.ui.main.screens.places.PlacesScreen(
+                onPlaceClick = { place ->
+                    // TODO: Navigate to filtered cloud grid for this place
+                }
+            )
         }
     }
 }

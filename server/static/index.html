@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudGallery Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav>
+    <div class="nav-brand">☁️ CloudGallery</div>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Search photos..." />
+      <button onclick="doSearch()"><i data-lucide="search"></i></button>
+    </div>
+  </nav>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="overview" onclick="switchTab('overview')"><i data-lucide="layout-dashboard"></i> Overview</button>
+    <button class="tab" data-tab="timeline" onclick="switchTab('timeline')"><i data-lucide="calendar"></i> Timeline</button>
+    <button class="tab" data-tab="people" onclick="switchTab('people')"><i data-lucide="users"></i> People</button>
+    <button class="tab" data-tab="places" onclick="switchTab('places')"><i data-lucide="map-pin"></i> Places</button>
+    <button class="tab" data-tab="albums" onclick="switchTab('albums')"><i data-lucide="folder"></i> Albums</button>
+    <button class="tab" data-tab="memories" onclick="switchTab('memories')"><i data-lucide="sparkles"></i> On This Day</button>
+    <button class="tab" data-tab="search-results" onclick="switchTab('search-results')" id="searchTab" style="display:none"><i data-lucide="search"></i> Results</button>
+  </div>
+
+  <main>
+    <!-- Overview -->
+    <section id="tab-overview" class="tab-content active">
+      <div class="stats-grid" id="statsGrid"></div>
+      <h2>Recent Photos</h2>
+      <div class="photo-grid" id="recentPhotos"></div>
+    </section>
+
+    <!-- Timeline -->
+    <section id="tab-timeline" class="tab-content">
+      <h2>Timeline</h2>
+      <div id="timelineContent"></div>
+    </section>
+
+    <!-- People -->
+    <section id="tab-people" class="tab-content">
+      <h2>People</h2>
+      <div class="cards-grid" id="peopleContent"></div>
+    </section>
+
+    <!-- Places -->
+    <section id="tab-places" class="tab-content">
+      <h2>Places</h2>
+      <div class="cards-grid" id="placesContent"></div>
+    </section>
+
+    <!-- Albums -->
+    <section id="tab-albums" class="tab-content">
+      <h2>Albums</h2>
+      <div class="album-actions">
+        <input type="text" id="newAlbumName" placeholder="New album name..." />
+        <button onclick="createAlbum()">Create Album</button>
+      </div>
+      <div class="cards-grid" id="albumsContent"></div>
+    </section>
+
+    <!-- Memories -->
+    <section id="tab-memories" class="tab-content">
+      <h2>📸 On This Day</h2>
+      <div id="memoriesContent"></div>
+    </section>
+
+    <!-- Search Results -->
+    <section id="tab-search-results" class="tab-content">
+      <h2>Search Results</h2>
+      <div class="photo-grid" id="searchResults"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

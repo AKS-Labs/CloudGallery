@@ -332,7 +332,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                             Column(modifier = Modifier.padding(top = 30.dp)) {
                                                 val titleText = when (currentRoute) {
                                                     Screens.LocalPhotos.route -> " Device Photos"
-                                                    Screens.RemotePhotos.route -> " Cloud Gallery"
+                                                    Screens.RemotePhotos.route -> if (cloudPhotosCount > 0) " Cloud · ${java.text.NumberFormat.getInstance().format(cloudPhotosCount)}" else " Cloud Gallery"
                                                     Screens.TrashBin.route -> " Trash Bin"
                                                     else -> " Cloud Gallery"
                                                 }
@@ -580,23 +580,30 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                         val backupProgress by viewModel.backupProgress.collectAsStateWithLifecycle()
                         
                         Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+                            // WorkManager state — read once so visibility + content use same data
+                            val workManager = androidx.work.WorkManager.getInstance(context)
+                            val workInfos by workManager.getWorkInfosForUniqueWorkFlow("InstantPhotoBackupWork").collectAsStateWithLifecycle(emptyList())
+                            val hasRunningWorker = workInfos.any { it.state == androidx.work.WorkInfo.State.RUNNING || it.state == androidx.work.WorkInfo.State.ENQUEUED }
+                            val running = workInfos.firstOrNull { it.state == androidx.work.WorkInfo.State.RUNNING }
+                            val progress = running?.progress
+                            val wkCurrent = progress?.getInt("progress_current", 0) ?: 0
+                            val wkTotal = progress?.getInt("progress_max", 0) ?: 0
+                            val wkTotalDone = progress?.getInt("total_done", 0) ?: 0
+                            val wkTotalPhotos = progress?.getInt("total_photos", 0) ?: 0
+                            val wkPending = if (wkTotalPhotos > 0) wkTotalPhotos - wkTotalDone else 0
+                            // Show bar only when worker is actually running/enqueued AND there are pending photos
+                            val showProgress = hasRunningWorker && (wkPending > 0 || backupProgress.isActive)
+
                             AnimatedVisibility(
-                                visible = backupProgress.isActive || (backupProgress.totalPhotos > 0 && backupProgress.totalPhotos > backupProgress.totalDone),
+                                visible = showProgress,
                                 enter = expandVertically() + fadeIn(),
                                 exit = shrinkVertically() + fadeOut()
                             ) {
                                 run {
-                                    val workManager = androidx.work.WorkManager.getInstance(context)
-                                    val workInfos by workManager.getWorkInfosForUniqueWorkFlow("InstantPhotoBackupWork").collectAsStateWithLifecycle(emptyList())
-                                    val running = workInfos.firstOrNull { it.state == androidx.work.WorkInfo.State.RUNNING }
-                                    val progress = running?.progress
-                                    val current = progress?.getInt("progress_current", 0) ?: 0
-                                    val total = progress?.getInt("progress_max", 0) ?: 0
+                                    val current = wkCurrent
+                                    val total = wkTotal
                                     val rawUri = progress?.getString("current_file_uri") ?: ""
-                                    // Live count from worker progress, fallback to ViewModel
-                                    val wkTotalDone = progress?.getInt("total_done", 0) ?: 0
-                                    val wkTotalPhotos = progress?.getInt("total_photos", 0) ?: 0
-                                    val pendingCount = if (wkTotalPhotos > 0) wkTotalPhotos - wkTotalDone else backupProgress.totalPhotos - backupProgress.totalDone
+                                    val pendingCount = if (wkPending > 0) wkPending else backupProgress.totalPhotos - backupProgress.totalDone
 
                                     Card(
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),

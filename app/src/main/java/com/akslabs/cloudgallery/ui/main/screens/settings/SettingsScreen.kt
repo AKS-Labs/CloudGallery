@@ -45,6 +45,10 @@ import com.akslabs.cloudgallery.utils.toastFromMainThread
 import com.akslabs.cloudgallery.workers.WorkModule
 import com.akslabs.cloudgallery.ui.components.DonateBottomSheet
 import com.akslabs.cloudgallery.ui.components.MoreAppsBottomSheet
+import androidx.navigation.NavController
+import com.akslabs.cloudgallery.api.ServerApi
+import com.akslabs.cloudgallery.api.ServerConfig
+import com.akslabs.cloudgallery.ui.main.nav.Screens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -298,7 +302,7 @@ fun SettingsItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.background)) {
+fun SettingsScreen(navController: NavController? = null, modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.background)) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -725,6 +729,127 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                                 }
                             }
                         }
+                    )
+                }
+            }
+
+            // CLOUD SERVER SECTION
+            Spacer(modifier = Modifier.height(16.dp))
+            SettingsSection(title = "Cloud Server")
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
+                var serverUrl by remember { mutableStateOf(ServerConfig.getServerUrl()) }
+                var connectionStatus by remember { mutableStateOf<String?>(null) }
+                var isTestingConnection by remember { mutableStateOf(false) }
+                var isScanning by remember { mutableStateOf(false) }
+
+                Column(modifier = Modifier.padding(16.dp)) {
+                    OutlinedTextField(
+                        value = serverUrl,
+                        onValueChange = {
+                            serverUrl = it
+                            ServerConfig.setServerUrl(it)
+                            connectionStatus = null
+                        },
+                        label = { Text("Server URL") },
+                        placeholder = { Text("http://192.168.1.x:8100") },
+                        leadingIcon = { Icon(Icons.Rounded.Dns, contentDescription = null) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                isTestingConnection = true
+                                connectionStatus = null
+                                scope.launch {
+                                    val status = ServerApi.getServerStatus()
+                                    connectionStatus = if (status != null) {
+                                        "✅ Connected - CloudGallery Server ${status.version}"
+                                    } else {
+                                        "❌ Cannot reach server"
+                                    }
+                                    isTestingConnection = false
+                                }
+                            },
+                            enabled = serverUrl.isNotBlank() && !isTestingConnection,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (isTestingConnection) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(if (isTestingConnection) "Testing..." else "Test Connection")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                isScanning = true
+                                connectionStatus = "Scanning..."
+                                scope.launch {
+                                    val found = ServerApi.autoDetectServer()
+                                    if (found != null) {
+                                        serverUrl = found
+                                        ServerConfig.setServerUrl(found)
+                                        connectionStatus = "✅ Found at $found"
+                                    } else {
+                                        connectionStatus = "❌ Not found on local network"
+                                    }
+                                    isScanning = false
+                                }
+                            },
+                            enabled = !isScanning,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (isScanning) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(if (isScanning) "Scanning..." else "Auto-detect")
+                        }
+                    }
+
+                    connectionStatus?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (it.startsWith("✅")) MaterialTheme.colorScheme.primary
+                                   else if (it.startsWith("❌")) MaterialTheme.colorScheme.error
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    if (serverUrl.isNotBlank() && navController != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+            }
+
+            // Server Features link (only if URL is set)
+            if (ServerConfig.getServerUrl().isNotBlank() && navController != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow
+                ) {
+                    SettingsItem(
+                        icon = Icons.Rounded.AutoAwesome,
+                        title = "Server Features",
+                        subtitle = "People, Places, Search, Albums & Dashboard",
+                        onClick = { navController.navigate(Screens.ServerFeatures.route) }
                     )
                 }
             }

@@ -24,7 +24,8 @@ fun PhotoPageView(
     onDismissRequest: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
-    onPhotoChanged: (String) -> Unit = {}
+    onPhotoChanged: (String) -> Unit = {},
+    onPhotoDeleted: ((String) -> Unit)? = null
 ) {
     val showUiState = remember { androidx.compose.runtime.mutableStateOf(true) }
     
@@ -82,7 +83,13 @@ fun PhotoPageView(
                     showUiState = { showUiState },
                     window = window,
                     sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    onDeletePhoto = {
+                        val deletedId = if (isRemote) activePhotos[pageIndex].remoteId else activePhotos[pageIndex].localId
+                        if (deletedId != null) onPhotoDeleted?.invoke(deletedId)
+                        // If last photo, dismiss; otherwise pager auto-adjusts
+                        if (activePhotos.size <= 1) onDismissRequest()
+                    }
                 )
             }
         }

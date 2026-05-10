@@ -5,25 +5,32 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.akslabs.cloudgallery.data.localdb.dao.DeletedPhotoDao
+import com.akslabs.cloudgallery.data.localdb.dao.PersonDao
+import com.akslabs.cloudgallery.data.localdb.dao.PlaceDao
 import com.akslabs.cloudgallery.data.localdb.dao.PhotoDao
 import com.akslabs.cloudgallery.data.localdb.dao.RemotePhotoDao
 import com.akslabs.cloudgallery.data.localdb.entities.DeletedPhoto
+import com.akslabs.cloudgallery.data.localdb.entities.Person
+import com.akslabs.cloudgallery.data.localdb.entities.Place
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import com.akslabs.cloudgallery.data.localdb.migration.Migration1to2_NullableRemoteId
 import com.akslabs.cloudgallery.data.localdb.migration.Migration2to3_RemotePhotoTable
 import com.akslabs.cloudgallery.data.localdb.migration.Migration3to4_EnhancedRemotePhoto
 import com.akslabs.cloudgallery.data.localdb.migration.Migration4to5_DeletedPhotos
+import com.akslabs.cloudgallery.data.localdb.migration.Migration9to10_Metadata
 
 @Database(
-    entities = [Photo::class, RemotePhoto::class, DeletedPhoto::class],
-    version = 7,
+    entities = [Photo::class, RemotePhoto::class, DeletedPhoto::class, Person::class, Place::class],
+    version = 10,
     exportSchema = false
 )
 abstract class WhDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun remotePhotoDao(): RemotePhotoDao
     abstract fun deletedPhotoDao(): DeletedPhotoDao
+    abstract fun personDao(): PersonDao
+    abstract fun placeDao(): PlaceDao
 
     companion object {
         private const val DATABASE_NAME = "wh_database"
@@ -44,7 +51,10 @@ abstract class WhDatabase : RoomDatabase() {
                         Migration3to4_EnhancedRemotePhoto(),
                         Migration4to5_DeletedPhotos(),
                         com.akslabs.cloudgallery.data.localdb.migration.Migration5to6_MessageId(),
-                        com.akslabs.cloudgallery.data.localdb.migration.Migration6to7_UploadType()
+                        com.akslabs.cloudgallery.data.localdb.migration.Migration6to7_UploadType(),
+                        com.akslabs.cloudgallery.data.localdb.migration.Migration7to8_ThumbFileId(),
+                        com.akslabs.cloudgallery.data.localdb.migration.Migration8to9_ThumbnailBlob(),
+                        Migration9to10_Metadata()
                     )
                     .fallbackToDestructiveMigration()
                     .build()

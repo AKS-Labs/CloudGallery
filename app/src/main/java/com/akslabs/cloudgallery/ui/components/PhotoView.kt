@@ -1,5 +1,10 @@
 package com.akslabs.cloudgallery.ui.components
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.Done
+import androidx.compose.material.icons.rounded.HourglassTop
 import com.akslabs.cloudgallery.api.BotApi
 
 import androidx.compose.animation.AnimatedVisibility
@@ -7,8 +12,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -27,10 +36,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -39,7 +51,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -57,6 +71,7 @@ import coil.request.ImageRequest
 import androidx.compose.animation.*
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.ui.main.screens.local.UploadState
 import com.akslabs.cloudgallery.ui.main.screens.remote.DownloadState
@@ -65,8 +80,10 @@ import com.akslabs.cloudgallery.utils.toastFromMainThread
 import com.akslabs.cloudgallery.workers.WorkModule
 import com.akslabs.cloudgallery.workers.WorkModule.UPLOADING_ID
 import com.akslabs.cloudgallery.workers.WorkModule.DOWNLOADING_ID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -81,7 +98,8 @@ fun PhotoView(
     showUiState: () -> MutableState<Boolean>,
     window: Window,
     sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    onDeletePhoto: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var showUi by showUiState()
@@ -101,10 +119,25 @@ fun PhotoView(
         )
     }
     
-    // Dialog state for download confirmation when photo exists
+    // Dialog states
     var showDownloadDialog by rememberSaveable { mutableStateOf(false) }
     var existingPhotoPath by rememberSaveable { mutableStateOf("") }
+    var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
+    var showInfoDialog by rememberSaveable { mutableStateOf(false) }
+    var isDeleting by rememberSaveable { mutableStateOf(false) }
 
+    // Zoom & pan state
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    // Full-res loading state for remote photos (thumbnail-first crossfade)
+    var fullResLoaded by remember { mutableStateOf(false) }
+    val fullResAlpha by animateFloatAsState(
+        targetValue = if (fullResLoaded) 1f else 0f,
+        animationSpec = tween(500),
+        label = "fullres_crossfade"
+    )
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -189,59 +222,283 @@ fun PhotoView(
             .background(Color.Black)
     ) {
         with(sharedTransitionScope) {
-            SubcomposeAsyncImage(
-                imageLoader = if (isOnlyRemote) ImageLoaderModule.remoteImageLoader else ImageLoaderModule.defaultImageLoader,
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(if (isOnlyRemote) photo.toRemotePhoto() else photo.pathUri)
-                    .crossfade(500)
-                    .build(),
-                contentDescription = "Photo",
-                contentScale = ContentScale.Fit,
-                loading = {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        androidx.compose.material3.ContainedLoadingIndicator()
-                    }
-                },
-                modifier = Modifier
-                    .sharedElement(
-                        rememberSharedContentState(key = if (isOnlyRemote) "photo_${photo.remoteId}" else "photo_${photo.localId}"),
-                        animatedVisibilityScope = animatedVisibilityScope,
-                        boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
-                    )
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { showUi = !showUi }
+            if (isOnlyRemote) {
+                // === REMOTE PHOTO: Thumbnail-first with crossfade to full-res ===
+                val remotePhoto = photo.toRemotePhoto()
+
+                // Layer 1: Thumbnail (immediate, from cache)
+                AsyncImage(
+                    imageLoader = ImageLoaderModule.thumbnailImageLoader,
+                    model = ImageRequest.Builder(context)
+                        .data(remotePhoto)
+                        .memoryCacheKey("rt_thumb_${remotePhoto.remoteId}")
+                        .diskCacheKey("rt_thumb_${remotePhoto.remoteId}")
+                        .build(),
+                    contentDescription = "Photo thumbnail",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .sharedElement(
+                            rememberSharedContentState(key = "photo_${photo.remoteId}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
                         )
-                    }
-            )
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offsetX
+                            translationY = offsetY
+                            // Hide thumbnail when full-res is loaded
+                            alpha = 1f - fullResAlpha
+                        }
+                )
+
+                // Layer 2: Full resolution (loads in background, crossfades in)
+                SubcomposeAsyncImage(
+                    imageLoader = ImageLoaderModule.remoteImageLoader,
+                    model = ImageRequest.Builder(context)
+                        .data(remotePhoto)
+                        .build(),
+                    contentDescription = "Photo full resolution",
+                    contentScale = ContentScale.Fit,
+                    loading = {
+                        // Invisible placeholder while loading — thumbnail shows through
+                    },
+                    onSuccess = {
+                        fullResLoaded = true
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offsetX
+                            translationY = offsetY
+                            alpha = fullResAlpha
+                        }
+                )
+
+                // Gesture layer on top
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                if (scale > 1f) {
+                                    offsetX += pan.x
+                                    offsetY += pan.y
+                                } else {
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                }
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { showUi = !showUi },
+                                onDoubleTap = {
+                                    if (scale > 1.1f) {
+                                        scale = 1f
+                                        offsetX = 0f
+                                        offsetY = 0f
+                                    } else {
+                                        scale = 3f
+                                    }
+                                }
+                            )
+                        }
+                )
+            } else {
+                // === LOCAL PHOTO: existing behavior with zoom ===
+                SubcomposeAsyncImage(
+                    imageLoader = ImageLoaderModule.defaultImageLoader,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(photo.pathUri)
+                        .crossfade(500)
+                        .build(),
+                    contentDescription = "Photo",
+                    contentScale = ContentScale.Fit,
+                    loading = {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            androidx.compose.material3.ContainedLoadingIndicator()
+                        }
+                    },
+                    modifier = Modifier
+                        .sharedElement(
+                            rememberSharedContentState(key = "photo_${photo.localId}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            boundsTransform = { _, _ -> com.akslabs.cloudgallery.ui.theme.AnimationConstants.PremiumBoundsSpring }
+                        )
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offsetX
+                            translationY = offsetY
+                        }
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                if (scale > 1f) {
+                                    offsetX += pan.x
+                                    offsetY += pan.y
+                                } else {
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                }
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { showUi = !showUi },
+                                onDoubleTap = {
+                                    if (scale > 1.1f) {
+                                        scale = 1f
+                                        offsetX = 0f
+                                        offsetY = 0f
+                                    } else {
+                                        scale = 3f
+                                    }
+                                }
+                            )
+                        }
+                )
+            }
         }
 
-        // Download button for cloud photos
+        // === BOTTOM ACTION BAR ===
         AnimatedVisibility(
-            visible = isOnlyRemote && showUi,
+            visible = showUi,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 80.dp)
+                .padding(bottom = 32.dp),
+            enter = fadeIn() + slideInVertically { it },
+            exit = fadeOut() + slideOutVertically { it }
         ) {
-            FloatingDownloadBar(
+            Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                downloadState = photoDownloadState,
-                onClickDownload = {
-                    android.util.Log.d("PhotoView", "Download button clicked!")
-                    photo.remoteId?.let { remoteId ->
-                        scope.launch {
-                            handleDownloadClick(remoteId)
-                        }
-                    } ?: android.util.Log.e("PhotoView", "No remoteId found for photo!")
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isOnlyRemote) {
+                    // Download button
+                    IconButton(
+                        onClick = {
+                            photo.remoteId?.let { remoteId ->
+                                scope.launch { handleDownloadClick(remoteId) }
+                            }
+                        },
+                        enabled = photoDownloadState != DownloadState.DOWNLOADING && photoDownloadState != DownloadState.DOWNLOADED
+                    ) {
+                        Icon(
+                            imageVector = when (photoDownloadState) {
+                                DownloadState.DOWNLOADED -> Icons.Rounded.Done
+                                DownloadState.DOWNLOADING, DownloadState.ENQUEUED -> Icons.Rounded.HourglassTop
+                                else -> Icons.Rounded.CloudDownload
+                            },
+                            contentDescription = when (photoDownloadState) {
+                                DownloadState.DOWNLOADED -> "Already downloaded"
+                                DownloadState.DOWNLOADING -> "Downloading"
+                                else -> "Download"
+                            },
+                            tint = if (photoDownloadState == DownloadState.DOWNLOADED)
+                                MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
-            )
+
+                // Share button
+                IconButton(onClick = {
+                    scope.launch {
+                        try {
+                            if (isOnlyRemote && photo.remoteId != null) {
+                                android.widget.Toast.makeText(context, "Preparing to share...", android.widget.Toast.LENGTH_SHORT).show()
+                                val bytes = BotApi.getFile(photo.remoteId!!)
+                                if (bytes != null) {
+                                    val tempFile = java.io.File(context.cacheDir, "share_${System.currentTimeMillis()}.${photo.photoType}")
+                                    tempFile.writeBytes(bytes)
+                                    val shareUri = androidx.core.content.FileProvider.getUriForFile(
+                                        context, "${context.packageName}.provider", tempFile
+                                    )
+                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "image/${photo.photoType}"
+                                        putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
+                                } else {
+                                    android.widget.Toast.makeText(context, "Failed to download photo", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                val photoUri = android.net.Uri.parse(photo.pathUri)
+                                val mimeType = context.contentResolver.getType(photoUri) ?: "image/*"
+                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = mimeType
+                                    putExtra(android.content.Intent.EXTRA_STREAM, photoUri)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
+                            }
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "Share failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Share,
+                        contentDescription = "Share",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // Delete button (cloud photos only)
+                if (isOnlyRemote) {
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+
+                // Info button (cloud photos only)
+                if (isOnlyRemote) {
+                    IconButton(onClick = { showInfoDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Info,
+                            contentDescription = "Info",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
         }
 
-        // Upload button for local photos
+        // Download state indicator for remote photos (replaces old FloatingDownloadBar)
+        if (isOnlyRemote && showUi && (photoDownloadState == DownloadState.DOWNLOADING || photoDownloadState == DownloadState.ENQUEUED)) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = if (photoDownloadState == DownloadState.DOWNLOADING) "Downloading..." else "Download queued...",
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+        }
+
+        // Upload button for local photos (keep old behavior)
         AnimatedVisibility(
             visible = !isOnlyRemote && showUi,
             modifier = Modifier
@@ -258,64 +515,6 @@ fun PhotoView(
                     handleUploadClick()
                 }
             )
-        }
-
-        // Share button
-        AnimatedVisibility(
-            visible = showUi,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 80.dp, end = 16.dp)
-        ) {
-            androidx.compose.material3.FloatingActionButton(
-                onClick = {
-                    scope.launch {
-                        try {
-                            if (isOnlyRemote && photo.remoteId != null) {
-                                // Cloud photo: download to temp, then share
-                                android.widget.Toast.makeText(context, "Preparing to share...", android.widget.Toast.LENGTH_SHORT).show()
-                                val bytes = BotApi.getFile(photo.remoteId!!)
-                                if (bytes != null) {
-                                    val tempFile = java.io.File(context.cacheDir, "share_${System.currentTimeMillis()}.${photo.photoType}")
-                                    tempFile.writeBytes(bytes)
-                                    val shareUri = androidx.core.content.FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.provider",
-                                        tempFile
-                                    )
-                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                        type = "image/${photo.photoType}"
-                                        putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
-                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
-                                } else {
-                                    android.widget.Toast.makeText(context, "Failed to download photo", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            } else {
-                                // Local photo: share directly
-                                val photoUri = android.net.Uri.parse(photo.pathUri)
-                                val mimeType = context.contentResolver.getType(photoUri) ?: "image/*"
-                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                    type = mimeType
-                                    putExtra(android.content.Intent.EXTRA_STREAM, photoUri)
-                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
-                            }
-                        } catch (e: Exception) {
-                            android.widget.Toast.makeText(context, "Share failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Share,
-                    contentDescription = "Share"
-                )
-            }
         }
     }
     
@@ -345,7 +544,6 @@ fun PhotoView(
                 TextButton(
                     onClick = {
                         showDownloadDialog = false
-                        // Try to open in gallery
                         try {
                             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
                                 setDataAndType(existingPhotoPath.toUri(), "image/*")
@@ -361,6 +559,103 @@ fun PhotoView(
                     }
                 ) {
                     Text("View in Gallery")
+                }
+            }
+        )
+    }
+
+    // Delete confirmation dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isDeleting) showDeleteDialog = false },
+            title = { Text("Delete from Cloud?") },
+            text = {
+                Text("This will permanently delete this photo from your Telegram cloud storage. This cannot be undone.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isDeleting = true
+                        scope.launch {
+                            try {
+                                val remoteId = photo.remoteId ?: return@launch
+                                // Get RemotePhoto from DB for messageId
+                                val remotePhoto = withContext(Dispatchers.IO) {
+                                    DbHolder.database.remotePhotoDao().getById(remoteId)
+                                }
+                                val channelId = Preferences.getEncryptedLong(Preferences.channelId, 0L)
+                                
+                                // Delete message from Telegram
+                                if (remotePhoto?.messageId != null && channelId != 0L) {
+                                    withContext(Dispatchers.IO) {
+                                        BotApi.deleteMessage(channelId, remotePhoto.messageId!!)
+                                    }
+                                }
+                                
+                                // Delete from local DB
+                                withContext(Dispatchers.IO) {
+                                    DbHolder.database.remotePhotoDao().delete(remoteId)
+                                }
+                                
+                                android.widget.Toast.makeText(context, "Photo deleted from cloud", android.widget.Toast.LENGTH_SHORT).show()
+                                showDeleteDialog = false
+                                isDeleting = false
+                                onDeletePhoto?.invoke()
+                            } catch (e: Exception) {
+                                android.util.Log.e("PhotoView", "Delete failed: ${e.message}", e)
+                                android.widget.Toast.makeText(context, "Delete failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                isDeleting = false
+                            }
+                        }
+                    },
+                    enabled = !isDeleting,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(if (isDeleting) "Deleting..." else "Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteDialog = false },
+                    enabled = !isDeleting
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Info dialog
+    if (showInfoDialog) {
+        val remotePhoto = photo.toRemotePhoto()
+        val uploadDate = remember(remotePhoto.uploadedAt) {
+            java.text.SimpleDateFormat("MMM d, yyyy 'at' h:mm a", java.util.Locale.getDefault())
+                .format(java.util.Date(remotePhoto.uploadedAt))
+        }
+        AlertDialog(
+            onDismissRequest = { showInfoDialog = false },
+            title = { Text("Photo Info") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("File: ${remotePhoto.fileName ?: "Unknown"}")
+                    Text("Type: ${remotePhoto.photoType}")
+                    remotePhoto.fileSize?.let { size ->
+                        val sizeStr = when {
+                            size > 1024 * 1024 -> "%.1f MB".format(size / (1024.0 * 1024.0))
+                            size > 1024 -> "%.1f KB".format(size / 1024.0)
+                            else -> "$size bytes"
+                        }
+                        Text("Size: $sizeStr")
+                    }
+                    Text("Uploaded: $uploadDate")
+                    Text("ID: ${remotePhoto.remoteId.take(20)}...")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showInfoDialog = false }) {
+                    Text("Close")
                 }
             }
         )

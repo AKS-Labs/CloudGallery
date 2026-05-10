@@ -15,6 +15,7 @@ import coil.memory.MemoryCache
 import android.graphics.Bitmap
 import coil.Coil
 import com.akslabs.cloudgallery.utils.NotificationHelper
+import com.akslabs.cloudgallery.workers.ThumbnailSyncWorker
 import java.io.File
 
 
@@ -49,6 +50,9 @@ class App : Application() {
             .build()
         Coil.setImageLoader(imageLoader)
         NotificationHelper.createNotificationChannels(this)
+
+        // Start thumbnail sync worker to pre-download all cloud thumbnails
+        ThumbnailSyncWorker.enqueue(this)
     }
 
     }

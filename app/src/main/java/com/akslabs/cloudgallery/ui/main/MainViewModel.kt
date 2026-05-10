@@ -157,9 +157,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val allCloudPhotosFlow: Flow<PagingData<RemotePhoto>> by lazy {
         Pager(
             config = PagingConfig(
-                pageSize = 24,
-                prefetchDistance = 72,
-                jumpThreshold = 120
+                pageSize = 200,
+                prefetchDistance = 400,
+                jumpThreshold = 500,
+                initialLoadSize = 200
             ),
             pagingSourceFactory = {
                 Log.d("MainViewModel", "=== CREATING NEW REMOTE PAGING SOURCE ===")

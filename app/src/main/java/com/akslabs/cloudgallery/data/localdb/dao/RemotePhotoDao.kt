@@ -61,4 +61,19 @@ interface RemotePhotoDao {
 
     @Query("SELECT remoteId FROM remote_photos")
     suspend fun getAllRemoteIds(): List<String>
+
+    @Query("UPDATE remote_photos SET thumbFileId = :thumbFileId WHERE remoteId = :remoteId")
+    suspend fun updateThumbFileId(remoteId: String, thumbFileId: String)
+
+    @Query("SELECT * FROM remote_photos WHERE thumbSynced = 0 ORDER BY uploadedAt DESC LIMIT :limit")
+    suspend fun getUnsyncedPhotos(limit: Int = 20): List<RemotePhoto>
+
+    @Query("UPDATE remote_photos SET thumbnailBytes = :bytes, thumbSynced = 1 WHERE remoteId = :remoteId")
+    suspend fun updateThumbnail(remoteId: String, bytes: ByteArray)
+
+    @Query("SELECT COUNT(*) FROM remote_photos WHERE thumbSynced = 0")
+    suspend fun getUnsyncedCount(): Int
+
+    @Query("SELECT COUNT(*) FROM remote_photos WHERE thumbSynced = 1")
+    suspend fun getSyncedCount(): Int
 }

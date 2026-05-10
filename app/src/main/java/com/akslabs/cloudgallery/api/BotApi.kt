@@ -96,6 +96,25 @@ object BotApi {
         }
     }
 
+    /**
+     * Resolves a Telegram file_id to a direct download URL.
+     * Returns a URL like: https://api.telegram.org/file/bot{TOKEN}/{file_path}
+     * These URLs are valid for ~1 hour.
+     */
+    suspend fun getFileUrl(fileId: String): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val result = bot.getFile(fileId)
+                val filePath = result.first?.body()?.result?.filePath ?: return@withContext null
+                val token = Preferences.getEncryptedString(Preferences.botToken, "")
+                "https://api.telegram.org/file/bot$token/$filePath"
+            } catch (e: Exception) {
+                Log.e(TAG, "getFileUrl failed for $fileId", e)
+                null
+            }
+        }
+    }
+
     suspend fun deleteMessage(chatId: Long, messageId: Long): Boolean {
         return withContext(Dispatchers.IO) {
             try {

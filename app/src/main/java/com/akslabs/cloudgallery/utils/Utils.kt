@@ -96,8 +96,10 @@ suspend fun sendFileViaUri(
     uploadType: String? = null,
     fileName: String? = null
 ) {
-    val mimeType: String? = getMimeTypeFromUri(contentResolver, uri)
-    val fileExtension = getExtFromMimeType(mimeType!!)
+    val mimeType: String = getMimeTypeFromUri(contentResolver, uri) ?: "image/jpeg"
+    val fileExtension = getExtFromMimeType(mimeType)
+        ?: mimeType.substringAfterLast('/').let { if (it == "jpg") "jpeg" else it }
+        ?: "jpg"
     val originalFileName = fileName ?: getFileName(contentResolver, uri)
     val inputStream = contentResolver.openInputStream(uri)
     inputStream?.use { ipStream ->
@@ -168,6 +170,7 @@ suspend fun sendFileApi(
         DbHolder.database.photoDao().updateRemoteIdForPath(pathUri.toString(), fileId)
 
         // Insert/replace RemotePhoto so Cloud screen picks it up immediately
+        val thumbId = doc?.thumb?.fileId
         DbHolder.database.remotePhotoDao().insertAll(
             RemotePhoto(
                 remoteId = fileId,
@@ -177,7 +180,8 @@ suspend fun sendFileApi(
                 uploadedAt = System.currentTimeMillis(),
                 thumbnailCached = false,
                 messageId = message?.messageId,
-                uploadType = uploadType
+                uploadType = uploadType,
+                thumbFileId = thumbId
             )
         )
         Log.d(TAG, "sendFile: Success! Metadata included in caption.")

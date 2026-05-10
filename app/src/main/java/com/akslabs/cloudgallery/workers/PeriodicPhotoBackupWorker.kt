@@ -139,8 +139,10 @@ class PeriodicPhotoBackupWorker(
 
             val uri = photo.pathUri.toUri()
             val fileName = com.akslabs.cloudgallery.utils.getFileName(appContext.contentResolver, uri)
-            val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri)
-            val ext = getExtFromMimeType(mimeType!!)
+            val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri) ?: "image/jpeg"
+            val ext = getExtFromMimeType(mimeType)
+                ?: mimeType.substringAfterLast('/').let { if (it == "jpg") "jpeg" else it }
+                ?: "jpg"
             val FIFTY_MB = 50L * 1024 * 1024
 
             // Stream file to temp instead of reading entire file into memory

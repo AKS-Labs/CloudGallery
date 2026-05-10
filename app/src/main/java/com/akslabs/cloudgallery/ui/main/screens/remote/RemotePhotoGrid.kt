@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,7 +34,11 @@ import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.*
@@ -52,6 +57,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import coil.compose.AsyncImage
@@ -75,12 +81,15 @@ import com.akslabs.cloudgallery.ui.components.PhotoPageView
 import com.akslabs.cloudgallery.ui.main.rememberGridState
 import com.akslabs.cloudgallery.utils.coil.ImageLoaderModule
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 import androidx.compose.ui.graphics.graphicsLayer
 import com.akslabs.cloudgallery.ui.components.ExpressiveEmptyState
 import com.akslabs.cloudgallery.ui.main.nav.Screens
-import kotlinx.coroutines.yield
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 private const val TAG = "RemotePhotoGrid"
 
@@ -107,16 +116,45 @@ data class RemoteLayoutCache(
     val lastUpdateTime: Long
 )
 
-// Function to format remote photo date with fallback
-private fun formatRemotePhotoDate(timestamp: Long): String {
+// Smart date label: Today, Yesterday, This Week, Last Week, Month Year, or Year
+private fun formatSmartDateLabel(timestamp: Long): String {
     return try {
-        java.text.SimpleDateFormat("EEE d - LLLL yyyy", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+        val now = Calendar.getInstance()
+        val photo = Calendar.getInstance().apply { timeInMillis = timestamp }
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+        val yesterday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+
+        // Week boundaries (Monday start)
+        val thisWeekStart = (today.clone() as Calendar).apply {
+            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            if (get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) add(Calendar.WEEK_OF_YEAR, 0)
+        }
+        val lastWeekStart = (thisWeekStart.clone() as Calendar).apply { add(Calendar.WEEK_OF_YEAR, -1) }
+
+        val photoDay = Calendar.getInstance().apply {
+            timeInMillis = timestamp
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+
+        when {
+            photoDay.timeInMillis >= today.timeInMillis -> "Today"
+            photoDay.timeInMillis >= yesterday.timeInMillis -> "Yesterday"
+            photoDay.timeInMillis >= thisWeekStart.timeInMillis -> "This Week"
+            photoDay.timeInMillis >= lastWeekStart.timeInMillis -> "Last Week"
+            photo.get(Calendar.YEAR) == now.get(Calendar.YEAR) ||
+                photo.get(Calendar.YEAR) == now.get(Calendar.YEAR) - 1 -> {
+                java.text.SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(timestamp))
+            }
+            else -> photo.get(Calendar.YEAR).toString()
+        }
     } catch (e: Exception) {
         "Unknown Date"
     }
 }
 
-// Optimized function to group remote photos by date ensuring ALL photos are included
+// Optimized function to group remote photos by smart date ensuring ALL photos are included
 private fun groupRemotePhotosByDateOptimized(
     cloudPhotos: LazyPagingItems<RemotePhoto>
 ): List<RemoteDateGroup> {
@@ -124,13 +162,10 @@ private fun groupRemotePhotosByDateOptimized(
     var processedCount = 0
     var skippedCount = 0
 
-    Log.d(TAG, "🔍 Starting remote date grouping for ${cloudPhotos.itemCount} photos")
-
-    // Process ALL photos - no filtering
     for (i in 0 until cloudPhotos.itemCount) {
-        val photo = cloudPhotos.peek(i)
+        val photo = cloudPhotos[i]
         if (photo != null) {
-            val dateLabel = formatRemotePhotoDate(photo.uploadedAt)
+            val dateLabel = formatSmartDateLabel(photo.uploadedAt)
             photosByDate.getOrPut(dateLabel) { mutableListOf() }.add(photo to i)
             processedCount++
         } else {
@@ -138,9 +173,8 @@ private fun groupRemotePhotosByDateOptimized(
         }
     }
 
-    Log.d(TAG, "✅ Remote date grouping complete: $processedCount processed, $skippedCount skipped")
+    Log.d(TAG, "✅ Remote date grouping: $processedCount processed, $skippedCount skipped")
 
-    // Convert to sorted list of RemoteDateGroups (most recent first)
     return photosByDate.map { (dateLabel, photos) ->
         val sortKey = photos.maxOfOrNull { it.first.uploadedAt } ?: 0L
         RemoteDateGroup(
@@ -159,7 +193,7 @@ private fun createRemoteLayoutCache(
 
     // Create normal grid items (simple list)
     val normalGridItems = (0 until cloudPhotos.itemCount).mapNotNull { index ->
-        cloudPhotos.peek(index)?.let { photo ->
+        cloudPhotos[index]?.let { photo ->
             RemoteGridItem.PhotoItem(photo, index)
         }
     }
@@ -251,8 +285,8 @@ fun RemotePhotosGrid(
     // Responsive grid configuration (3-6 columns, default 4)
     val gridState = rememberGridState()
     val columns = gridState.columnCount.coerceIn(3, 6)
-    val horizontalSpacing = 12.dp
-    val verticalSpacing = 12.dp
+    val horizontalSpacing = 2.dp
+    val verticalSpacing = 2.dp
 
     // Layout mode configuration
     val isDateGroupedLayout = gridState.isDateGroupedLayout
@@ -349,59 +383,17 @@ fun RemotePhotosGrid(
             }
         }
     }
-    // Optimized prefetching for remote photos: Debounced to prevent main thread saturation
-    LaunchedEffect(currentLayoutItems, isScrollbarDragging) {
-        val prefetchDebounce = if (isScrollbarDragging) 100L else 150L
-        
-        snapshotFlow { lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .distinctUntilChanged()
-            .debounce(prefetchDebounce)
-            .collectLatest { lastIndex ->
-                if (lastIndex == null || layoutCache.totalPhotos == 0) return@collectLatest
-                
-                withContext(Dispatchers.IO) {
-                    try {
-                        val prefetchRange = (lastIndex + 1)..(lastIndex + 40)
-                        prefetchRange.forEach { index ->
-                            if (index in currentLayoutItems.indices) {
-                                yield() // Allow other background tasks to breathe
-                                when (val item = currentLayoutItems[index]) {
-                                    is RemoteGridItem.PhotoItem -> {
-                                        val microRequest = ImageRequest.Builder(context)
-                                            .data(item.photo)
-                                            .size(64, 64) 
-                                            .allowHardware(true)
-                                            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
-                                            .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                                            .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                                            .build()
-                                        ImageLoaderModule.thumbnailImageLoader.enqueue(microRequest)
-
-                                        // Prefetch full thumbnails for immediate next items
-                                        if (index <= lastIndex + 10) {
-                                            val thumbRequest = ImageRequest.Builder(context)
-                                                .data(item.photo)
-                                                .size(180, 180)
-                                                .allowHardware(true)
-                                                .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
-                                                .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                                                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                                                .build()
-                                            ImageLoaderModule.thumbnailImageLoader.enqueue(thumbRequest)
-                                        }
-                                    }
-                                    else -> {}
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Remote prefetch error: ${e.message}")
-                    }
-                }
-            }
-    }
 
     val maxLineSpan = columns
+
+    // Aggressively load ALL pages: continuously access the last item to trigger paging
+    // until all pages are loaded. This ensures the full photo list is available for scrolling.
+    LaunchedEffect(cloudPhotos.itemCount) {
+        if (cloudPhotos.itemCount > 0) {
+            // Access the last item to trigger next page load
+            cloudPhotos[cloudPhotos.itemCount - 1]
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (cloudPhotos.loadState.refresh == LoadState.Loading && cloudPhotos.itemCount == 0) {
@@ -418,6 +410,65 @@ fun RemotePhotosGrid(
                 }
             )
         } else {
+            // Thumbnail sync progress indicator
+            var thumbSyncedCount by remember { mutableStateOf(0) }
+            var thumbTotalCount by remember { mutableStateOf(0) }
+            var thumbSyncing by remember { mutableStateOf(false) }
+
+            LaunchedEffect(Unit) {
+                withContext(Dispatchers.IO) {
+                    while (true) {
+                        val dao = DbHolder.database.remotePhotoDao()
+                        val unsynced = dao.getUnsyncedCount()
+                        val synced = dao.getSyncedCount()
+                        val total = synced + unsynced
+                        withContext(Dispatchers.Main) {
+                            thumbSyncedCount = synced
+                            thumbTotalCount = total
+                            thumbSyncing = unsynced > 0
+                        }
+                        if (unsynced == 0) break
+                        delay(2000)
+                    }
+                }
+            }
+
+            // Sync complete flash
+            var showSyncComplete by remember { mutableStateOf(false) }
+            LaunchedEffect(thumbSyncing) {
+                if (!thumbSyncing && thumbTotalCount > 0 && thumbSyncedCount == thumbTotalCount) {
+                    showSyncComplete = true
+                    delay(2500)
+                    showSyncComplete = false
+                }
+            }
+
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Thumbnail sync progress bar
+                AnimatedVisibility(visible = thumbSyncing && thumbTotalCount > 0) {
+                    Column {
+                        LinearProgressIndicator(
+                            progress = { thumbSyncedCount.toFloat() / thumbTotalCount },
+                            modifier = Modifier.fillMaxWidth().height(3.dp),
+                        )
+                        Text(
+                            text = "Syncing thumbnails… ${java.text.NumberFormat.getInstance().format(thumbSyncedCount)} of ${java.text.NumberFormat.getInstance().format(thumbTotalCount)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
+                        )
+                    }
+                }
+                AnimatedVisibility(visible = showSyncComplete) {
+                    Text(
+                        text = "✓ All synced",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
+                    )
+                }
+            Box(modifier = Modifier.fillMaxSize().weight(1f)) {
             ExpressiveScrollbar(
                 lazyGridState = lazyGridState,
                 totalRows = effectiveTotalRows,
@@ -479,7 +530,7 @@ fun RemotePhotosGrid(
                         onCollapse = { onExpandedChange(false) },
                     ),
                 columns = GridCells.Fixed(columns),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
                 verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                 horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
             ) {
@@ -501,16 +552,40 @@ fun RemotePhotosGrid(
                 ) { index ->
                     when (val item = currentLayoutItems[index]) {
                         is RemoteGridItem.HeaderItem -> {
-                            // Date header
-                            Text(
-                                text = item.dateLabel,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                            // Count photos in this group
+                            val groupPhotoCount = run {
+                                var count = 0
+                                for (j in (index + 1) until currentLayoutItems.size) {
+                                    if (currentLayoutItems[j] is RemoteGridItem.PhotoItem) count++
+                                    else break
+                                }
+                                count
+                            }
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 8.dp, bottom = 4.dp)
-                            )
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.85f)
+                                    )
+                                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = item.dateLabel,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        letterSpacing = (-0.3).sp
+                                    )
+                                    Text(
+                                        text = " · $groupPhotoCount photos",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                         is RemoteGridItem.PhotoItem -> {
                             val isSelected = selectedPhotos.contains(item.photo.remoteId)
@@ -541,6 +616,8 @@ fun RemotePhotosGrid(
                     }
                 }
             }
+            } // inner Box
+            } // Column
         }
 
     }
@@ -597,19 +674,33 @@ fun CloudPhotoItem(
                     scaleY = 0.92f + 0.08f * entrance
                     translationY = (1f - entrance) * 15f
                 }
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(4.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 .then(
                     if (isSelected) Modifier.border(
-                        6.dp, 
+                        4.dp, 
                         MaterialTheme.colorScheme.primary, 
-                        RoundedCornerShape(16.dp)
+                        RoundedCornerShape(4.dp)
                     ) else Modifier
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // Restore: Circular LoadAnimation for remote items
-            LoadAnimation(modifier = Modifier.size(48.dp))
+            // Shimmer placeholder while thumbnail loads
+            val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+            val shimmerAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 0.7f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(800),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "shimmer_alpha"
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = shimmerAlpha))
+            )
 
             if (remotePhoto != null) {
                 // Fix: Stabilize ImageRequest model
@@ -640,13 +731,12 @@ fun CloudPhotoItem(
                     placeholder = null
                 )
 
-                // Selection Tonal Overlay
+                    // Selection Tonal Overlay
                 if (isSelected) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(6.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(2.dp))
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                     )
                 }

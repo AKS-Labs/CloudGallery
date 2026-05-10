@@ -19,7 +19,16 @@ local.properties
 /builderrors.md
 
 # Server (local development only)
-server/
 __pycache__/
 *.pyc
 .env
+
+# Server sensitive files
+server/.env
+server/photo_cache/
+server/thumbnails/
+server/__pycache__/
+server/**/__pycache__/
+server/.venv/
+server/*.db
+.kotlin/

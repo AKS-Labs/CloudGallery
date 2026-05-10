@@ -21,6 +21,15 @@ data class RemotePhoto(
     @ColumnInfo val thumbnailCached: Boolean = false,
     @ColumnInfo val messageId: Long? = null,
     @ColumnInfo val uploadType: String? = null,
+    @ColumnInfo val thumbFileId: String? = null,
+    @ColumnInfo(name = "thumbnailBytes", typeAffinity = ColumnInfo.BLOB)
+    val thumbnailBytes: ByteArray? = null,
+    @ColumnInfo(name = "thumbSynced")
+    val thumbSynced: Boolean = false,
+    @ColumnInfo val dateTaken: String? = null,
+    @ColumnInfo val personIds: String? = null,
+    @ColumnInfo val placeId: Int? = null,
+    @ColumnInfo val placeName: String? = null,
 ) : Parcelable {
 
     fun toPhoto(): Photo = Photo("", remoteId, photoType, "")
@@ -37,6 +46,13 @@ data class RemotePhoto(
             @JsonProperty("thumbnailCached") thumbnailCached: Boolean = false,
             @JsonProperty("messageId") messageId: Long? = null,
             @JsonProperty("uploadType") uploadType: String? = null,
-        ): RemotePhoto = RemotePhoto(remoteId, photoType, fileName, fileSize, uploadedAt, thumbnailCached, messageId, uploadType)
+            @JsonProperty("thumbFileId") thumbFileId: String? = null,
+            @JsonProperty("thumbnailBytes") thumbnailBytes: ByteArray? = null,
+            @JsonProperty("thumbSynced") thumbSynced: Boolean = false,
+            @JsonProperty("dateTaken") dateTaken: String? = null,
+            @JsonProperty("personIds") personIds: String? = null,
+            @JsonProperty("placeId") placeId: Int? = null,
+            @JsonProperty("placeName") placeName: String? = null,
+        ): RemotePhoto = RemotePhoto(remoteId, photoType, fileName, fileSize, uploadedAt, thumbnailCached, messageId, uploadType, thumbFileId, thumbnailBytes, thumbSynced, dateTaken, personIds, placeId, placeName)
     }
 }
