@@ -271,6 +271,11 @@ fun PhotoView(
                     // Share the photo via Android share intent
                     try {
                         val photoUri = android.net.Uri.parse(photo.pathUri)
+                        // Cloud-only photos need to be downloaded first
+                        if (isOnlyRemote && (photo.remoteId != null && photo.pathUri.startsWith("content://") == false)) {
+                            android.widget.Toast.makeText(context, "Download the photo first to share it", android.widget.Toast.LENGTH_SHORT).show()
+                            return@FloatingActionButton
+                        }
                         val mimeType = context.contentResolver.getType(photoUri) ?: "image/*"
                         val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                             type = mimeType

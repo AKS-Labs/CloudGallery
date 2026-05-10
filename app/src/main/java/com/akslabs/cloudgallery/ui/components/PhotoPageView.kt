@@ -29,7 +29,7 @@ fun PhotoPageView(
     val showUiState = remember { androidx.compose.runtime.mutableStateOf(true) }
     
     // Choose the list based on which grid we started from
-    val activePhotos = remember(isRemote, localPhotos, cloudPhotos) {
+    val activePhotos = remember(isRemote) {
         if (isRemote) cloudPhotos else localPhotos
     }
 
