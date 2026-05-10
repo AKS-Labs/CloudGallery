@@ -1,5 +1,13 @@
 package com.akslabs.cloudgallery.ui.main
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
+import androidx.compose.ui.layout.ContentScale
+import coil.request.ImageRequest
+import coil.compose.AsyncImage
+import androidx.work.WorkManager
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
@@ -577,13 +585,53 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                 enter = expandVertically() + fadeIn(),
                                 exit = shrinkVertically() + fadeOut()
                             ) {
-                                UploadProgressBar(
-                                    current = backupProgress.current,
-                                    total = backupProgress.total,
-                                    totalDone = backupProgress.totalDone,
-                                    totalPhotos = backupProgress.totalPhotos,
-                                    currentFileName = backupProgress.currentFileUri
-                                )
+                                run {
+                                    val workManager = androidx.work.WorkManager.getInstance(context)
+                                    val workInfos by workManager.getWorkInfosForUniqueWorkFlow("InstantPhotoBackupWork").collectAsStateWithLifecycle(emptyList())
+                                    val running = workInfos.firstOrNull { it.state == androidx.work.WorkInfo.State.RUNNING }
+                                    val progress = running?.progress
+                                    val current = progress?.getInt("progress_current", 0) ?: 0
+                                    val total = progress?.getInt("progress_max", 0) ?: 0
+                                    val rawUri = progress?.getString("current_file_uri") ?: ""
+                                    val pendingCount = backupProgress.totalPhotos - backupProgress.totalDone
+
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                if (rawUri.isNotEmpty() && rawUri.startsWith("content://")) {
+                                                    AsyncImage(
+                                                        model = ImageRequest.Builder(context)
+                                                            .data(rawUri)
+                                                            .crossfade(true)
+                                                            .size(160)
+                                                            .build(),
+                                                        contentDescription = "Uploading",
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp))
+                                                    )
+                                                    Spacer(Modifier.width(12.dp))
+                                                } else {
+                                                    Icon(Icons.Rounded.CloudUpload, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                                    Spacer(Modifier.width(8.dp))
+                                                }
+                                                Text(if (total > 0 && current > 0) "Uploading $current of $total" else "Preparing backup...", style = MaterialTheme.typography.titleSmall)
+                                                Spacer(Modifier.weight(1f))
+                                                Text(if (pendingCount > 0) "$pendingCount remaining" else "Complete", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                            Spacer(Modifier.height(8.dp))
+                                            LinearProgressIndicator(
+                                                progress = { if (total > 0 && current > 0) current.toFloat() / total else 0f },
+                                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         
                         AppNavHost(
