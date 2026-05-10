@@ -774,8 +774,24 @@ private fun UploadListContent(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.CloudUpload, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(8.dp))
+                                if (rawUri.isNotEmpty() && rawUri.startsWith("content://")) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(rawUri)
+                                            .crossfade(true)
+                                            .size(160)
+                                            .build(),
+                                        contentDescription = "Uploading",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                } else {
+                                    Icon(Icons.Rounded.CloudUpload, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                }
                                 Text(if (total > 0 && current > 0) "Uploading $current of $total" else "Preparing backup...", style = MaterialTheme.typography.titleSmall)
                                 Spacer(Modifier.weight(1f))
                                 Text("${queuedPhotos.size} remaining • batch $current/$total", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

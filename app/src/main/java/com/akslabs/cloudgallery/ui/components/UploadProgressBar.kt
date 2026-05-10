@@ -26,8 +26,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 
 /**
  * Upload progress bar matching the Uploads screen style.
@@ -50,6 +52,21 @@ fun UploadProgressBar(
         label = "upload_progress"
     )
 
+    // Determine display text and progress
+    val statusText = when {
+        total > 0 && current > 0 -> "Uploading $current of $total"
+        totalPhotos > 0 && totalDone > 0 -> "Backed up $totalDone of $totalPhotos"
+        totalPhotos > 0 -> "Starting backup..."
+        else -> "Preparing backup..."
+    }
+    val overallProgress = if (totalPhotos > 0 && totalDone > 0) totalDone.toFloat() / totalPhotos.toFloat() else 0f
+    val displayProgress = if (progress > 0f) progress else overallProgress
+    val animatedDisplayProgress by animateFloatAsState(
+        targetValue = displayProgress,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "upload_display_progress"
+    )
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -61,15 +78,28 @@ fun UploadProgressBar(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Rounded.CloudUpload,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
+                // Thumbnail of current upload
+                if (currentFileName != null && currentFileName.startsWith("content://")) {
+                    AsyncImage(
+                        model = currentFileName,
+                        contentDescription = "Uploading",
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(Modifier.width(12.dp))
+                } else {
+                    Icon(
+                        Icons.Rounded.CloudUpload,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
                 Text(
-                    text = if (total > 0 && current > 0) "Uploading $current of $total" else "Preparing backup...",
+                    text = statusText,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -82,7 +112,7 @@ fun UploadProgressBar(
             }
             Spacer(Modifier.height(8.dp))
             LinearProgressIndicator(
-                progress = { if (progress > 0f) animatedProgress else 0f },
+                progress = { if (displayProgress > 0f) animatedDisplayProgress else 0f },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
@@ -90,7 +120,7 @@ fun UploadProgressBar(
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
             )
-            if (currentFileName != null && currentFileName.isNotEmpty()) {
+            if (currentFileName != null && currentFileName.isNotEmpty() && !currentFileName.startsWith("content://")) {
                 Spacer(Modifier.height(4.dp))
                 val displayName = "Photo ${currentFileName.substringAfterLast("/")}"
                 Text(

@@ -98,12 +98,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val running = workList.firstOrNull { it.state == WorkInfo.State.RUNNING }
                         if (running != null) {
                             val pd = running.progress
+                            val newCurrent = pd.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_CURRENT, 0)
+                            val newTotal = pd.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_MAX, 0)
+                            val newTotalDone = pd.getInt(PeriodicPhotoBackupWorker.KEY_TOTAL_DONE, 0)
+                            val newTotalPhotos = pd.getInt(PeriodicPhotoBackupWorker.KEY_TOTAL_PHOTOS, 0)
+                            val newFileUri = pd.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)
+                            // Only update if we have real progress data, otherwise keep last known values
+                            val prev = _backupProgress.value
                             _backupProgress.value = BackupProgress(
-                                current = pd.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_CURRENT, 0),
-                                total = pd.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_MAX, 0),
-                                totalDone = pd.getInt(PeriodicPhotoBackupWorker.KEY_TOTAL_DONE, 0),
-                                totalPhotos = pd.getInt(PeriodicPhotoBackupWorker.KEY_TOTAL_PHOTOS, 0),
-                                currentFileUri = pd.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI),
+                                current = if (newCurrent > 0) newCurrent else prev.current,
+                                total = if (newTotal > 0) newTotal else prev.total,
+                                totalDone = if (newTotalDone > 0) newTotalDone else prev.totalDone,
+                                totalPhotos = if (newTotalPhotos > 0) newTotalPhotos else prev.totalPhotos,
+                                currentFileUri = newFileUri ?: prev.currentFileUri,
                                 isActive = true
                             )
                         } else {
