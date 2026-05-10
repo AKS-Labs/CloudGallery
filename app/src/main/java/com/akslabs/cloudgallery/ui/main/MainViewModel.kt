@@ -1,4 +1,5 @@
 package com.akslabs.cloudgallery.ui.main
+import kotlinx.coroutines.withContext
 
 import android.app.Application
 import android.util.Log
@@ -106,7 +107,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 isActive = true
                             )
                         } else {
-                            if (_backupProgress.value.isActive) {
+                            // Keep showing progress if photos are still pending
+                            val pendingCount = withContext(Dispatchers.IO) {
+                                DbHolder.database.photoDao().getAll().count { it.remoteId == null }
+                            }
+                            val totalCount = withContext(Dispatchers.IO) {
+                                DbHolder.database.photoDao().getAll().size
+                            }
+                            if (pendingCount > 0) {
+                                _backupProgress.value = BackupProgress(
+                                    totalDone = totalCount - pendingCount,
+                                    totalPhotos = totalCount,
+                                    isActive = false
+                                )
+                            } else if (_backupProgress.value.isActive) {
                                 _backupProgress.value = BackupProgress(isActive = false)
                             }
                         }
