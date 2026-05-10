@@ -1,4 +1,12 @@
 package com.akslabs.cloudgallery.ui.main.screens.uploads
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
 
 import android.text.format.DateUtils
 import androidx.compose.animation.AnimatedVisibility
@@ -747,6 +755,44 @@ private fun UploadListContent(
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // ─── Upload Progress Bar ─────────────────────
+            if (showQueued && queuedPhotos.isNotEmpty()) {
+                item(key = "upload_progress") {
+                    val workManager = androidx.work.WorkManager.getInstance(LocalContext.current)
+                    val workInfos by workManager.getWorkInfosForUniqueWorkFlow("InstantPhotoBackupWork").collectAsStateWithLifecycle(emptyList())
+                    val running = workInfos.firstOrNull { it.state == androidx.work.WorkInfo.State.RUNNING }
+                    val progress = running?.progress
+                    val current = progress?.getInt("progress_current", 0) ?: 0
+                    val total = progress?.getInt("progress_max", 50) ?: 50
+                    val fileName = progress?.getString("current_file_uri")?.substringAfterLast("/") ?: ""
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.CloudUpload, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Backing up photos...", style = MaterialTheme.typography.titleSmall)
+                                Spacer(Modifier.weight(1f))
+                                Text("${queuedPhotos.size} remaining", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { if (total > 0) current.toFloat() / total else 0f },
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            )
+                            if (fileName.isNotEmpty()) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(fileName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
             // ─── Active worker uploads ───────────────────────
             val activeItems = localUploads.filter { it.status != UploadStatus.Completed }
             if (activeItems.isNotEmpty()) {
