@@ -581,7 +581,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                         
                         Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
                             AnimatedVisibility(
-                                visible = backupProgress.isActive || backupProgress.totalPhotos > backupProgress.totalDone || backupProgress.totalDone > 0,
+                                visible = backupProgress.isActive || (backupProgress.totalPhotos > 0 && backupProgress.totalPhotos > backupProgress.totalDone),
                                 enter = expandVertically() + fadeIn(),
                                 exit = shrinkVertically() + fadeOut()
                             ) {
