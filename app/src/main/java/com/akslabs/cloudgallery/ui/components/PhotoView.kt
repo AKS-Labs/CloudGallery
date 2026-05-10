@@ -1,4 +1,5 @@
 package com.akslabs.cloudgallery.ui.components
+import androidx.compose.material.icons.rounded.Share
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -256,6 +257,38 @@ fun PhotoView(
                     handleUploadClick()
                 }
             )
+        }
+
+        // Share button
+        AnimatedVisibility(
+            visible = showUi,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 80.dp, end = 16.dp)
+        ) {
+            androidx.compose.material3.FloatingActionButton(
+                onClick = {
+                    // Share the photo via Android share intent
+                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "image/*"
+                        if (!isOnlyRemote) {
+                            putExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri.parse(photo.pathUri))
+                        } else if (photo.remoteId != null) {
+                            // For cloud photos, share the pathUri if available
+                            putExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri.parse(photo.pathUri))
+                        }
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
+                },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Share,
+                    contentDescription = "Share"
+                )
+            }
         }
     }
     
