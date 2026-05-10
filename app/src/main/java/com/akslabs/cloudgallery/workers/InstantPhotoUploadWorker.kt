@@ -1,7 +1,6 @@
 package com.akslabs.cloudgallery.workers
 
 import android.content.Context
-import android.content.pm.ServiceInfo
 import android.util.Log
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
@@ -12,7 +11,6 @@ import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.utils.sendFileViaUri
-import com.akslabs.cloudgallery.workers.WorkModule.NOTIFICATION_ID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -55,8 +53,8 @@ class InstantPhotoUploadWorker(
                     KEY_FILE_NAME to fileName,
                     KEY_UPLOAD_TYPE to uploadType
                 ))
-            } catch (e: Throwable) {
-                Log.d("PhotoUpload", "FAILED, will retry: ${e.localizedMessage}")
+            } catch (e: Exception) {
+                Log.e("PhotoUpload", "FAILED, will retry: ${e.localizedMessage}", e)
                 Result.retry()
             }
         }

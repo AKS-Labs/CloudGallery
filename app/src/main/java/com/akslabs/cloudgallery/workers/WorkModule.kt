@@ -66,7 +66,7 @@ object WorkModule {
 
                 manager.enqueueUniqueWork(
                     "InstantPhotoBackupWork",
-                    ExistingWorkPolicy.REPLACE,
+                    ExistingWorkPolicy.KEEP,
                     instantBackupRequest
                 )
             }

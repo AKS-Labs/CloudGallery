@@ -10,9 +10,6 @@ import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.TelegramFile
-import com.github.kotlintelegrambot.entities.Update
-import com.github.kotlintelegrambot.entities.files.Document
-import com.github.kotlintelegrambot.entities.files.PhotoSize
 import com.github.kotlintelegrambot.network.Response
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -112,8 +109,16 @@ object BotApi {
     }
 
     /**
-     * Scan Telegram channel/chat for all media files (documents and photos)
-     * Returns a list of discovered media files with their metadata
+     * Scan for cloud photos by verifying known uploads.
+     *
+     * NOTE: The Telegram Bot API does NOT support reading channel message history.
+     * `getUpdates()` only returns unprocessed incoming updates (24h window) and is
+     * fundamentally wrong for channel scanning.  Instead we rely on upload-time
+     * tracking: every successful upload already inserts into `remote_photos`.
+     *
+     * This method now returns an empty success result. Historical discovery from
+     * the channel is not possible via Bot API — use the daily DB backup/restore
+     * flow for the "reinstall" scenario.
      */
     suspend fun scanChannelForMedia(
         channelId: Long,
@@ -121,80 +126,16 @@ object BotApi {
         offsetMessageId: Long? = null
     ): ChannelScanResult {
         return withContext(Dispatchers.IO) {
-            try {
-                Log.d(TAG, "=== SCANNING CHANNEL FOR MEDIA ===")
-                Log.d(TAG, "Channel ID: $channelId, Limit: $limit, Offset: $offsetMessageId")
+            Log.i(TAG, "scanChannelForMedia called — Bot API cannot read channel history.")
+            Log.i(TAG, "Cloud photo inventory is maintained at upload time. Returning empty result.")
 
-                val updates = bot.getUpdates(
-                    offset = offsetMessageId,
-                    limit = limit,
-                    timeout = 30
-                )
-
-                val mediaFiles = mutableListOf<DiscoveredMediaFile>()
-                var lastMessageId: Long? = null
-
-                if (updates.isSuccess) {
-                    val updateList = updates.get()
-                    Log.i(TAG, "Received ${updateList.size} updates from Telegram")
-
-                    updateList.forEach { update ->
-                        update.message?.let { message ->
-                            // Only process messages from the target channel
-                            if (message.chat.id == channelId) {
-                                lastMessageId = message.messageId.toLong()
-
-                                // Check for document attachments
-                                message.document?.let { document ->
-                                    val mediaFile = DiscoveredMediaFile(
-                                        fileId = document.fileId,
-                                        fileName = document.fileName,
-                                        fileSize = document.fileSize?.toLong(),
-                                        mimeType = document.mimeType,
-                                        uploadDate = message.date * 1000L, // Convert to milliseconds
-                                        messageId = message.messageId.toInt(),
-                                        mediaType = MediaType.DOCUMENT
-                                    )
-                                    mediaFiles.add(mediaFile)
-                                    Log.d(TAG, "Found document: ${document.fileName} (${document.fileId})")
-                                }
-
-                                // Check for photo attachments
-                                message.photo?.let { photos ->
-                                    // Get the largest photo size
-                                    val largestPhoto = photos.maxByOrNull { it.fileSize ?: 0 }
-                                    largestPhoto?.let { photo ->
-                                        val mediaFile = DiscoveredMediaFile(
-                                            fileId = photo.fileId,
-                                            fileName = "photo_${message.messageId}.jpg",
-                                            fileSize = photo.fileSize?.toLong(),
-                                            mimeType = "image/jpeg",
-                                            uploadDate = message.date * 1000L,
-                                            messageId = message.messageId.toInt(),
-                                            mediaType = MediaType.PHOTO
-                                        )
-                                        mediaFiles.add(mediaFile)
-                                        Log.d(TAG, "Found photo: ${photo.fileId}")
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Log.i(TAG, "Scan complete: Found ${mediaFiles.size} media files")
-                    ChannelScanResult.Success(
-                        mediaFiles = mediaFiles,
-                        hasMore = updateList.size == limit,
-                        nextOffset = lastMessageId?.plus(1)
-                    )
-                } else {
-                    Log.e(TAG, "Failed to get updates from Telegram")
-                    ChannelScanResult.Error("Failed to fetch updates from Telegram")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception during channel scan", e)
-                ChannelScanResult.Error("Exception during channel scan: ${e.message}")
-            }
+            // Return empty success — the remote_photos table is the source of truth,
+            // populated during each upload in sendFileApi().
+            ChannelScanResult.Success(
+                mediaFiles = emptyList(),
+                hasMore = false,
+                nextOffset = null
+            )
         }
     }
 }

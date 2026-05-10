@@ -23,7 +23,6 @@ import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import com.github.kotlintelegrambot.entities.files.Document
 import com.github.kotlintelegrambot.network.fold
 import java.io.File
-import java.io.FileOutputStream
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -103,21 +102,26 @@ suspend fun sendFileViaUri(
     val inputStream = contentResolver.openInputStream(uri)
     inputStream?.use { ipStream ->
         val tempFile = File.createTempFile(Random.nextLong().toString(), ".$fileExtension")
-        val outputStream = FileOutputStream(tempFile)
-        ipStream.copyTo(outputStream)
-        sendFileApi(
-            botApi,
-            channelId,
-            uri,
-            tempFile,
-            fileExtension!!,
-            context,
-            uploadType,
-            originalFileName
-        )
-        outputStream.close()
-        Log.d(TAG, tempFile.name)
-        tempFile.deleteOnExit()
+        try {
+            // Stream directly to temp file instead of loading into memory
+            tempFile.outputStream().use { output ->
+                ipStream.copyTo(output, bufferSize = 8192)
+            }
+            sendFileApi(
+                botApi,
+                channelId,
+                uri,
+                tempFile,
+                fileExtension!!,
+                context,
+                uploadType,
+                originalFileName
+            )
+            Log.d(TAG, tempFile.name)
+        } finally {
+            // Delete immediately, not on JVM exit
+            tempFile.delete()
+        }
     }
 }
 

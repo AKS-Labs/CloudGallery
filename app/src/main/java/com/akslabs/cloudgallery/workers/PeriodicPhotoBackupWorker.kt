@@ -4,8 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
-import androidx.compose.ui.util.fastForEach
-import androidx.compose.ui.util.fastForEachIndexed
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -18,14 +16,16 @@ import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.utils.getExtFromMimeType
 import com.akslabs.cloudgallery.utils.getMimeTypeFromUri
 import com.akslabs.cloudgallery.utils.sendFileApi
-import com.akslabs.cloudgallery.workers.WorkModule.NOTIFICATION_ID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import kotlin.math.roundToInt
-import kotlin.random.Random
 
 class PeriodicPhotoBackupWorker(
     private val appContext: Context,
@@ -34,18 +34,21 @@ class PeriodicPhotoBackupWorker(
 
     private val channelId: Long = Preferences.getEncryptedLong(Preferences.channelId, 0L)
     private val botApi: BotApi = BotApi
+
     override suspend fun doWork(): Result {
         val compressionThresholdInBytes = params.inputData.getLong(
             KEY_COMPRESSION_THRESHOLD,
             0L
         )
         val uploadType = params.inputData.getString(KEY_UPLOAD_TYPE)
-        val imageList = DbHolder.database.photoDao().getAllNotUploaded()
+        // Batch size limit: only process up to MAX_BATCH_SIZE photos per worker run
+        val allNotUploaded = DbHolder.database.photoDao().getAllNotUploaded()
+        val imageList = allNotUploaded.take(MAX_BATCH_SIZE)
+
         return withContext(Dispatchers.IO) {
             try {
-                Log.d("PeriodicBackup", "Found ${imageList.size} photos not uploaded")
-                lateinit var tempFile: File
-                
+                Log.d("PeriodicBackup", "Found ${allNotUploaded.size} photos not uploaded, processing batch of ${imageList.size}")
+
                 // Initial progress
                 setProgress(
                     workDataOf(
@@ -55,74 +58,124 @@ class PeriodicPhotoBackupWorker(
                     )
                 )
 
-                imageList.fastForEachIndexed { index, photo ->
-                    Log.d("PeriodicBackup", "Processing ${index + 1}/${imageList.size}: ${photo.pathUri}")
-                    
-                    // Update progress
-                    val fileName = com.akslabs.cloudgallery.utils.getFileName(appContext.contentResolver, photo.pathUri.toUri())
+                var successCount = 0
+                var failedCount = 0
+
+                // Process in parallel chunks of PARALLELISM
+                val chunks = imageList.chunked(PARALLELISM)
+                for ((chunkIndex, chunk) in chunks.withIndex()) {
+                    val results = coroutineScope {
+                        chunk.mapIndexed { indexInChunk, photo ->
+                            async(Dispatchers.IO) {
+                                val globalIndex = chunkIndex * PARALLELISM + indexInChunk
+                                uploadSinglePhoto(photo, globalIndex, imageList.size, uploadType)
+                            }
+                        }.awaitAll()
+                    }
+
+                    results.forEach { success ->
+                        if (success) successCount++ else failedCount++
+                    }
+
+                    // Update progress after each parallel chunk
+                    val processed = (chunkIndex + 1) * PARALLELISM
                     setProgress(
                         workDataOf(
-                            KEY_PROGRESS_CURRENT to index + 1,
+                            KEY_PROGRESS_CURRENT to minOf(processed, imageList.size),
                             KEY_PROGRESS_MAX to imageList.size,
-                            KEY_CURRENT_FILE_URI to photo.pathUri,
-                            "fileName" to fileName // Explicitly using "fileName" key to match worker constant
+                            KEY_CURRENT_FILE_URI to (chunk.lastOrNull()?.pathUri ?: "")
                         )
                     )
 
-                    val uri = photo.pathUri.toUri()
-                    try {
-                        val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri)
-                        val ext = getExtFromMimeType(mimeType!!)
-                        val FIFTY_MB = 50L * 1024 * 1024 // 50 MB in bytes
-
-                        val bytes = appContext.contentResolver.openInputStream(uri)?.use {
-                            it.readBytes()
-                        }!!
-
-                        var outputBytes = bytes // default — no compression
-                        var quality = 100
-
-                        // Compress only if image > 50 MB
-                        if (bytes.size > FIFTY_MB) {
-                            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                            val compressFormat = when (mimeType) {
-                                MIME_TYPE_JPEG -> Bitmap.CompressFormat.JPEG
-                                MIME_TYPE_PNG -> Bitmap.CompressFormat.PNG
-                                MIME_TYPE_WEBP -> Bitmap.CompressFormat.WEBP
-                                else -> Bitmap.CompressFormat.JPEG
-                            }
-
-                            do {
-                                val outputStream = ByteArrayOutputStream()
-                                outputStream.use {
-                                    bitmap.compress(compressFormat, quality, it)
-                                    outputBytes = it.toByteArray()
-                                }
-                                quality -= 5 // reduce quality by 5 each iteration
-                            } while (outputBytes.size > FIFTY_MB && quality > 0)
-                        }
-
-                        tempFile = File.createTempFile(
-                            Random.nextLong().toString(),
-                            ".$ext"
-                        )
-                        tempFile.writeBytes(outputBytes)
-                        sendFileApi(botApi, channelId, uri, tempFile, ext!!, appContext, uploadType, fileName)
-                    } catch (e: IOException) {
-                        Log.e("PeriodicBackup", "IO error on photo ${index + 1}, will retry: ${e.message}")
-                        return@withContext Result.retry()
-                    } finally {
-                        tempFile.deleteOnExit()
+                    // Rate limit: delay between parallel chunks to respect Telegram limits
+                    if (chunkIndex < chunks.size - 1) {
+                        delay(DELAY_BETWEEN_CHUNKS_MS)
                     }
                 }
-                val lastUri = if (imageList.isNotEmpty()) imageList.last().pathUri else null
-                Result.success(
-                    if (lastUri != null) workDataOf(KEY_CURRENT_FILE_URI to lastUri) else workDataOf()
-                )
+
+                Log.d("PeriodicBackup", "Batch complete: $successCount succeeded, $failedCount failed")
+
+                // If more than half failed, retry; otherwise success
+                // If there are more photos remaining beyond this batch, WorkManager will re-run
+                if (failedCount > imageList.size / 2) {
+                    Result.retry()
+                } else {
+                    val lastUri = if (imageList.isNotEmpty()) imageList.last().pathUri else null
+                    Result.success(
+                        if (lastUri != null) workDataOf(KEY_CURRENT_FILE_URI to lastUri) else workDataOf()
+                    )
+                }
             } catch (e: Exception) {
                 Log.e("PeriodicBackup", "Backup failed, will retry: ${e.message}")
                 Result.retry()
             }
+        }
+    }
+
+    /**
+     * Upload a single photo with error handling. Returns true on success, false on failure.
+     */
+    private suspend fun uploadSinglePhoto(
+        photo: com.akslabs.cloudgallery.data.localdb.entities.Photo,
+        index: Int,
+        total: Int,
+        uploadType: String?
+    ): Boolean {
+        var tempFile: File? = null
+        try {
+            Log.d("PeriodicBackup", "Processing ${index + 1}/$total: ${photo.pathUri}")
+
+            val uri = photo.pathUri.toUri()
+            val fileName = com.akslabs.cloudgallery.utils.getFileName(appContext.contentResolver, uri)
+            val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri)
+            val ext = getExtFromMimeType(mimeType!!)
+            val FIFTY_MB = 50L * 1024 * 1024
+
+            // Stream file to temp instead of reading entire file into memory
+            tempFile = File.createTempFile("upload_${index}_", ".$ext")
+            val fileSize: Long
+
+            appContext.contentResolver.openInputStream(uri)?.use { input ->
+                tempFile!!.outputStream().use { output ->
+                    input.copyTo(output, bufferSize = 8192)
+                }
+            } ?: throw IOException("Cannot open input stream for $uri")
+
+            fileSize = tempFile!!.length()
+
+            // Compress only if file > 50 MB
+            if (fileSize > FIFTY_MB) {
+                val bytes = tempFile!!.readBytes()
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                if (bitmap != null) {
+                    val compressFormat = when (mimeType) {
+                        MIME_TYPE_JPEG -> Bitmap.CompressFormat.JPEG
+                        MIME_TYPE_PNG -> Bitmap.CompressFormat.PNG
+                        MIME_TYPE_WEBP -> Bitmap.CompressFormat.WEBP
+                        else -> Bitmap.CompressFormat.JPEG
+                    }
+                    var quality = 100
+                    var outputBytes: ByteArray
+                    do {
+                        val outputStream = ByteArrayOutputStream()
+                        outputStream.use {
+                            bitmap.compress(compressFormat, quality, it)
+                            outputBytes = it.toByteArray()
+                        }
+                        quality -= 5
+                    } while (outputBytes.size > FIFTY_MB && quality > 0)
+                    tempFile!!.writeBytes(outputBytes)
+                }
+            }
+
+            sendFileApi(botApi, channelId, uri, tempFile!!, ext!!, appContext, uploadType, fileName)
+            return true
+        } catch (e: Exception) {
+            Log.e("PeriodicBackup", "Failed to upload photo ${index + 1} (${photo.pathUri}), skipping: ${e.message}")
+            return false
+        } finally {
+            // Delete temp file immediately, not on exit
+            tempFile?.delete()
         }
     }
 
@@ -144,5 +197,12 @@ class PeriodicPhotoBackupWorker(
         const val KEY_PROGRESS_MAX = "progress_max"
         const val KEY_CURRENT_FILE_URI = "current_file_uri"
         const val KEY_UPLOAD_TYPE = "upload_type"
+
+        /** Max photos to process in a single worker run to avoid WorkManager timeout */
+        const val MAX_BATCH_SIZE = 50
+        /** Number of concurrent uploads */
+        const val PARALLELISM = 3
+        /** Delay between parallel chunks to respect Telegram rate limits (~1s per photo effective) */
+        const val DELAY_BETWEEN_CHUNKS_MS = 1500L
     }
 }
