@@ -61,6 +61,15 @@ class MainActivity : ComponentActivity() {
         // Start daily database backup
         WorkModule.DailyDatabaseBackup.enqueuePeriodic()
 
+        // Auto-start upload worker if there are pending photos
+        lifecycleScope.launch {
+            val pendingCount = com.akslabs.cloudgallery.data.localdb.DbHolder.database.photoDao().getAll().count { it.remoteId == null }
+            if (pendingCount > 0) {
+                android.util.Log.i("MainActivity", "Found $pendingCount pending uploads — starting backup worker")
+                WorkModule.PeriodicBackup.enqueue(type = "auto")
+            }
+        }
+
         setContent {
             AppTheme {
                 val topNavController = rememberNavController()
