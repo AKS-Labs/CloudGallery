@@ -763,8 +763,10 @@ private fun UploadListContent(
                     val running = workInfos.firstOrNull { it.state == androidx.work.WorkInfo.State.RUNNING }
                     val progress = running?.progress
                     val current = progress?.getInt("progress_current", 0) ?: 0
-                    val total = progress?.getInt("progress_max", 50) ?: 50
-                    val fileName = progress?.getString("current_file_uri")?.substringAfterLast("/") ?: ""
+                    val total = progress?.getInt("progress_max", 0) ?: 0
+                    val rawUri = progress?.getString("current_file_uri") ?: ""
+                    // Convert content URI to readable filename
+                    val fileName = if (rawUri.isNotEmpty()) "Photo ${rawUri.substringAfterLast("/")}" else ""
                     
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -780,7 +782,7 @@ private fun UploadListContent(
                             }
                             Spacer(Modifier.height(8.dp))
                             LinearProgressIndicator(
-                                progress = { if (total > 0) current.toFloat() / total else 0f },
+                                progress = { if (total > 0 && current > 0) current.toFloat() / total else 0f },
                                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
