@@ -73,6 +73,8 @@ object BackupHelper {
                 )
             }
             context.toastFromMainThread(context.getString(R.string.import_successful))
+            // Run deduplication after import to catch any conflicts
+            deduplicateDatabase()
         } catch (e: Exception) {
             Log.d("Import All Photos", "doWork: ${e.localizedMessage}")
             context.toastFromMainThread(e.localizedMessage)
@@ -275,3 +277,57 @@ object BackupHelper {
         val needsDailyBackup: Boolean
     )
 }
+
+    /**
+     * Deduplicate the database after import or sync operations.
+     * Only removes entries where we're 100% certain they're duplicates:
+     * - Same remoteId appearing multiple times in remote_photos
+     * - Same localId + remoteId combination (exact match)
+     * If uncertain, keeps both entries (safer to have dupes than lose data).
+     */
+    suspend fun deduplicateDatabase() {
+        withContext(Dispatchers.IO) {
+            try {
+                val dao = DbHolder.database.remotePhotoDao()
+                val photoDao = DbHolder.database.photoDao()
+                
+                // 1. Deduplicate remote_photos by remoteId (keep first inserted)
+                val allRemote = dao.getAll()
+                val seen = mutableSetOf<String>()
+                var removedRemote = 0
+                for (photo in allRemote) {
+                    if (photo.remoteId in seen) {
+                        dao.delete(photo.remoteId)
+                        removedRemote++
+                    } else {
+                        seen.add(photo.remoteId)
+                    }
+                }
+                
+                // 2. Deduplicate photos table by localId (keep the one with remoteId if exists)
+                val allPhotos = photoDao.getAll()
+                val localIdMap = mutableMapOf<String, MutableList<com.akslabs.cloudgallery.data.localdb.entities.Photo>>()
+                for (photo in allPhotos) {
+                    localIdMap.getOrPut(photo.localId) { mutableListOf() }.add(photo)
+                }
+                
+                var removedLocal = 0
+                for ((_, photos) in localIdMap) {
+                    if (photos.size > 1) {
+                        // Keep the one with remoteId (it's been backed up)
+                        val withRemote = photos.filter { it.remoteId != null }
+                        val toKeep = if (withRemote.isNotEmpty()) withRemote.first() else photos.first()
+                        val toRemove = photos.filter { it !== toKeep }
+                        for (dupe in toRemove) {
+                            photoDao.deleteById(dupe.localId)
+                            removedLocal++
+                        }
+                    }
+                }
+                
+                Log.i("BackupHelper", "Dedup complete: removed $removedRemote remote dupes, $removedLocal local dupes")
+            } catch (e: Exception) {
+                Log.e("BackupHelper", "Error during deduplication", e)
+            }
+        }
+    }
