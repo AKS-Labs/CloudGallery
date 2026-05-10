@@ -122,7 +122,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 DbHolder.database.photoDao().getAll().size
                             }
                             if (pendingCount > 0) {
-                                _backupProgress.value = BackupProgress(
+                                _backupProgress.value = _backupProgress.value.copy(
                                     totalDone = totalCount - pendingCount,
                                     totalPhotos = totalCount,
                                     isActive = false
