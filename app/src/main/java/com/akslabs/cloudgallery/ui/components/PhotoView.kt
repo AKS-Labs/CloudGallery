@@ -269,17 +269,18 @@ fun PhotoView(
             androidx.compose.material3.FloatingActionButton(
                 onClick = {
                     // Share the photo via Android share intent
-                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "image/*"
-                        if (!isOnlyRemote) {
-                            putExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri.parse(photo.pathUri))
-                        } else if (photo.remoteId != null) {
-                            // For cloud photos, share the pathUri if available
-                            putExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri.parse(photo.pathUri))
+                    try {
+                        val photoUri = android.net.Uri.parse(photo.pathUri)
+                        val mimeType = context.contentResolver.getType(photoUri) ?: "image/*"
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = mimeType
+                            putExtra(android.content.Intent.EXTRA_STREAM, photoUri)
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
-                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "Cannot share this photo: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                     }
-                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share photo"))
                 },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
