@@ -581,7 +581,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                         
                         Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
                             AnimatedVisibility(
-                                visible = backupProgress.isActive || backupProgress.totalPhotos > backupProgress.totalDone,
+                                visible = backupProgress.isActive || backupProgress.totalPhotos > backupProgress.totalDone || backupProgress.totalDone > 0,
                                 enter = expandVertically() + fadeIn(),
                                 exit = shrinkVertically() + fadeOut()
                             ) {
@@ -593,7 +593,10 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                     val current = progress?.getInt("progress_current", 0) ?: 0
                                     val total = progress?.getInt("progress_max", 0) ?: 0
                                     val rawUri = progress?.getString("current_file_uri") ?: ""
-                                    val pendingCount = backupProgress.totalPhotos - backupProgress.totalDone
+                                    // Live count from worker progress, fallback to ViewModel
+                                    val wkTotalDone = progress?.getInt("total_done", 0) ?: 0
+                                    val wkTotalPhotos = progress?.getInt("total_photos", 0) ?: 0
+                                    val pendingCount = if (wkTotalPhotos > 0) wkTotalPhotos - wkTotalDone else backupProgress.totalPhotos - backupProgress.totalDone
 
                                     Card(
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
