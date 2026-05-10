@@ -17,3 +17,9 @@ local.properties
 !fastlane/
 !fastlane/**/*.txt
 /builderrors.md
+
+# Server (local development only)
+server/
+__pycache__/
+*.pyc
+.env
