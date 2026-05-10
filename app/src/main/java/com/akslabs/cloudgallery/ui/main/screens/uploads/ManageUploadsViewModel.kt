@@ -60,7 +60,9 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         // Auto-clear history older than 24 hours on startup
         viewModelScope.launch {
             val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
-            DbHolder.database.remotePhotoDao().deleteOlderThan(oneDayAgo)
+            // DISABLED: Was deleting all cloud photo history older than 24h
+            // DbHolder.database.remotePhotoDao().deleteOlderThan(oneDayAgo)
+            Log.d("ManageUploadsVM", "Skipped auto-clear of remote photo history")
         }
     }
 
