@@ -101,6 +101,12 @@ class PeriodicPhotoBackupWorker(
                     Result.retry()
                 } else {
                     val lastUri = if (imageList.isNotEmpty()) imageList.last().pathUri else null
+                    // Re-enqueue if there are still pending photos
+                    val remainingPhotos = DbHolder.database.photoDao().getAll().count { it.remoteId == null }
+                    if (remainingPhotos > 0) {
+                        Log.i("PeriodicBackup", "Batch done but $remainingPhotos still pending — re-enqueuing")
+                        WorkModule.PeriodicBackup.enqueue(type = "auto")
+                    }
                     Result.success(
                         if (lastUri != null) workDataOf(KEY_CURRENT_FILE_URI to lastUri) else workDataOf()
                     )
