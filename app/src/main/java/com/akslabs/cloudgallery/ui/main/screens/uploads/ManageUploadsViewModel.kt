@@ -333,15 +333,25 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
                 thumbnailUri = extractedUri
                 localPhotoId = extractedUri
                 
+                val current = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_CURRENT, 0)
+                val total = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_MAX, 0)
+                val totalDone = progressData.getInt(PeriodicPhotoBackupWorker.KEY_TOTAL_DONE, 0)
+                val totalPhotos = progressData.getInt(PeriodicPhotoBackupWorker.KEY_TOTAL_PHOTOS, 0)
+                
+                if (total > 0) {
+                    totalItems = total
+                    progress = current.toFloat() / total.toFloat()
+                }
+                
                 progressText = when (status) {
                     UploadStatus.InProgress -> {
-                        val current = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_CURRENT, 0)
-                        val total = progressData.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_MAX, 0)
-                        if (total > 0) "Backing up $current of $total..." else "Calculating..."
+                        val batchText = if (total > 0) "Uploading $current of $total" else "Calculating..."
+                        val overallText = if (totalPhotos > 0) " · $totalDone of $totalPhotos backed up" else ""
+                        "$batchText$overallText"
                     }
                     UploadStatus.Completed -> "Backup complete"
                     UploadStatus.Failed -> "Backup failed"
-                    else -> "Queued for backup..."
+                    else -> if (totalPhotos > 0) "Queued · $totalDone of $totalPhotos backed up" else "Queued for backup..."
                 }
                 
                 fileName = progressData.getString("fileName")?.takeIf<String> { it.isNotEmpty() }

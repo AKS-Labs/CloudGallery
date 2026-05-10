@@ -19,6 +19,7 @@ import com.akslabs.cloudgallery.data.mediastore.AlbumInfo
 import com.akslabs.cloudgallery.data.mediastore.LocalPhotoSource
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.ui.main.nav.Screens
+import com.akslabs.cloudgallery.workers.PeriodicPhotoBackupWorker
 import com.akslabs.cloudgallery.workers.WorkModule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +51,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
 
+    // Backup progress data for home page progress bar
+    data class BackupProgress(
+        val current: Int = 0,
+        val total: Int = 0,
+        val totalDone: Int = 0,
+        val totalPhotos: Int = 0,
+        val currentFileUri: String? = null,
+        val isActive: Boolean = false
+    )
+    private val _backupProgress = MutableStateFlow(BackupProgress())
+    val backupProgress: StateFlow<BackupProgress> = _backupProgress.asStateFlow()
+
     init {
         // Combine observations of manual_backup and instant_upload tags
         viewModelScope.launch {
@@ -74,6 +87,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error observing upload work", e)
+            }
+        }
+        // Observe backup worker progress for home page bar
+        viewModelScope.launch {
+            try {
+                WorkModule.observeWorkerByName(WorkModule.PERIODIC_PHOTO_BACKUP_WORK)
+                    .collect { workList ->
+                        val running = workList.firstOrNull { it.state == WorkInfo.State.RUNNING }
+                        if (running != null) {
+                            val pd = running.progress
+                            _backupProgress.value = BackupProgress(
+                                current = pd.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_CURRENT, 0),
+                                total = pd.getInt(PeriodicPhotoBackupWorker.KEY_PROGRESS_MAX, 0),
+                                totalDone = pd.getInt(PeriodicPhotoBackupWorker.KEY_TOTAL_DONE, 0),
+                                totalPhotos = pd.getInt(PeriodicPhotoBackupWorker.KEY_TOTAL_PHOTOS, 0),
+                                currentFileUri = pd.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI),
+                                isActive = true
+                            )
+                        } else {
+                            if (_backupProgress.value.isActive) {
+                                _backupProgress.value = BackupProgress(isActive = false)
+                            }
+                        }
+                    }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error observing backup progress", e)
             }
         }
         loadMediaStorePhotos()

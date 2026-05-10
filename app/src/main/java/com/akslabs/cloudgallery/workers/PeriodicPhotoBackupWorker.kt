@@ -44,6 +44,8 @@ class PeriodicPhotoBackupWorker(
         // Batch size limit: only process up to MAX_BATCH_SIZE photos per worker run
         val allNotUploaded = DbHolder.database.photoDao().getAllNotUploaded()
         val imageList = allNotUploaded.take(MAX_BATCH_SIZE)
+        val totalPhotosOnDevice = DbHolder.database.photoDao().getCount()
+        val totalAlreadyUploaded = totalPhotosOnDevice - allNotUploaded.size
 
         return withContext(Dispatchers.IO) {
             try {
@@ -54,7 +56,9 @@ class PeriodicPhotoBackupWorker(
                     workDataOf(
                         KEY_PROGRESS_CURRENT to 0,
                         KEY_PROGRESS_MAX to imageList.size,
-                        KEY_CURRENT_FILE_URI to ""
+                        KEY_CURRENT_FILE_URI to "",
+                        KEY_TOTAL_DONE to totalAlreadyUploaded,
+                        KEY_TOTAL_PHOTOS to totalPhotosOnDevice
                     )
                 )
 
@@ -83,7 +87,9 @@ class PeriodicPhotoBackupWorker(
                         workDataOf(
                             KEY_PROGRESS_CURRENT to minOf(processed, imageList.size),
                             KEY_PROGRESS_MAX to imageList.size,
-                            KEY_CURRENT_FILE_URI to (chunk.lastOrNull()?.pathUri ?: "")
+                            KEY_CURRENT_FILE_URI to (chunk.lastOrNull()?.pathUri ?: ""),
+                            KEY_TOTAL_DONE to (totalAlreadyUploaded + successCount),
+                            KEY_TOTAL_PHOTOS to totalPhotosOnDevice
                         )
                     )
 
@@ -203,6 +209,8 @@ class PeriodicPhotoBackupWorker(
         const val KEY_PROGRESS_MAX = "progress_max"
         const val KEY_CURRENT_FILE_URI = "current_file_uri"
         const val KEY_UPLOAD_TYPE = "upload_type"
+        const val KEY_TOTAL_DONE = "total_done"
+        const val KEY_TOTAL_PHOTOS = "total_photos"
 
         /** Max photos to process in a single worker run to avoid WorkManager timeout */
         const val MAX_BATCH_SIZE = 50

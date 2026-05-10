@@ -66,7 +66,7 @@ object WorkModule {
 
                 manager.enqueueUniqueWork(
                     "InstantPhotoBackupWork",
-                    ExistingWorkPolicy.KEEP,
+                    ExistingWorkPolicy.REPLACE,
                     instantBackupRequest
                 )
             }
@@ -163,7 +163,7 @@ object WorkModule {
         fun enqueue() {
             manager.enqueueUniqueWork(
                 "$UPLOADING_ID:${uri.lastPathSegment}",
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 instantUploadRequest
             )
         }
@@ -194,7 +194,7 @@ object WorkModule {
         fun enqueue() {
             manager.enqueueUniqueWork(
                 "$DOWNLOADING_ID:$remoteId",
-                if (forceDownload) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+                if (forceDownload) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.REPLACE,
                 instantDownloadRequest
             )
         }
@@ -219,7 +219,7 @@ object WorkModule {
         fun enqueue() {
             manager.enqueueUniqueWork(
                 RESTORE_ALL_PHOTOS_WORK,
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 instantUploadRequest
             )
         }

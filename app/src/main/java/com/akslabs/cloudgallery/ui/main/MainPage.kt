@@ -63,6 +63,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.platform.LocalContext
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
+import com.akslabs.cloudgallery.ui.components.UploadProgressBar
 import com.akslabs.cloudgallery.ui.components.ConnectivityStatusPopup
 import com.akslabs.cloudgallery.ui.main.nav.AppNavHost
 import com.akslabs.cloudgallery.ui.main.nav.Screens
@@ -566,9 +567,27 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
             ) { paddingValues ->
                     CompositionLocalProvider(LocalGridState provides gridState) {
                         val isAppBarVisible = scrollBehavior.state.heightOffset > -1f
+                        
+                        // Backup progress bar
+                        val backupProgress by viewModel.backupProgress.collectAsStateWithLifecycle()
+                        
+                        Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+                            AnimatedVisibility(
+                                visible = backupProgress.isActive,
+                                enter = expandVertically() + fadeIn(),
+                                exit = shrinkVertically() + fadeOut()
+                            ) {
+                                UploadProgressBar(
+                                    current = backupProgress.current,
+                                    total = backupProgress.total,
+                                    totalDone = backupProgress.totalDone,
+                                    totalPhotos = backupProgress.totalPhotos,
+                                    currentFileName = backupProgress.currentFileUri
+                                )
+                            }
+                        
                         AppNavHost(
                             modifier = Modifier
-                                .padding(paddingValues)
                                 .fillMaxSize(),
                             navController = navController,
                             expanded = expanded,
@@ -583,6 +602,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                             viewModel = viewModel,
                             showTopBars = isAppBarVisible
                         )
+                        }
                     }
                 }
             } else {
