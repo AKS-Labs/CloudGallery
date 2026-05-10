@@ -85,7 +85,7 @@ object BotApi {
                 chatId = ChatId.fromId(channelId),
                 document = TelegramFile.ByFile(file),
                 caption = caption,
-                disableContentTypeDetection = false
+                disableContentTypeDetection = true
             )
         }
     }

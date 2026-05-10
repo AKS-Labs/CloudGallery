@@ -152,8 +152,9 @@ suspend fun sendFileApi(
     )
 
     val doc = message?.document
+    val sticker = message?.sticker
     val photoSize = message?.photo?.maxByOrNull { it.fileSize ?: 0 }
-    val fileId = doc?.fileId ?: photoSize?.fileId
+    val fileId = doc?.fileId ?: photoSize?.fileId ?: sticker?.fileId
 
     if (fileId != null) {
         // Resolve extension from Telegram metadata if available
