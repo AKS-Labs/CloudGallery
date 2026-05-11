@@ -296,7 +296,7 @@ fun RemotePhotosGrid(
         mutableStateOf(RemoteLayoutCache(emptyList(), emptyList(), emptyMap(), emptyMap(), 0, 0L)) 
     }
 
-    LaunchedEffect(cloudPhotos.itemSnapshotList, isDateGroupedLayout) {
+    LaunchedEffect(cloudPhotos.itemCount, isDateGroupedLayout) {
         withContext(Dispatchers.Default) {
             val newCache = createRemoteLayoutCache(cloudPhotos)
             withContext(Dispatchers.Main) {

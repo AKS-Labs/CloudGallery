@@ -96,7 +96,12 @@ class ThumbnailSyncWorker(
                                 if (thumbBytes != null) {
                                     dao.updateThumbnail(photo.remoteId, thumbBytes)
                                     true
-                                } else false
+                                } else {
+                                    // Can't decode (e.g. HEIC) — mark synced to stop retrying
+                                    Log.w(TAG, "Can't decode ${photo.remoteId} (${photo.photoType}), marking synced")
+                                    dao.markThumbSynced(photo.remoteId)
+                                    true
+                                }
                             } catch (e: Exception) {
                                 Log.e(TAG, "Error syncing ${photo.remoteId}: ${e.message}")
                                 false
