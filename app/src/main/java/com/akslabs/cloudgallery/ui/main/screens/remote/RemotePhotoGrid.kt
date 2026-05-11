@@ -531,22 +531,32 @@ fun RemotePhotosGrid(
                 verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                 horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
             ) {
-                // Unified remote layout rendering with smooth transitions
+                // Use cloudPhotos.itemCount directly — NOT currentLayoutItems.size
+                // This ensures the grid knows about ALL pages and triggers paging
                 items(
-                    count = currentLayoutItems.size,
+                    count = cloudPhotos.itemCount,
                     key = { index ->
-                        when (val item = currentLayoutItems[index]) {
-                            is RemoteGridItem.HeaderItem -> item.id
-                            is RemoteGridItem.PhotoItem -> item.photo.remoteId
+                        if (index < currentLayoutItems.size) {
+                            when (val item = currentLayoutItems[index]) {
+                                is RemoteGridItem.HeaderItem -> item.id
+                                is RemoteGridItem.PhotoItem -> item.photo.remoteId
+                            }
+                        } else {
+                            cloudPhotos.peek(index)?.remoteId ?: "loading_$index"
                         }
                     },
                     span = { index ->
-                        when (currentLayoutItems[index]) {
-                            is RemoteGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
-                            is RemoteGridItem.PhotoItem -> GridItemSpan(1)
+                        if (index < currentLayoutItems.size) {
+                            when (currentLayoutItems[index]) {
+                                is RemoteGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
+                                is RemoteGridItem.PhotoItem -> GridItemSpan(1)
+                            }
+                        } else {
+                            GridItemSpan(1)
                         }
                     }
                 ) { index ->
+                    if (index < currentLayoutItems.size) {
                     when (val item = currentLayoutItems[index]) {
                         is RemoteGridItem.HeaderItem -> {
                             // Count photos in this group
@@ -611,13 +621,38 @@ fun RemotePhotosGrid(
                             )
                         }
                     }
+                    } else {
+                        // Item beyond layout cache — render directly from paging
+                        val photo = cloudPhotos[index] // This triggers paging!
+                        if (photo != null) {
+                            val isSelected = selectedPhotos.contains(photo.remoteId)
+                            CloudPhotoItem(
+                                remotePhoto = photo,
+                                index = index,
+                                isSelected = isSelected,
+                                isScrollbarDragging = isScrollbarDragging,
+                                thumbnailResolution = thumbnailResolution,
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedVisibilityScope = animatedVisibilityScope,
+                                modifier = Modifier.clickable {
+                                    if (selectionMode) toggleSelection(photo.remoteId)
+                                    else {
+                                        onSaveScrollState(photo.remoteId, lazyGridState.firstVisibleItemIndex, lazyGridState.firstVisibleItemScrollOffset)
+                                        onPhotoClick(index, photo)
+                                    }
+                                }
+                            )
+                        } else {
+                            Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow))
+                        }
+                    }
                 }
-            }
-            } // inner Box
             } // Column
         }
 
     }
+}
+}
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
