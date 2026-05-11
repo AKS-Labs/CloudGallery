@@ -383,12 +383,22 @@ fun RemotePhotosGrid(
 
     val maxLineSpan = columns
 
-    // Aggressively load ALL pages: continuously access the last item to trigger paging
-    // until all pages are loaded. This ensures the full photo list is available for scrolling.
-    LaunchedEffect(cloudPhotos.itemCount) {
-        if (cloudPhotos.itemCount > 0) {
-            // Access the last item to trigger next page load
-            cloudPhotos[cloudPhotos.itemCount - 1]
+    // Aggressively load ALL pages in a loop until everything is loaded
+    LaunchedEffect(Unit) {
+        var lastCount = 0
+        while (true) {
+            val currentCount = cloudPhotos.itemCount
+            if (currentCount > 0 && currentCount != lastCount) {
+                // Access the last item to trigger next page
+                cloudPhotos[currentCount - 1]
+                lastCount = currentCount
+            }
+            delay(500) // Check every 500ms
+            // Stop when no new items loaded in 2 checks
+            if (currentCount == lastCount && currentCount > 0) {
+                delay(1000)
+                if (cloudPhotos.itemCount == lastCount) break // All loaded
+            }
         }
     }
 

@@ -154,6 +154,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         ).flow.cachedIn(viewModelScope)
     }
 
+    // Lightweight list of all cloud photos (no thumbnail BLOBs) — for grid rendering
+    val allCloudPhotosLight: StateFlow<List<com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto>> by lazy {
+        DbHolder.database.remotePhotoDao().getAllLightFlow()
+            .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    }
+
     val allCloudPhotosFlow: Flow<PagingData<RemotePhoto>> by lazy {
         Pager(
             config = PagingConfig(

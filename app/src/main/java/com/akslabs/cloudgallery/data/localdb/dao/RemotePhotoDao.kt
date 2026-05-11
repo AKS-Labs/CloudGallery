@@ -20,6 +20,9 @@ interface RemotePhotoDao {
     @Query("SELECT * FROM remote_photos ORDER BY uploadedAt DESC")
     fun getAllFlow(): Flow<List<RemotePhoto>>
 
+    @Query("SELECT remoteId, photoType, fileName, fileSize, uploadedAt, thumbnailCached, messageId, uploadType, thumbFileId, thumbSynced, dateTaken, personIds, placeId, placeName, NULL as thumbnailBytes FROM remote_photos ORDER BY uploadedAt DESC")
+    fun getAllLightFlow(): Flow<List<RemotePhoto>>
+
     @Query("SELECT * FROM remote_photos")
     suspend fun getAll(): List<RemotePhoto>
 
