@@ -185,57 +185,7 @@ private fun groupRemotePhotosByDateOptimized(
     }.sortedByDescending { it.sortKey }
 }
 
-// Snapshot-based layout cache — works with pre-collected data, no paging access needed
-private fun createLayoutCacheFromSnapshot(
-    snapshot: List<Pair<RemotePhoto, Int>>,
-    isDateGroupedLayout: Boolean
-): RemoteLayoutCache {
-    val normalGridItems = snapshot.map { (photo, index) ->
-        RemoteGridItem.PhotoItem(photo, index)
-    }
-
-    // Group by date
-    val photosByDate = mutableMapOf<String, MutableList<Pair<RemotePhoto, Int>>>()
-    for ((photo, index) in snapshot) {
-        val dateLabel = formatSmartDateLabel(photo.uploadedAt)
-        photosByDate.getOrPut(dateLabel) { mutableListOf() }.add(photo to index)
-    }
-
-    val dateGroups = photosByDate.map { (dateLabel, photos) ->
-        val sortKey = photos.maxOfOrNull { it.first.uploadedAt } ?: 0L
-        RemoteDateGroup(dateLabel, photos.sortedByDescending { it.first.uploadedAt }, sortKey)
-    }.sortedByDescending { it.sortKey }
-
-    val dateGroupedItems = mutableListOf<RemoteGridItem>()
-    dateGroups.forEachIndexed { groupIndex, dateGroup ->
-        dateGroupedItems.add(RemoteGridItem.HeaderItem(
-            dateLabel = "${dateGroup.dateLabel} \u00b7 ${dateGroup.photos.size} photos",
-            id = "header_${groupIndex}_${dateGroup.dateLabel}"
-        ))
-        dateGroup.photos.forEach { (photo, originalIndex) ->
-            dateGroupedItems.add(RemoteGridItem.PhotoItem(photo, originalIndex))
-        }
-    }
-
-    val idToNormalIndex = mutableMapOf<String, Int>()
-    normalGridItems.forEachIndexed { index, item -> idToNormalIndex[item.photo.remoteId] = index }
-
-    val idToDateGroupedIndex = mutableMapOf<String, Int>()
-    dateGroupedItems.forEachIndexed { index, item ->
-        if (item is RemoteGridItem.PhotoItem) idToDateGroupedIndex[item.photo.remoteId] = index
-    }
-
-    return RemoteLayoutCache(
-        normalGridItems = normalGridItems,
-        dateGroupedItems = dateGroupedItems,
-        idToNormalIndex = idToNormalIndex,
-        idToDateGroupedIndex = idToDateGroupedIndex,
-        totalPhotos = snapshot.size,
-        lastUpdateTime = System.currentTimeMillis()
-    )
-}
-
-// Legacy function kept for reference
+// Optimized function to create remote layout cache
 private fun createRemoteLayoutCache(
     cloudPhotos: LazyPagingItems<RemotePhoto>
 ): RemoteLayoutCache {
@@ -347,17 +297,9 @@ fun RemotePhotosGrid(
     }
 
     LaunchedEffect(cloudPhotos.itemCount, isDateGroupedLayout) {
-        // IMPORTANT: Access paging items on main thread first, then process on background
-        val snapshot = mutableListOf<Pair<RemotePhoto, Int>>()
-        for (i in 0 until cloudPhotos.itemCount) {
-            cloudPhotos[i]?.let { snapshot.add(it to i) }
-        }
-        withContext(Dispatchers.Default) {
-            val newCache = createLayoutCacheFromSnapshot(snapshot, isDateGroupedLayout)
-            withContext(Dispatchers.Main) {
-                layoutCache = newCache
-            }
-        }
+        // Must run on main thread — LazyPagingItems only works on main thread
+        val newCache = createRemoteLayoutCache(cloudPhotos)
+        layoutCache = newCache
     }
 
     val currentLayoutItems = if (isDateGroupedLayout) layoutCache.dateGroupedItems else layoutCache.normalGridItems
