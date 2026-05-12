@@ -57,6 +57,7 @@ async def process_photo(photo_id: int):
                 logger.error(f"Face detection failed for photo {photo.id}: {fe}")
 
         except Exception as e:
+            photo.processed = True  # Mark as processed to avoid infinite retry
             photo.processing_error = str(e)[:500]
             logger.error(f"Failed to process photo {photo.id}: {e}")
 
