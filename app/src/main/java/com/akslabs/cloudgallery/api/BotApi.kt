@@ -152,4 +152,90 @@ object BotApi {
             }
         }
     }
+
+    /**
+     * Scan Telegram channel/chat for all media files (documents and photos)
+     * Returns a list of discovered media files with their metadata
+     */
+    suspend fun scanChannelForMedia(
+        channelId: Long,
+        limit: Int = 100,
+        offsetMessageId: Long? = null
+    ): ChannelScanResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "=== SCANNING CHANNEL FOR MEDIA ===")
+                Log.d(TAG, "Channel ID: $channelId, Limit: $limit, Offset: $offsetMessageId")
+
+                val updates = bot.getUpdates(
+                    offset = offsetMessageId,
+                    limit = limit,
+                    timeout = 30
+                )
+
+                val mediaFiles = mutableListOf<DiscoveredMediaFile>()
+                var lastMessageId: Long? = null
+
+                if (updates.isSuccess) {
+                    val updateList = updates.get()
+                    Log.i(TAG, "Received ${updateList.size} updates from Telegram")
+
+                    updateList.forEach { update ->
+                        update.message?.let { message ->
+                            // Only process messages from the target channel
+                            if (message.chat.id == channelId) {
+                                lastMessageId = message.messageId.toLong()
+
+                                // Check for document attachments
+                                message.document?.let { document ->
+                                    val mediaFile = DiscoveredMediaFile(
+                                        fileId = document.fileId,
+                                        fileName = document.fileName,
+                                        fileSize = document.fileSize?.toLong(),
+                                        mimeType = document.mimeType,
+                                        uploadDate = message.date * 1000L,
+                                        messageId = message.messageId.toInt(),
+                                        mediaType = MediaType.DOCUMENT
+                                    )
+                                    mediaFiles.add(mediaFile)
+                                    Log.d(TAG, "Found document: ${document.fileName} (${document.fileId})")
+                                }
+
+                                // Check for photo attachments
+                                message.photo?.let { photos ->
+                                    val largestPhoto = photos.maxByOrNull { it.fileSize ?: 0 }
+                                    largestPhoto?.let { photo ->
+                                        val mediaFile = DiscoveredMediaFile(
+                                            fileId = photo.fileId,
+                                            fileName = "photo_${message.messageId}.jpg",
+                                            fileSize = photo.fileSize?.toLong(),
+                                            mimeType = "image/jpeg",
+                                            uploadDate = message.date * 1000L,
+                                            messageId = message.messageId.toInt(),
+                                            mediaType = MediaType.PHOTO
+                                        )
+                                        mediaFiles.add(mediaFile)
+                                        Log.d(TAG, "Found photo: ${photo.fileId}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Log.i(TAG, "Scan complete: Found ${mediaFiles.size} media files")
+                    ChannelScanResult.Success(
+                        mediaFiles = mediaFiles,
+                        hasMore = updateList.size == limit,
+                        nextOffset = lastMessageId?.plus(1)
+                    )
+                } else {
+                    Log.e(TAG, "Failed to get updates from Telegram")
+                    ChannelScanResult.Error("Failed to fetch updates from Telegram")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during channel scan", e)
+                ChannelScanResult.Error("Exception during channel scan: ${e.message}")
+            }
+        }
+    }
 }

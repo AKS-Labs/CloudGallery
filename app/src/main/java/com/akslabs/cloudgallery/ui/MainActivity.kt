@@ -58,6 +58,9 @@ class MainActivity : ComponentActivity() {
         // Initialize hash backfill for content dedup
         initializeHashBackfill()
 
+        // Initialize cloud photo sync for background channel scanning
+        initializeCloudPhotoSync()
+
         // Start daily database backup
         WorkModule.DailyDatabaseBackup.enqueuePeriodic()
 
@@ -166,6 +169,38 @@ class MainActivity : ComponentActivity() {
                 WorkModule.UploadQueueCleanup.cleanup()
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error initializing hash backfill", e)
+            }
+        }
+    }
+
+    /**
+     * Initialize cloud photo sync workers for periodic channel scanning
+     */
+    private fun initializeCloudPhotoSync() {
+        lifecycleScope.launch {
+            try {
+                // Start periodic cloud photo sync (daily)
+                WorkModule.CloudPhotoSync.enqueue()
+
+                // Start quick sync (every 6 hours)
+                WorkModule.QuickCloudSync.enqueue()
+
+                // Trigger an immediate one-time sync if this is a fresh install
+                // or if it's been a while since last sync
+                val lastSyncTime = try {
+                    Preferences.getLong("last_cloud_photo_sync_timestamp", 0L)
+                } catch (e: ClassCastException) {
+                    Log.w("MainActivity", "Invalid sync timestamp format, resetting to 0", e)
+                    Preferences.edit { remove("last_cloud_photo_sync_timestamp") }
+                    0L
+                }
+                val daysSinceLastSync = (System.currentTimeMillis() - lastSyncTime) / (1000 * 60 * 60 * 24)
+
+                if (lastSyncTime == 0L || daysSinceLastSync > 1) {
+                    WorkModule.CloudPhotoSync.enqueueOneTime()
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error initializing cloud photo sync", e)
             }
         }
     }
