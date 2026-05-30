@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
-import androidx.compose.ui.util.fastForEachIndexed
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -14,18 +13,24 @@ import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.api.BotApi
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
+import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.UploadQueue
 import com.akslabs.cloudgallery.utils.ContentHasher
 import com.akslabs.cloudgallery.utils.getExtFromMimeType
+import com.akslabs.cloudgallery.utils.getFileName
 import com.akslabs.cloudgallery.utils.getMimeTypeFromUri
 import com.akslabs.cloudgallery.utils.sendFileApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
+import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.random.Random
 
 class PeriodicPhotoBackupWorker(
     private val appContext: Context,
@@ -42,15 +47,13 @@ class PeriodicPhotoBackupWorker(
         val remotePhotoDao = DbHolder.database.remotePhotoDao()
         val uploadQueueDao = DbHolder.database.uploadQueueDao()
 
-        // Use new dedup-aware query instead of getAllNotUploaded()
-        val imageList = photoDao.getAllPendingUpload()
+        val allPending = photoDao.getAllPendingUpload()
+        val imageList = allPending.take(MAX_BATCH_SIZE)
 
         return withContext(Dispatchers.IO) {
             try {
-                Log.d("PeriodicBackup", "Found ${imageList.size} photos pending upload (deviceId=$deviceId)")
-                var tempFile: File? = null
-                
-                // Initial progress
+                Log.d("PeriodicBackup", "Found ${allPending.size} photos pending, processing batch of ${imageList.size} (deviceId=$deviceId)")
+
                 setProgress(
                     workDataOf(
                         KEY_PROGRESS_CURRENT to 0,
@@ -59,126 +62,182 @@ class PeriodicPhotoBackupWorker(
                     )
                 )
 
-                imageList.forEachIndexed { index, photo ->
-                    Log.d("PeriodicBackup", "Processing ${index + 1}/${imageList.size}: ${photo.pathUri}")
-                    
-                    // 1. Re-check status (another worker may have uploaded it)
-                    val current = photoDao.getPhotoByLocalId(photo.localId) ?: return@forEachIndexed
-                    if (current.uploadStatus == "DONE" || current.remoteId != null) {
-                        Log.d("PeriodicBackup", "Skipping ${photo.localId}: already uploaded")
-                        return@forEachIndexed
+                var successCount = 0
+                var failedCount = 0
+
+                val chunks = imageList.chunked(PARALLELISM)
+                for ((chunkIndex, chunk) in chunks.withIndex()) {
+                    val results = coroutineScope {
+                        chunk.mapIndexed { indexInChunk, photo ->
+                            async(Dispatchers.IO) {
+                                val globalIndex = chunkIndex * PARALLELISM + indexInChunk
+                                uploadSinglePhoto(
+                                    photo = photo,
+                                    index = globalIndex,
+                                    total = imageList.size,
+                                    deviceId = deviceId,
+                                    photoDao = photoDao,
+                                    remotePhotoDao = remotePhotoDao,
+                                    uploadQueueDao = uploadQueueDao,
+                                    uploadType = uploadType
+                                )
+                            }
+                        }.awaitAll()
                     }
 
-                    // 2. Check upload queue for active entry from another worker
-                    val activeQueueEntry = uploadQueueDao.getActiveForPhoto(photo.localId)
-                    if (activeQueueEntry != null) {
-                        Log.d("PeriodicBackup", "Skipping ${photo.localId}: active queue entry exists")
-                        return@forEachIndexed
+                    results.forEach { success ->
+                        if (success) successCount++ else failedCount++
                     }
 
-                    // 3. Compute content hash if missing
-                    val hash = current.contentHash ?: ContentHasher.computeHash(appContext, current.pathUri.toUri())
-                    if (hash != null && current.contentHash == null) {
-                        photoDao.updateContentHash(current.localId, hash)
-                    }
-
-                    // 4. Content-based dedup: check if already uploaded (by any device)
-                    if (hash != null) {
-                        val existing = remotePhotoDao.getByContentHash(hash)
-                        if (existing != null) {
-                            Log.d("PeriodicBackup", "Dedup: ${photo.localId} already in cloud (hash match)")
-                            photoDao.updateRemoteIdForLocalId(current.localId, existing.remoteId)
-                            photoDao.updateUploadStatus(current.localId, "DONE", System.currentTimeMillis())
-                            return@forEachIndexed
-                        }
-                    }
-
-                    // Update progress
-                    val fileName = com.akslabs.cloudgallery.utils.getFileName(appContext.contentResolver, photo.pathUri.toUri())
+                    val processed = minOf((chunkIndex + 1) * PARALLELISM, imageList.size)
                     setProgress(
                         workDataOf(
-                            KEY_PROGRESS_CURRENT to index + 1,
+                            KEY_PROGRESS_CURRENT to processed,
                             KEY_PROGRESS_MAX to imageList.size,
-                            KEY_CURRENT_FILE_URI to photo.pathUri,
-                            "fileName" to fileName
+                            KEY_CURRENT_FILE_URI to (chunk.lastOrNull()?.pathUri ?: "")
                         )
                     )
 
-                    // 5. Create queue entry
-                    val queueId = uploadQueueDao.insert(UploadQueue(
-                        localId = current.localId,
-                        pathUri = current.pathUri,
-                        contentHash = hash,
-                        workerType = "periodic",
-                        deviceId = deviceId
-                    ))
-
-                    // 6. Mark uploading
-                    photoDao.updateUploadStatus(current.localId, "UPLOADING", System.currentTimeMillis())
-                    uploadQueueDao.markInProgress(queueId)
-
-                    val uri = photo.pathUri.toUri()
-                    try {
-                        val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri)
-                        val ext = getExtFromMimeType(mimeType!!)
-                        val FIFTY_MB = 50L * 1024 * 1024
-
-                        val bytes = appContext.contentResolver.openInputStream(uri)?.use {
-                            it.readBytes()
-                        }!!
-
-                        var outputBytes = bytes
-                        var quality = 100
-
-                        // Compress only if image > 50 MB
-                        if (bytes.size > FIFTY_MB) {
-                            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                            val compressFormat = when (mimeType) {
-                                MIME_TYPE_JPEG -> Bitmap.CompressFormat.JPEG
-                                MIME_TYPE_PNG -> Bitmap.CompressFormat.PNG
-                                MIME_TYPE_WEBP -> Bitmap.CompressFormat.WEBP
-                                else -> Bitmap.CompressFormat.JPEG
-                            }
-
-                            do {
-                                val outputStream = ByteArrayOutputStream()
-                                outputStream.use {
-                                    bitmap.compress(compressFormat, quality, it)
-                                    outputBytes = it.toByteArray()
-                                }
-                                quality -= 5
-                            } while (outputBytes.size > FIFTY_MB && quality > 0)
-                        }
-
-                        tempFile = File.createTempFile(
-                            Random.nextLong().toString(),
-                            ".$ext"
-                        )
-                        tempFile!!.writeBytes(outputBytes)
-
-                        // 7. Upload with hash and device metadata
-                        sendFileApi(botApi, channelId, uri, tempFile!!, ext!!, appContext, uploadType, fileName, hash)
-
-                        photoDao.updateUploadStatus(current.localId, "DONE", System.currentTimeMillis())
-                        uploadQueueDao.markDone(queueId)
-                        Log.d("PeriodicBackup", "Upload success: ${photo.localId}")
-                    } catch (e: IOException) {
-                        Log.e("PeriodicBackup", "Upload failed for ${photo.localId}: ${e.message}")
-                        photoDao.updateUploadStatus(current.localId, "FAILED", System.currentTimeMillis())
-                        uploadQueueDao.markFailed(queueId, e.message)
-                        // Continue with next photo instead of retrying entire batch
-                    } finally {
-                        tempFile?.deleteOnExit()
+                    if (chunkIndex < chunks.size - 1) {
+                        delay(DELAY_BETWEEN_CHUNKS_MS)
                     }
                 }
-                val lastUri = if (imageList.isNotEmpty()) imageList.last().pathUri else null
-                Result.success(
-                    if (lastUri != null) workDataOf(KEY_CURRENT_FILE_URI to lastUri) else workDataOf()
-                )
+
+                Log.d("PeriodicBackup", "Batch complete: $successCount succeeded, $failedCount failed")
+                if (failedCount > imageList.size / 2) {
+                    Result.retry()
+                } else {
+                    Result.success(workDataOf())
+                }
             } catch (e: Exception) {
                 Log.e("PeriodicBackup", "Backup failed, will retry: ${e.message}")
                 Result.retry()
             }
+        }
+    }
+
+    private suspend fun uploadSinglePhoto(
+        photo: Photo,
+        index: Int,
+        total: Int,
+        deviceId: String,
+        photoDao: com.akslabs.cloudgallery.data.localdb.dao.PhotoDao,
+        remotePhotoDao: com.akslabs.cloudgallery.data.localdb.dao.RemotePhotoDao,
+        uploadQueueDao: com.akslabs.cloudgallery.data.localdb.dao.UploadQueueDao,
+        uploadType: String?
+    ): Boolean {
+        return try {
+            Log.d("PeriodicBackup", "Processing ${index + 1}/$total: ${photo.pathUri}")
+
+            // 1. Re-check status (another worker may have uploaded it)
+            val current = photoDao.getPhotoByLocalId(photo.localId) ?: return false
+            if (current.uploadStatus == "DONE" || current.remoteId != null) {
+                Log.d("PeriodicBackup", "Skipping ${photo.localId}: already uploaded")
+                return true
+            }
+
+            // 2. Check upload queue for active entry from another worker
+            val activeQueueEntry = uploadQueueDao.getActiveForPhoto(photo.localId)
+            if (activeQueueEntry != null) {
+                Log.d("PeriodicBackup", "Skipping ${photo.localId}: active queue entry exists")
+                return true
+            }
+
+            // 3. Compute content hash if missing
+            val hash = current.contentHash ?: ContentHasher.computeHash(appContext, current.pathUri.toUri())
+            if (hash != null && current.contentHash == null) {
+                photoDao.updateContentHash(current.localId, hash)
+            }
+
+            // 4. Content-based dedup: check if already uploaded (by any device)
+            if (hash != null) {
+                val existing = remotePhotoDao.getByContentHash(hash)
+                if (existing != null) {
+                    Log.d("PeriodicBackup", "Dedup: ${photo.localId} already in cloud (hash match)")
+                    photoDao.updateRemoteIdForLocalId(current.localId, existing.remoteId)
+                    photoDao.updateUploadStatus(current.localId, "DONE", System.currentTimeMillis())
+                    return true
+                }
+            }
+
+            // 5. Create queue entry
+            val queueId = uploadQueueDao.insert(
+                UploadQueue(
+                    localId = current.localId,
+                    pathUri = current.pathUri,
+                    contentHash = hash,
+                    workerType = "periodic",
+                    deviceId = deviceId
+                )
+            )
+
+            // 6. Mark uploading
+            photoDao.updateUploadStatus(current.localId, "UPLOADING", System.currentTimeMillis())
+            uploadQueueDao.markInProgress(queueId)
+
+            val uri = photo.pathUri.toUri()
+            var tempFile: File? = null
+
+            try {
+                val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri)
+                val ext = getExtFromMimeType(mimeType!!)
+                val FIFTY_MB = 50L * 1024 * 1024
+
+                // Stream to temp file instead of readBytes() — avoids OOM on large files
+                tempFile = File.createTempFile("upload_${index}_", ".$ext")
+                appContext.contentResolver.openInputStream(uri)?.use { input ->
+                    tempFile!!.outputStream().use { output ->
+                        input.copyTo(output, bufferSize = 8192)
+                    }
+                } ?: throw IOException("Cannot open input stream for $uri")
+
+                val fileSize = tempFile!!.length()
+
+                // Compress only if file > 50 MB
+                if (fileSize > FIFTY_MB) {
+                    val bytes = tempFile!!.readBytes()
+                    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    if (bitmap != null) {
+                        val compressFormat = when (mimeType) {
+                            MIME_TYPE_JPEG -> Bitmap.CompressFormat.JPEG
+                            MIME_TYPE_PNG -> Bitmap.CompressFormat.PNG
+                            MIME_TYPE_WEBP -> Bitmap.CompressFormat.WEBP
+                            else -> Bitmap.CompressFormat.JPEG
+                        }
+                        var quality = 100
+                        var outputBytes: ByteArray
+                        do {
+                            val outputStream = ByteArrayOutputStream()
+                            outputStream.use {
+                                bitmap.compress(compressFormat, quality, it)
+                                outputBytes = it.toByteArray()
+                            }
+                            quality -= 5
+                        } while (outputBytes.size > FIFTY_MB && quality > 0)
+                        tempFile!!.writeBytes(outputBytes)
+                    }
+                }
+
+                val fileName = getFileName(appContext.contentResolver, uri)
+
+                // 7. Upload with hash and device metadata
+                sendFileApi(botApi, channelId, uri, tempFile!!, ext!!, appContext, uploadType, fileName, hash)
+
+                photoDao.updateUploadStatus(current.localId, "DONE", System.currentTimeMillis())
+                uploadQueueDao.markDone(queueId)
+                Log.d("PeriodicBackup", "Upload success: ${photo.localId}")
+                true
+            } catch (e: Exception) {
+                Log.e("PeriodicBackup", "Upload failed for ${photo.localId}: ${e.message}")
+                photoDao.updateUploadStatus(current.localId, "FAILED", System.currentTimeMillis())
+                uploadQueueDao.markFailed(queueId, e.message)
+                false
+            } finally {
+                tempFile?.delete()
+            }
+        } catch (e: Exception) {
+            Log.e("PeriodicBackup", "Error in uploadSinglePhoto for ${photo.localId}: ${e.message}")
+            false
         }
     }
 
@@ -200,5 +259,10 @@ class PeriodicPhotoBackupWorker(
         const val KEY_PROGRESS_MAX = "progress_max"
         const val KEY_CURRENT_FILE_URI = "current_file_uri"
         const val KEY_UPLOAD_TYPE = "upload_type"
+        const val KEY_TOTAL_DONE = "total_done"
+        const val KEY_TOTAL_PHOTOS = "total_photos"
+        const val MAX_BATCH_SIZE = 50
+        const val PARALLELISM = 3
+        const val DELAY_BETWEEN_CHUNKS_MS = 1500L
     }
 }
