@@ -20,6 +20,7 @@ data class ImageMetadata(
     @JsonProperty("fileName") val fileName: String,
     @JsonProperty("fileSize") val fileSize: Long,
     @JsonProperty("mimeType") val mimeType: String,
+    @JsonProperty("filePath") val filePath: String = "",
     @JsonProperty("width") val width: Int? = null,
     @JsonProperty("height") val height: Int? = null,
     @JsonProperty("dateAdded") val dateAdded: Long,
@@ -39,6 +40,9 @@ data class ImageMetadata(
         // Basic file info
         sb.appendLine("📷 **Photo Metadata**")
         sb.appendLine("📁 File: $fileName")
+        if (filePath.isNotEmpty()) {
+            sb.appendLine("📍 Path: `$filePath`")
+        }
         sb.appendLine("📏 Size: ${formatFileSize(fileSize)}")
         
         // Dimensions
@@ -161,6 +165,7 @@ object ImageMetadataExtractor {
                 fileName = basicInfo.fileName,
                 fileSize = basicInfo.fileSize,
                 mimeType = basicInfo.mimeType,
+                filePath = basicInfo.filePath,
                 width = exifInfo.width,
                 height = exifInfo.height,
                 dateAdded = basicInfo.dateAdded,
@@ -192,7 +197,8 @@ object ImageMetadataExtractor {
             MediaStore.Images.ImageColumns.DATE_MODIFIED,
             MediaStore.Images.ImageColumns.DATE_TAKEN,
             MediaStore.Images.ImageColumns.WIDTH,
-            MediaStore.Images.ImageColumns.HEIGHT
+            MediaStore.Images.ImageColumns.HEIGHT,
+            MediaStore.Images.ImageColumns.DATA
         )
         
         return contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
@@ -205,7 +211,8 @@ object ImageMetadataExtractor {
                     dateModified = cursor.getLongOrDefault(MediaStore.Images.ImageColumns.DATE_MODIFIED, 0L) * 1000,
                     dateTaken = cursor.getLongOrNull(MediaStore.Images.ImageColumns.DATE_TAKEN),
                     width = cursor.getIntOrNull(MediaStore.Images.ImageColumns.WIDTH),
-                    height = cursor.getIntOrNull(MediaStore.Images.ImageColumns.HEIGHT)
+                    height = cursor.getIntOrNull(MediaStore.Images.ImageColumns.HEIGHT),
+                    filePath = cursor.getStringOrEmpty(MediaStore.Images.ImageColumns.DATA)
                 )
             } else null
         }
@@ -371,6 +378,7 @@ private data class BasicFileInfo(
     val fileName: String,
     val fileSize: Long,
     val mimeType: String,
+    val filePath: String = "",
     val dateAdded: Long,
     val dateModified: Long,
     val dateTaken: Long?,

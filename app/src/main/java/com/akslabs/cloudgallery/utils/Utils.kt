@@ -153,7 +153,8 @@ suspend fun sendFileApi(
     }
     
     // Append device and hash tags
-    val deviceTag = "#device:$deviceId"
+    val deviceName = Preferences.getDeviceName()
+    val deviceTag = if (deviceName.isNotEmpty()) "#device:$deviceId ($deviceName)" else "#device:$deviceId"
     val hashTag = if (contentHash != null) " #hash:$contentHash" else ""
     val caption = buildString {
         if (metadataCaption != null) {
