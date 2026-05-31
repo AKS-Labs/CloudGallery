@@ -114,6 +114,7 @@ import com.akslabs.cloudgallery.ui.main.screens.remote.RemoteViewModel
 import com.akslabs.cloudgallery.workers.WorkModule
 import androidx.core.net.toUri
 import android.net.Uri
+import androidx.compose.material.icons.rounded.ClearAll
 
 // ─── Tab definitions ────────────────────────────────────────────────
 private enum class UploadTab(val label: String, val icon: ImageVector) {
@@ -267,7 +268,7 @@ fun ManageUploadsScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Rounded.CheckCircle, // Or a sweep icon
+                                        imageVector = Icons.Rounded.ClearAll, // Or a sweep icon
                                         contentDescription = "Clear All Completed",
                                         modifier = Modifier.size(20.dp),
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer
