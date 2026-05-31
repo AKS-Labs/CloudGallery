@@ -9,6 +9,7 @@ import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
+import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.entities.TelegramFile
 import com.github.kotlintelegrambot.entities.Update
 import com.github.kotlintelegrambot.entities.files.Document
@@ -84,12 +85,34 @@ object BotApi {
         caption: String? = null
     ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
         return withContext(Dispatchers.IO) {
-            bot.sendDocument(
-                chatId = ChatId.fromId(channelId),
-                document = TelegramFile.ByFile(file),
-                caption = caption,
-                disableContentTypeDetection = false
-            )
+            Log.d(TAG, "📤 sendFile: file=${file.name}, size=${file.length()}, channel=$channelId, captionLen=${caption?.length ?: 0}")
+            if (!file.exists()) {
+                Log.e(TAG, "❌ sendFile: File does not exist: ${file.absolutePath}")
+                return@withContext Pair(null, java.io.FileNotFoundException("File not found: ${file.absolutePath}"))
+            }
+            if (channelId == 0L) {
+                Log.e(TAG, "❌ sendFile: Invalid channel ID: $channelId")
+                return@withContext Pair(null, IllegalArgumentException("Invalid channel ID: $channelId"))
+            }
+            try {
+                val result = bot.sendDocument(
+                    chatId = ChatId.fromId(channelId),
+                    document = TelegramFile.ByFile(file),
+                    caption = caption,
+                    parseMode = ParseMode.HTML,
+                    disableContentTypeDetection = true
+                )
+                val (response, error) = result
+                if (error != null) {
+                    Log.e(TAG, "❌ sendFile: API error", error)
+                } else {
+                    Log.d(TAG, "📤 sendFile: Response code=${response?.code()}, isSuccessful=${response?.isSuccessful}")
+                }
+                result
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ sendFile: Exception during upload", e)
+                Pair(null, e)
+            }
         }
     }
 
@@ -107,6 +130,27 @@ object BotApi {
             } catch (e: Exception) {
                 Log.e(TAG, "Error deleting message $messageId from chat $chatId", e)
                 false
+            }
+        }
+    }
+
+    /**
+     * Get file metadata from Telegram (for individual file size lookups).
+     * Returns the file size in bytes, or null if not available.
+     */
+    suspend fun getFileSize(fileId: String): Long? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val result = bot.getFile(fileId)
+                val (response, error) = result
+                if (error != null) {
+                    Log.e(TAG, "Error getting file size for $fileId", error)
+                    return@withContext null
+                }
+                response?.body()?.result?.fileSize?.toLong()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting file size for $fileId", e)
+                null
             }
         }
     }
@@ -151,7 +195,7 @@ object BotApi {
                                         fileName = document.fileName,
                                         fileSize = document.fileSize?.toLong(),
                                         mimeType = document.mimeType,
-                                        uploadDate = message.date * 1000L, // Convert to milliseconds
+                                        uploadDate = message.date * 1000L,
                                         messageId = message.messageId.toInt(),
                                         mediaType = MediaType.DOCUMENT
                                     )
@@ -161,7 +205,6 @@ object BotApi {
 
                                 // Check for photo attachments
                                 message.photo?.let { photos ->
-                                    // Get the largest photo size
                                     val largestPhoto = photos.maxByOrNull { it.fileSize ?: 0 }
                                     largestPhoto?.let { photo ->
                                         val mediaFile = DiscoveredMediaFile(

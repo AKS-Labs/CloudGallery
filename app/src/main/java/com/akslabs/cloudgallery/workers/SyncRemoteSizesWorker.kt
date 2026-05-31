@@ -35,27 +35,22 @@ class SyncRemoteSizesWorker(
                     return@withContext Result.success()
                 }
 
-                Log.i(TAG, "Found ${photosWithoutSize.size} photos without size info. Scanning channel...")
+                Log.i(TAG, "Found ${photosWithoutSize.size} photos without size info. Fetching individually...")
 
-                // We scan the channel to find matching files
-                // This is a heavy operation, so we might want to limit it or do it incrementally
-                // For now, we'll scan recent history
-                
-                val scanResult = BotApi.scanChannelForMedia(channelId, limit = 500)
-                
-                if (scanResult is com.akslabs.cloudgallery.api.ChannelScanResult.Success) {
-                    val mediaMap = scanResult.mediaFiles.associateBy { it.fileId }
-                    var updatedCount = 0
-
-                    photosWithoutSize.forEach { photo ->
-                        val media = mediaMap[photo.remoteId]
-                        if (media != null && media.fileSize != null) {
-                            dao.insertAll(photo.copy(fileSize = media.fileSize))
+                var updatedCount = 0
+                photosWithoutSize.forEach { photo ->
+                    try {
+                        val fileSize = BotApi.getFileSize(photo.remoteId)
+                        if (fileSize != null) {
+                            dao.insertAll(photo.copy(fileSize = fileSize))
                             updatedCount++
                         }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to get size for ${photo.remoteId}: ${e.message}")
+                        // Continue with next photo
                     }
-                    Log.i(TAG, "Updated size for $updatedCount photos.")
                 }
+                Log.i(TAG, "Updated size for $updatedCount photos.")
 
                 Result.success()
             } catch (e: Exception) {

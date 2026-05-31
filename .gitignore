@@ -1,19 +1,60 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# ===== Gradle =====
+
+.gradle/
+build/
+**/build/
+
+# ===== Local Config =====
+
 local.properties
+
+# ===== Logs =====
+
+*.log
+
+# ===== Android Studio / IntelliJ =====
+
+*.iml
+.idea/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# ===== OS Files =====
+
+.DS_Store
+
+# ===== Android Build Outputs =====
+
+*.apk
+*.aab
+output-metadata.json
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ===== Keystore (IMPORTANT: never commit) =====
+
+*.jks
+*.keystore
+
+# ===== Google Services (optional: keep if needed) =====
+
+google-services.json
+
+# ===== Profiling =====
+
+*.hprof
+
+# ===== Misc =====
+
 *.txt
+/builderrors.md
+
+# ===== Exceptions =====
+
 !fastlane/
 !fastlane/**/*.txt
-/builderrors.md

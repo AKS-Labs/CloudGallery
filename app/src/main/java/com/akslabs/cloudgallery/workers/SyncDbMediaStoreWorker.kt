@@ -11,6 +11,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.akslabs.cloudgallery.R
 import com.akslabs.cloudgallery.data.localdb.DbHolder
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.mediastore.getPhotoFromCursor
 import com.akslabs.cloudgallery.utils.toastFromMainThread
@@ -25,6 +26,7 @@ class SyncDbMediaStoreWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.Default) {
             try {
+                val deviceId = Preferences.getOrCreateDeviceId()
                 val resolver = context.contentResolver
                 val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
                 val projection = arrayOf(
@@ -42,7 +44,9 @@ class SyncDbMediaStoreWorker(
                 cursor?.use {
                     while (cursor.moveToNext()) {
                         try {
-                            photosOnDevice.add(cursor.getPhotoFromCursor())
+                            val photo = cursor.getPhotoFromCursor()
+                            // Set deviceId on new photos
+                            photosOnDevice.add(photo.copy(deviceId = deviceId))
                         } catch (e: Exception) {
                             Log.d(TAG, "doWork: ${e.localizedMessage}")
                         }
@@ -50,14 +54,16 @@ class SyncDbMediaStoreWorker(
                 }
                 DbHolder.database.photoDao().insertPhotos(*photosOnDevice.toTypedArray())
                 val photosInDb = DbHolder.database.photoDao().getAll()
+                // Only delete photos that are truly gone from device AND have no cloud backup
+                // Photos with remoteId are cloud-linked — preserve them even if local URI changed
                 val deletedPhotos = photosInDb.filter { photo ->
-                    photosOnDevice.none { it.localId == photo.localId }
+                    photosOnDevice.none { it.localId == photo.localId } && photo.remoteId == null
                 }
                 Log.d(TAG, "doWork: $deletedPhotos")
                 deletedPhotos.fastForEach {
                     DbHolder.database.photoDao().deleteById(it.localId)
                 }
-                Log.d("Sync MediaStore", "doWork: Success")
+                Log.d("Sync MediaStore", "doWork: Success (deviceId=$deviceId)")
                 Result.success()
             } catch (e: Exception) {
                 Log.d("Sync MediaStore", "doWork: ${e.localizedMessage}")

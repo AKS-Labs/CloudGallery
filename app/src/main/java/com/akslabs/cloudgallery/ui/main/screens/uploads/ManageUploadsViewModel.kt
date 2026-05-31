@@ -56,12 +56,21 @@ enum class UploadStatus {
 
 class ManageUploadsViewModel(application: Application) : AndroidViewModel(application) {
 
+    companion object {
+        private val dismissedIds = mutableSetOf<String>()
+    }
+
+    // UI-dismissed synced item IDs — held in companion object to survive ViewModel recreation
+    private val _dismissedIds = MutableStateFlow<Set<String>>(emptySet())
+
     init {
         // Auto-clear history older than 24 hours on startup
         viewModelScope.launch {
             val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
             DbHolder.database.remotePhotoDao().deleteOlderThan(oneDayAgo)
         }
+        // Restore persisted dismissed IDs into the StateFlow
+        _dismissedIds.value = dismissedIds.toSet()
     }
 
     private val workManager = WorkManager.getInstance(application)
@@ -175,9 +184,12 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     val allUploads: StateFlow<List<UploadUiItem>> = combine(
         allWorkFlow, 
         remotePhotosFlow,
-        remoteToLocalPathMapFlow
-    ) { workItems, dbItems, localMap ->
-        val dbUploads = dbItems.map { mapRemotePhotoToUiItem(it, localMap) }
+        remoteToLocalPathMapFlow,
+        _dismissedIds
+    ) { workItems, dbItems, localMap, dismissed ->
+        val dbUploads = dbItems
+            .filter { it.remoteId !in dismissed }
+            .map { mapRemotePhotoToUiItem(it, localMap) }
         val dbFileNames = dbItems.mapNotNull { it.fileName }.toSet()
 
         // Deduplicate: Keep work items only if they are not yet in the DB
@@ -203,11 +215,13 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     val manualUploads: StateFlow<List<UploadUiItem>> = combine(
         allWorkFlow, 
         remotePhotosFlow,
-        remoteToLocalPathMapFlow
-    ) { workItems, dbItems, localMap ->
+        remoteToLocalPathMapFlow,
+        _dismissedIds
+    ) { workItems, dbItems, localMap, dismissed ->
         val manualWork = workItems.filter { it.type == UploadType.Selective || it.type == UploadType.Instant }
         val manualDb = dbItems
             .filter { it.uploadType == "manual_backup" || it.uploadType == "instant" }
+            .filter { it.remoteId !in dismissed }
             .map { mapRemotePhotoToUiItem(it, localMap) }
         
         val dbFileNames = manualDb.mapNotNull { it.fileName }.toSet()
@@ -236,14 +250,17 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     val syncedUploads: StateFlow<List<UploadUiItem>> = combine(
         allWorkFlow,
         remotePhotosFlow,
-        remoteToLocalPathMapFlow
-    ) { workItems, dbItems, localMap ->
-        val dbUploads = dbItems.map { mapRemotePhotoToUiItem(it, localMap) }
+        remoteToLocalPathMapFlow,
+        _dismissedIds
+    ) { workItems, dbItems, localMap, dismissed ->
+        val dbUploads = dbItems
+            .filter { it.remoteId !in dismissed }
+            .map { mapRemotePhotoToUiItem(it, localMap) }
         val dbFileNames = dbItems.mapNotNull { it.fileName }.toSet()
         
         // Include work items that are completed but not yet in DB
         val recentlyCompletedWork = workItems.filter { 
-            it.status == UploadStatus.Completed && it.fileName !in dbFileNames 
+            it.status == UploadStatus.Completed && it.fileName !in dbFileNames && it.id !in dismissed
         }
         
         (recentlyCompletedWork + dbUploads).sortedByDescending { it.timestamp }
@@ -431,9 +448,9 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun clearAllHistory() {
-        viewModelScope.launch {
-            DbHolder.database.remotePhotoDao().clearAll()
-        }
+        val currentSynced = syncedUploads.value.map { it.id }.toSet()
+        dismissedIds.addAll(currentSynced)
+        _dismissedIds.value = dismissedIds.toSet()
     }
 
     fun retryAllFailed() {

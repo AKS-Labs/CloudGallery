@@ -265,6 +265,72 @@ object WorkModule {
         }
     }
 
+    object HashBackfill {
+        private val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
+
+        fun enqueue() {
+            val request = OneTimeWorkRequestBuilder<HashBackfillWorker>()
+                .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, Duration.ofMinutes(15))
+                .build()
+
+            manager.enqueueUniqueWork(
+                HASH_BACKFILL_WORK,
+                ExistingWorkPolicy.KEEP,
+                request
+            )
+        }
+
+        fun cancel() {
+            manager.cancelUniqueWork(HASH_BACKFILL_WORK)
+        }
+    }
+
+    object DailyDatabaseBackup {
+        private val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        private val dailyBackupRequest = PeriodicWorkRequestBuilder<DailyDatabaseBackupWorker>(
+            Duration.ofDays(1)
+        )
+            .setConstraints(constraints)
+            .setInitialDelay(Duration.ofHours(1))
+            .build()
+
+        fun enqueuePeriodic() {
+            if (!Preferences.getBoolean(Preferences.isAutoCloudBackupEnabledKey, true)) {
+                return
+            }
+            manager.enqueueUniquePeriodicWork(
+                DAILY_DATABASE_BACKUP_WORK,
+                ExistingPeriodicWorkPolicy.KEEP,
+                dailyBackupRequest
+            )
+        }
+
+        fun cancel() {
+            manager.cancelUniqueWork(DAILY_DATABASE_BACKUP_WORK)
+        }
+    }
+
+    object UploadQueueCleanup {
+        /**
+         * Cleans up completed upload_queue entries older than 7 days.
+         * Called from DailyDatabaseBackupWorker or on app launch.
+         */
+        suspend fun cleanup() {
+            try {
+                val sevenDaysAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
+                com.akslabs.cloudgallery.data.localdb.DbHolder.database.uploadQueueDao().cleanupOld(sevenDaysAgo)
+            } catch (e: Exception) {
+                android.util.Log.e("UploadQueueCleanup", "Failed to clean up old queue entries", e)
+            }
+        }
+    }
+
     object CloudPhotoSync {
         private val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -274,7 +340,7 @@ object WorkModule {
         private val periodicCloudSyncRequest =
             PeriodicWorkRequestBuilder<CloudPhotoSyncWorker>(Duration.ofDays(1))
                 .setConstraints(constraints)
-                .setInitialDelay(Duration.ofMinutes(30)) // Wait 30 minutes after app install
+                .setInitialDelay(Duration.ofMinutes(30))
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, Duration.ofMinutes(15))
                 .build()
 
@@ -328,34 +394,6 @@ object WorkModule {
         }
     }
 
-    object DailyDatabaseBackup {
-        private val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-
-        private val dailyBackupRequest = PeriodicWorkRequestBuilder<DailyDatabaseBackupWorker>(
-            Duration.ofDays(1)
-        )
-            .setConstraints(constraints)
-            .setInitialDelay(Duration.ofHours(1)) // Start 1 hour after app install
-            .build()
-
-        fun enqueuePeriodic() {
-            if (!Preferences.getBoolean(Preferences.isAutoCloudBackupEnabledKey, true)) {
-                return
-            }
-            manager.enqueueUniquePeriodicWork(
-                DAILY_DATABASE_BACKUP_WORK,
-                ExistingPeriodicWorkPolicy.KEEP,
-                dailyBackupRequest
-            )
-        }
-
-        fun cancel() {
-            manager.cancelUniqueWork(DAILY_DATABASE_BACKUP_WORK)
-        }
-    }
-
     fun observeWorkerByName(name: String) = manager.getWorkInfosForUniqueWorkFlow(name)
         .flowOn(Dispatchers.IO)
 
@@ -366,6 +404,7 @@ object WorkModule {
     const val SYNC_MEDIA_STORE_WORK = "SyncMediaStoreWork"
     const val RESTORE_ALL_PHOTOS_WORK = "RestoreAllPhotosWork"
     const val PERIODIC_DB_EXPORT_WORK = "PeriodicDbExportWork"
+    const val HASH_BACKFILL_WORK = "HashBackfillWork"
     const val CLOUD_PHOTO_SYNC_WORK = "CloudPhotoSyncWork"
     const val CLOUD_PHOTO_SYNC_ONE_TIME_WORK = "CloudPhotoSyncOneTimeWork"
     const val QUICK_CLOUD_SYNC_WORK = "QuickCloudSyncWork"

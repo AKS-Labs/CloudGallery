@@ -2,6 +2,7 @@ package com.akslabs.cloudgallery.data.localdb
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import java.util.UUID
 
 @Suppress("ktlint:standard:property-naming")
 object Preferences {
@@ -16,6 +18,28 @@ object Preferences {
     // encrypted preferences
     const val botToken: String = "botToken"
     const val channelId: String = "channelId"
+
+    // device identity
+    const val deviceIdKey: String = "device_id"
+    const val deviceNameKey: String = "device_name"
+
+    fun getOrCreateDeviceId(): String {
+        var id = getEncryptedString(deviceIdKey, "")
+        if (id.isBlank()) {
+            id = UUID.randomUUID().toString().take(8)
+            editEncrypted { putString(deviceIdKey, id) }
+        }
+        return id
+    }
+
+    fun getDeviceName(): String {
+        val default = "${Build.MANUFACTURER} ${Build.MODEL}"
+        return getString(deviceNameKey, default)
+    }
+
+    fun setDeviceName(name: String) {
+        edit { putString(deviceNameKey, name) }
+    }
 
     // non-encrypted preferences
     const val startTabKey: String = "startTab"

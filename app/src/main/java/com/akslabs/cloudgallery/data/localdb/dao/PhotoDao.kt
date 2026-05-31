@@ -72,11 +72,34 @@ interface PhotoDao {
     @Query("UPDATE photos SET remoteId = :remoteId WHERE pathUri = :pathUri")
     suspend fun updateRemoteIdForPath(pathUri: String, remoteId: String)
 
+    @Query("UPDATE photos SET remoteId = :remoteId WHERE localId = :localId")
+    suspend fun updateRemoteIdForLocalId(localId: String, remoteId: String)
+
     @Query("SELECT localId FROM photos")
     suspend fun getAllLocalIds(): List<String>
 
     @Query("SELECT localId, remoteId FROM photos WHERE remoteId IS NOT NULL")
     suspend fun getSyncedPhotoMap(): List<SyncedPhotoTuple>
+
+    // ── New queries for multi-device & dedup ──
+
+    @Query("SELECT * FROM photos WHERE contentHash = :hash LIMIT 1")
+    suspend fun getByContentHash(hash: String): Photo?
+
+    @Query("UPDATE photos SET uploadStatus = :status, lastUploadAttempt = :lastAttempt WHERE localId = :localId")
+    suspend fun updateUploadStatus(localId: String, status: String, lastAttempt: Long? = null)
+
+    @Query("UPDATE photos SET contentHash = :hash WHERE localId = :localId")
+    suspend fun updateContentHash(localId: String, hash: String)
+
+    @Query("SELECT * FROM photos WHERE contentHash IS NULL")
+    suspend fun getAllNeedingHash(): List<Photo>
+
+    @Query("SELECT * FROM photos WHERE uploadStatus IN ('NONE', 'FAILED') AND remoteId IS NULL")
+    suspend fun getAllPendingUpload(): List<Photo>
+
+    @Query("UPDATE photos SET deviceId = :deviceId WHERE localId = :localId")
+    suspend fun setDeviceId(localId: String, deviceId: String)
 }
 
 data class SyncedPhotoTuple(

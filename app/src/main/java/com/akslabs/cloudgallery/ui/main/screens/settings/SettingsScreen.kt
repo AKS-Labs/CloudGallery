@@ -620,13 +620,16 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     SettingsItem(
                         icon = Icons.Rounded.CloudSync,
                         title = "Sync Cloud Photos",
-                        subtitle = "Sync Manually Uploaded images from Telegram Channel",
+                        subtitle = "Scan Telegram channel for new photos",
                         onClick = {
                             scope.launch {
                                 context.toastFromMainThread("Syncing...")
                                 CloudPhotoSyncService.forceSync(context).collect { progress ->
                                     if (progress.isComplete) {
-                                        context.toastFromMainThread(if (progress.errorMessage != null) "Sync failed" else "Sync complete!")
+                                        context.toastFromMainThread(
+                                            if (progress.errorMessage != null) "Sync failed: ${progress.errorMessage}"
+                                            else "Sync complete!"
+                                        )
                                     }
                                 }
                             }
