@@ -572,7 +572,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     SettingsSwitchItem(
                         icon = Icons.Rounded.Image,
                         title = "Sync Image Preview",
-                        subtitle = "Upload a low-quality preview for faster cloud viewing",
+                        subtitle = "Sync low-quality previews with original image",
                         isChecked = isSyncImagePreviewEnabled,
                         onCheckedChange = { enabled ->
                             isSyncImagePreviewEnabled = enabled

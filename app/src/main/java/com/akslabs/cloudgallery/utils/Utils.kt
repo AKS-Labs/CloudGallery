@@ -238,43 +238,79 @@ suspend fun sendFileApi(
 }
 
 /**
- * Generates a low-quality JPEG preview of an image at the given URI.
+ * Generates a JPEG preview of an image at the given URI.
+ * Targets at least [minBytes] file size by adjusting quality and dimensions.
+ * If the original image is smaller than [minBytes], returns a copy as-is.
  * Returns a temp file with the preview, or null on failure.
  */
 suspend fun generatePreview(
     context: Context,
     uri: Uri,
     maxDimension: Int = 320,
-    quality: Int = 30
+    minBytes: Long = 25600
 ): File? = withContext(Dispatchers.IO) {
     try {
+        // Check original file size — if already below threshold, copy as-is
+        val originalSize = try {
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize }
+        } catch (_: Exception) { null }
+        if (originalSize != null && originalSize in 1 until minBytes) {
+            val copy = File.createTempFile("preview_", ".jpg")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(copy).use { output -> input.copyTo(output) }
+            }
+            return@withContext copy
+        }
+
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { input ->
             BitmapFactory.decodeStream(input, null, opts)
         }
         if (opts.outWidth <= 0 || opts.outHeight <= 0) return@withContext null
 
-        val sampleSize = calculateSampleSize(opts.outWidth, opts.outHeight, maxDimension)
+        var currentMaxDim = maxDimension
+        var quality = 30
+        var bestFile: File? = null
 
-        val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        val bitmap = context.contentResolver.openInputStream(uri)?.use { input ->
-            BitmapFactory.decodeStream(input, null, decodeOpts)
-        } ?: return@withContext null
+        while (quality <= 95 && currentMaxDim <= 1280) {
+            val sampleSize = calculateSampleSize(opts.outWidth, opts.outHeight, currentMaxDim)
+            val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            val bitmap = context.contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, decodeOpts)
+            } ?: return@withContext null
 
-        val scale = minOf(
-            maxDimension.toFloat() / bitmap.width,
-            maxDimension.toFloat() / bitmap.height
-        )
-        val newWidth = (bitmap.width * scale).toInt().coerceAtLeast(1)
-        val newHeight = (bitmap.height * scale).toInt().coerceAtLeast(1)
+            val scale = minOf(
+                currentMaxDim.toFloat() / bitmap.width,
+                currentMaxDim.toFloat() / bitmap.height
+            )
+            val newWidth = (bitmap.width * scale).toInt().coerceAtLeast(1)
+            val newHeight = (bitmap.height * scale).toInt().coerceAtLeast(1)
 
-        val scaled = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
-        if (scaled != bitmap) bitmap.recycle()
+            val scaled = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+            if (scaled != bitmap) bitmap.recycle()
 
-        val tempFile = File.createTempFile("preview_", ".jpg")
-        FileOutputStream(tempFile).use { out -> scaled.compress(Bitmap.CompressFormat.JPEG, quality, out) }
-        scaled.recycle()
-        tempFile
+            val tempFile = File.createTempFile("preview_", ".jpg")
+            FileOutputStream(tempFile).use { out -> scaled.compress(Bitmap.CompressFormat.JPEG, quality, out) }
+            scaled.recycle()
+
+            if (tempFile.length() >= minBytes) {
+                bestFile?.delete()
+                bestFile = tempFile
+                break
+            }
+
+            bestFile?.delete()
+            bestFile = tempFile
+
+            if (quality < 95) {
+                quality = (quality + 15).coerceAtMost(95)
+            } else {
+                currentMaxDim += 200
+                quality = 30
+            }
+        }
+
+        bestFile
     } catch (e: Exception) {
         Log.e("Preview", "Failed to generate preview", e)
         null
@@ -300,7 +336,7 @@ suspend fun uploadPreviewFile(
     contentHash: String?
 ): String? {
     val caption = buildString {
-        appendLine("<b>[Preview]</b>")
+        append("<b>[Preview ${formatFileSize(file.length())}]</b>")
         if (contentHash != null) {
             append("<b>#hash:</b> ${escapeHtml(contentHash)}")
         }
@@ -324,3 +360,15 @@ suspend fun Context.toastFromMainThread(msg: String?, length: Int = Toast.LENGTH
     withContext(Dispatchers.Main) {
         Toast.makeText(this@toastFromMainThread, msg ?: getString(R.string.error), length).show()
     }
+
+fun formatFileSize(bytes: Long): String {
+    val units = arrayOf("B", "KB", "MB", "GB")
+    var size = bytes.toDouble()
+    var unitIndex = 0
+    while (size >= 1024 && unitIndex < units.lastIndex) {
+        size /= 1024
+        unitIndex++
+    }
+    return if (unitIndex == 0) "${bytes} ${units[unitIndex]}"
+    else "%.1f %s".format(size, units[unitIndex])
+}
