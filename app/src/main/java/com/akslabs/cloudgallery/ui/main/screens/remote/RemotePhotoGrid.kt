@@ -367,8 +367,10 @@ fun RemotePhotosGrid(
                                 yield() // Allow other background tasks to breathe
                                 when (val item = currentLayoutItems[index]) {
                                     is RemoteGridItem.PhotoItem -> {
+                                        val previewFileId = item.photo.previewRemoteId ?: item.photo.remoteId
+                                        val fileIdData = com.akslabs.cloudgallery.utils.coil.FileIdData(previewFileId)
                                         val microRequest = ImageRequest.Builder(context)
-                                            .data(item.photo)
+                                            .data(fileIdData)
                                             .size(64, 64) 
                                             .allowHardware(true)
                                             .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
@@ -380,7 +382,7 @@ fun RemotePhotosGrid(
                                         // Prefetch full thumbnails for immediate next items
                                         if (index <= lastIndex + 10) {
                                             val thumbRequest = ImageRequest.Builder(context)
-                                                .data(item.photo)
+                                                .data(fileIdData)
                                                 .size(180, 180)
                                                 .allowHardware(true)
                                                 .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
@@ -612,15 +614,13 @@ fun CloudPhotoItem(
             LoadAnimation(modifier = Modifier.size(48.dp))
 
             if (remotePhoto != null) {
-                // Fix: Stabilize ImageRequest model
-                val imageRequest = remember(remotePhoto.remoteId) {
+                val fileId = remotePhoto.previewRemoteId ?: remotePhoto.remoteId
+                val imageRequest = remember(fileId) {
                     ImageRequest.Builder(context)
-                        .data(remotePhoto)
+                        .data(com.akslabs.cloudgallery.utils.coil.FileIdData(fileId))
                         .size(180, 180)
-                        .memoryCacheKey("rt_thumb_${remotePhoto.remoteId}")
-                        .diskCacheKey("rt_thumb_${remotePhoto.remoteId}")
                         .allowHardware(true)
-                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565) // Forced for memory efficiency
+                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
                         .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                         .crossfade(200)
                         .build()
