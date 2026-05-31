@@ -9,6 +9,7 @@ import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
+import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.entities.TelegramFile
 import com.github.kotlintelegrambot.entities.Update
 import com.github.kotlintelegrambot.entities.files.Document
@@ -98,6 +99,7 @@ object BotApi {
                     chatId = ChatId.fromId(channelId),
                     document = TelegramFile.ByFile(file),
                     caption = caption,
+                    parseMode = ParseMode.HTML,
                     disableContentTypeDetection = true
                 )
                 val (response, error) = result

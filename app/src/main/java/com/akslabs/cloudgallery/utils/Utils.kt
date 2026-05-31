@@ -152,17 +152,19 @@ suspend fun sendFileApi(
         null
     }
     
-    // Append device and hash tags
+    // Append device and hash tags in formatted footer
     val deviceName = Preferences.getDeviceName()
-    val deviceTag = if (deviceName.isNotEmpty()) "#device:$deviceId ($deviceName)" else "#device:$deviceId"
-    val hashTag = if (contentHash != null) " #hash:$contentHash" else ""
     val caption = buildString {
         if (metadataCaption != null) {
             append(metadataCaption)
             append("\n")
         }
-        append(deviceTag)
-        append(hashTag)
+        appendLine("\u2501".repeat(18))
+        appendLine("<b>#device:</b> ${deviceId} (<b>${escapeHtml(deviceName)}</b>)")
+        if (contentHash != null) {
+            appendLine()
+            appendLine("<b>#hash:</b> ${contentHash}")
+        }
     }
     
     Log.d(TAG, "⬆️ sendFileApi: Uploading file=${file.name} (${file.length()} bytes) to channel=$channelId")

@@ -31,88 +31,100 @@ data class ImageMetadata(
     @JsonProperty("technical") val technical: TechnicalInfo? = null,
     @JsonProperty("tags") val tags: List<String> = emptyList()
 ) {
-    /**
-     * Generate a formatted metadata caption for Telegram
-     */
     fun toTelegramCaption(): String {
         val sb = StringBuilder()
-        
-        // Basic file info
-        sb.appendLine("📷 **Photo Metadata**")
-        sb.appendLine("📁 File: $fileName")
+        val d = "\u2501".repeat(18)
+
+        sb.appendLine("\uD83D\uDCC1 <b>File:</b>")
+        sb.appendLine("<blockquote><code>${escapeHtml(fileName)}</code></blockquote>")
         if (filePath.isNotEmpty()) {
-            sb.appendLine("📍 Path: `$filePath`")
+            sb.appendLine()
+            sb.appendLine("\uD83D\uDCCD <b>Path:</b>")
+            sb.appendLine("<blockquote><code>${escapeHtml(filePath)}</code></blockquote>")
         }
-        sb.appendLine("📏 Size: ${formatFileSize(fileSize)}")
-        
-        // Dimensions
+        sb.appendLine()
+        sb.append("\uD83D\uDCBE <b>Size: ${formatFileSize(fileSize)}</b>")
         if (width != null && height != null) {
-            sb.appendLine("📐 Dimensions: ${width}x${height}")
+            sb.append("  \u00B7  \uD83D\uDDBC\uFE0F <b>Res: ${width}\u00d7${height}</b>")
         }
-        
-        // Date information
+        sb.appendLine()
+
+        sb.appendLine()
+        sb.appendLine(d)
         if (dateTaken != null) {
-            sb.appendLine("📅 Taken: ${formatDate(dateTaken)}")
+            sb.appendLine()
+            sb.appendLine("<b>Date taken:</b>")
+            sb.appendLine("<blockquote><code>${formatDate(dateTaken)}</code></blockquote>")
         }
-        sb.appendLine("📅 Added: ${formatDate(dateAdded)}")
-        
-        // Camera information
+        sb.appendLine()
+        sb.appendLine("<b>Date added:</b>")
+        sb.appendLine("<blockquote><code>${formatDate(dateAdded)}</code></blockquote>")
+
         camera?.let { cam ->
-            sb.appendLine("\n📸 **Camera Info**")
-            if (cam.make.isNotEmpty()) sb.appendLine("🏭 Make: ${cam.make}")
-            if (cam.model.isNotEmpty()) sb.appendLine("📱 Model: ${cam.model}")
-            if (cam.lens.isNotEmpty()) sb.appendLine("🔍 Lens: ${cam.lens}")
+            val has = cam.make.isNotEmpty() || cam.model.isNotEmpty() || cam.lens.isNotEmpty()
+            if (has) {
+                sb.appendLine()
+                sb.appendLine(d)
+                if (cam.make.isNotEmpty()) sb.appendLine("\uD83C\uDFED <b>Make:</b> <i>${escapeHtml(cam.make)}</i>")
+                if (cam.model.isNotEmpty()) sb.appendLine("\uD83D\uDCF1 <b>Model:</b> <u>${escapeHtml(cam.model)}</u>")
+                if (cam.lens.isNotEmpty()) sb.appendLine("\uD83D\uDD0D <b>Lens:</b> <tg-spoiler>${escapeHtml(cam.lens)}</tg-spoiler>")
+            }
         }
-        
-        // Technical details
+
         technical?.let { tech ->
-            sb.appendLine("\n⚙️ **Technical**")
-            if (tech.aperture.isNotEmpty()) sb.appendLine("🕳️ Aperture: f/${tech.aperture}")
-            if (tech.shutterSpeed.isNotEmpty()) sb.appendLine("⚡ Shutter: ${tech.shutterSpeed}")
-            if (tech.iso.isNotEmpty()) sb.appendLine("🎛️ ISO: ${tech.iso}")
-            if (tech.focalLength.isNotEmpty()) sb.appendLine("🔭 Focal: ${tech.focalLength}mm")
-            if (tech.flash.isNotEmpty()) sb.appendLine("💡 Flash: ${tech.flash}")
+            val has = tech.aperture.isNotEmpty() || tech.shutterSpeed.isNotEmpty() ||
+                tech.iso.isNotEmpty() || tech.focalLength.isNotEmpty() || tech.flash.isNotEmpty()
+            if (has) {
+                sb.appendLine()
+                sb.appendLine(d)
+                if (tech.aperture.isNotEmpty()) sb.appendLine("\uD83D\uDD73\uFE0F <b>Aperture:</b> f/${tech.aperture}")
+                if (tech.shutterSpeed.isNotEmpty()) sb.appendLine("\u26A1 <b>Shutter:</b> <s>${tech.shutterSpeed}</s>")
+                if (tech.iso.isNotEmpty()) sb.appendLine("\uD83C\uDF9B\uFE0F <b>ISO:</b> ${tech.iso}")
+                if (tech.focalLength.isNotEmpty()) sb.appendLine("\uD83D\uDD2D <b>Focal:</b> ${tech.focalLength}mm")
+                if (tech.flash.isNotEmpty()) sb.appendLine("\uD83D\uDCA1 <b>Flash:</b> ${tech.flash}")
+            }
         }
-        
-        // Location information
+
         location?.let { loc ->
-            sb.appendLine("\n🌍 **Location**")
-            sb.appendLine("📍 Coordinates: ${loc.latitude}, ${loc.longitude}")
+            sb.appendLine()
+            sb.appendLine(d)
+            sb.appendLine("\uD83D\uDCCD <b>Coords:</b> <code>${loc.latitude}, ${loc.longitude}</code>")
             if (loc.altitude != null) {
-                sb.appendLine("⛰️ Altitude: ${loc.altitude}m")
+                sb.appendLine("\u26F0\uFE0F <b>Altitude:</b> ${loc.altitude}m")
             }
             if (loc.address.isNotEmpty()) {
-                sb.appendLine("🏠 Address: ${loc.address}")
+                sb.appendLine("\uD83C\uDFE0 <b>Address:</b> <i>${escapeHtml(loc.address)}</i>")
             }
+            sb.appendLine("<blockquote expandable>\uD83D\uDCCD Location embedded in EXIF</blockquote>")
         }
-        
-        // Tags
+
         if (tags.isNotEmpty()) {
-            sb.appendLine("\n🏷️ **Tags**")
+            sb.appendLine()
+            sb.appendLine(d)
             sb.appendLine(tags.joinToString(" ") { "#$it" })
         }
-        
-        return sb.toString().take(1024) // Telegram caption limit
+
+        return collapseBlankLines(sb.toString()).take(1024)
     }
-    
+
     private fun formatFileSize(bytes: Long): String {
         val units = arrayOf("B", "KB", "MB", "GB")
         var size = bytes.toDouble()
         var unitIndex = 0
-        
         while (size >= 1024 && unitIndex < units.size - 1) {
             size /= 1024
             unitIndex++
         }
-        
         return "%.1f %s".format(size, units[unitIndex])
     }
-    
+
     private fun formatDate(timestamp: Long): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault())
         return sdf.format(Date(timestamp))
     }
 }
+
+private fun collapseBlankLines(text: String): String = text.replace(Regex("\\n{3,}"), "\n\n")
 
 data class CameraInfo(
     @JsonProperty("make") val make: String = "",
@@ -137,30 +149,26 @@ data class TechnicalInfo(
     @JsonProperty("colorSpace") val colorSpace: String = ""
 )
 
-/**
- * Utility object for extracting comprehensive image metadata
- */
+fun escapeHtml(text: String): String {
+    return text
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+}
+
 object ImageMetadataExtractor {
-    
+
     private const val TAG = "ImageMetadataExtractor"
-    
-    /**
-     * Extract comprehensive metadata from an image URI
-     */
+
     suspend fun extractMetadata(
         context: Context,
         uri: Uri
     ): ImageMetadata? = withContext(Dispatchers.IO) {
         try {
             val contentResolver = context.contentResolver
-            
-            // Get basic file information from MediaStore
-            val basicInfo = getBasicFileInfo(contentResolver, uri)
-                ?: return@withContext null
-            
-            // Get EXIF data
+            val basicInfo = getBasicFileInfo(contentResolver, uri) ?: return@withContext null
             val exifInfo = getExifInfo(contentResolver, uri)
-            
+
             ImageMetadata(
                 fileName = basicInfo.fileName,
                 fileSize = basicInfo.fileSize,
@@ -181,10 +189,7 @@ object ImageMetadataExtractor {
             null
         }
     }
-    
-    /**
-     * Get basic file information from MediaStore
-     */
+
     private fun getBasicFileInfo(
         contentResolver: ContentResolver,
         uri: Uri
@@ -200,7 +205,7 @@ object ImageMetadataExtractor {
             MediaStore.Images.ImageColumns.HEIGHT,
             MediaStore.Images.ImageColumns.DATA
         )
-        
+
         return contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) {
                 BasicFileInfo(
@@ -217,10 +222,7 @@ object ImageMetadataExtractor {
             } else null
         }
     }
-    
-    /**
-     * Extract EXIF information from image
-     */
+
     private fun getExifInfo(
         contentResolver: ContentResolver,
         uri: Uri
@@ -228,15 +230,15 @@ object ImageMetadataExtractor {
         return try {
             contentResolver.openInputStream(uri)?.use { inputStream ->
                 val exif = ExifInterface(inputStream)
-                
+
                 val camera = CameraInfo(
                     make = exif.getAttribute(ExifInterface.TAG_MAKE) ?: "",
                     model = exif.getAttribute(ExifInterface.TAG_MODEL) ?: "",
                     lens = exif.getAttribute(ExifInterface.TAG_LENS_MODEL) ?: ""
                 )
-                
+
                 val location = getLocationFromExif(exif)
-                
+
                 val technical = TechnicalInfo(
                     aperture = exif.getAttribute(ExifInterface.TAG_APERTURE_VALUE) ?: "",
                     shutterSpeed = exif.getAttribute(ExifInterface.TAG_EXPOSURE_TIME) ?: "",
@@ -246,7 +248,7 @@ object ImageMetadataExtractor {
                     whiteBalance = exif.getAttribute(ExifInterface.TAG_WHITE_BALANCE) ?: "",
                     colorSpace = exif.getAttribute(ExifInterface.TAG_COLOR_SPACE) ?: ""
                 )
-                
+
                 val dateTaken = exif.getAttribute(ExifInterface.TAG_DATETIME)?.let { dateStr ->
                     try {
                         val sdf = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.getDefault())
@@ -255,7 +257,7 @@ object ImageMetadataExtractor {
                         null
                     }
                 }
-                
+
                 ExifInfo(
                     width = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).takeIf { it > 0 },
                     height = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).takeIf { it > 0 },
@@ -270,10 +272,7 @@ object ImageMetadataExtractor {
             ExifInfo()
         }
     }
-    
-    /**
-     * Extract GPS location from EXIF data
-     */
+
     private fun getLocationFromExif(exif: ExifInterface): LocationInfo? {
         val latLong = FloatArray(2)
         return if (exif.getLatLong(latLong)) {
@@ -285,95 +284,79 @@ object ImageMetadataExtractor {
             )
         } else null
     }
-    
-    /**
-     * Generate searchable tags based on metadata
-     */
+
     private fun generateTags(basicInfo: BasicFileInfo, exifInfo: ExifInfo): List<String> {
         val tags = mutableListOf<String>()
-        
-        // Add camera brand tags
+
         if (exifInfo.camera.make.isNotEmpty()) {
             tags.add(exifInfo.camera.make.lowercase().replace(" ", "_"))
         }
-        
-        // Add camera model tags
         if (exifInfo.camera.model.isNotEmpty()) {
             tags.add(exifInfo.camera.model.lowercase().replace(" ", "_"))
         }
-        
-        // Add file type tag
         if (basicInfo.mimeType.isNotEmpty()) {
             val fileType = basicInfo.mimeType.substringAfter("/")
             tags.add(fileType)
         }
-        
-        // Add date-based tags
+        if (basicInfo.filePath.isNotEmpty()) {
+            val folder = basicInfo.filePath.substringBeforeLast("/")
+                .substringAfterLast("/")
+                .lowercase()
+                .replace(" ", "_")
+            if (folder.isNotEmpty()) {
+                tags.add(folder)
+            }
+        }
+
         val cal = Calendar.getInstance()
         if (basicInfo.dateTaken != null) {
             cal.timeInMillis = basicInfo.dateTaken
         } else {
             cal.timeInMillis = basicInfo.dateAdded
         }
-        
         tags.add("${cal.get(Calendar.YEAR)}")
         tags.add("${cal.get(Calendar.YEAR)}_${cal.get(Calendar.MONTH) + 1}")
-        
-        // Add location tags if available
+
         exifInfo.location?.let {
             tags.add("gps_enabled")
             tags.add("location_tagged")
         }
-        
-        // Add technical tags
         if (exifInfo.technical.flash.isNotEmpty()) {
             tags.add("flash_used")
         }
-        
+
         return tags.distinct()
     }
-    
-    // Helper extension functions
+
     private fun Cursor.getStringOrEmpty(columnName: String): String {
         return try {
             val index = getColumnIndexOrThrow(columnName)
             if (!isNull(index)) getString(index) else ""
-        } catch (e: Exception) {
-            ""
-        }
+        } catch (e: Exception) { "" }
     }
-    
+
     private fun Cursor.getLongOrNull(columnName: String): Long? {
         return try {
             val index = getColumnIndexOrThrow(columnName)
             if (!isNull(index)) getLong(index) else null
-        } catch (e: Exception) {
-            null
-        }
+        } catch (e: Exception) { null }
     }
-    
+
     private fun Cursor.getLongOrDefault(columnName: String, defaultValue: Long): Long {
         return try {
             val index = getColumnIndexOrThrow(columnName)
             if (!isNull(index)) getLong(index) else defaultValue
-        } catch (e: Exception) {
-            defaultValue
-        }
+        } catch (e: Exception) { defaultValue }
     }
-    
+
     private fun Cursor.getIntOrNull(columnName: String): Int? {
         return try {
             val index = getColumnIndexOrThrow(columnName)
             if (!isNull(index)) getInt(index) else null
-        } catch (e: Exception) {
-            null
-        }
+        } catch (e: Exception) { null }
     }
 }
 
-/**
- * Internal data classes for organization
- */
 private data class BasicFileInfo(
     val fileName: String,
     val fileSize: Long,
