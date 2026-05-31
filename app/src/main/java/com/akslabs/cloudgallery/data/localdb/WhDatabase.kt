@@ -19,10 +19,11 @@ import com.akslabs.cloudgallery.data.localdb.migration.Migration2to3_RemotePhoto
 import com.akslabs.cloudgallery.data.localdb.migration.Migration3to4_EnhancedRemotePhoto
 import com.akslabs.cloudgallery.data.localdb.migration.Migration4to5_DeletedPhotos
 import com.akslabs.cloudgallery.data.localdb.migration.Migration7to8_MultiDevice
+import com.akslabs.cloudgallery.data.localdb.migration.Migration8to9_PreviewRemoteId
 
 @Database(
     entities = [Photo::class, RemotePhoto::class, DeletedPhoto::class, UploadQueue::class, SyncMetadata::class],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class WhDatabase : RoomDatabase() {
@@ -53,7 +54,8 @@ abstract class WhDatabase : RoomDatabase() {
                         Migration4to5_DeletedPhotos(),
                         com.akslabs.cloudgallery.data.localdb.migration.Migration5to6_MessageId(),
                         com.akslabs.cloudgallery.data.localdb.migration.Migration6to7_UploadType(),
-                        Migration7to8_MultiDevice()
+                        Migration7to8_MultiDevice(),
+                        Migration8to9_PreviewRemoteId()
                     )
                     .fallbackToDestructiveMigration()
                     .build()

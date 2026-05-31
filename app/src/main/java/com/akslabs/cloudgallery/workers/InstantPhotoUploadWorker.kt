@@ -14,7 +14,10 @@ import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.UploadQueue
 import com.akslabs.cloudgallery.utils.ContentHasher
+import com.akslabs.cloudgallery.utils.generatePreview
+import com.akslabs.cloudgallery.utils.isSyncImagePreviewEnabled
 import com.akslabs.cloudgallery.utils.sendFileViaUri
+import com.akslabs.cloudgallery.utils.uploadPreviewFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -100,9 +103,27 @@ class InstantPhotoUploadWorker(
                         )
                     )
 
-                    // 6. Upload with hash
+                    // 6. Upload preview before original if enabled
+                    var previewId: String? = null
+                    if (isSyncImagePreviewEnabled()) {
+                        try {
+                            val previewFile = generatePreview(appContext, photoUri)
+                            if (previewFile != null) {
+                                previewId = uploadPreviewFile(botApi, channelId, previewFile, hash)
+                                if (previewId != null) {
+                                    photoDao.updatePreviewRemoteId(photo.localId, previewId)
+                                    Log.d("PhotoUpload", "Preview uploaded: $previewId for ${photo.localId}")
+                                }
+                                previewFile.delete()
+                            }
+                        } catch (e: Throwable) {
+                            Log.e("PhotoUpload", "Preview upload failed for ${photo.localId}, continuing with original", e)
+                        }
+                    }
+
+                    // 7. Upload original with hash
                     try {
-                        sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash)
+                        sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash, previewId)
                         photoDao.updateUploadStatus(photo.localId, "DONE", System.currentTimeMillis())
                         uploadQueueDao.markDone(queueId)
                     } catch (e: Exception) {

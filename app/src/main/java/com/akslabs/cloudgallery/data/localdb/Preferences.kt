@@ -57,6 +57,7 @@ object Preferences {
     const val glideSelectionBehaviorKey: String = "glideSelectionBehavior"
     const val thumbnailResolutionKey: String = "thumbnailResolution"
     const val defaultThumbnailResolution: Int = 150
+    const val syncImagePreviewKey: String = "syncImagePreview"
 
     private const val prefFile: String = "preferences"
     private const val encryptedPrefFile: String = "encryptedPreferences"

@@ -771,7 +771,16 @@ private fun UploadListContent(
                                     } else if (item.status == UploadStatus.Failed) {
                                         errorToShow = item
                                     } else {
-                                        navigateToPhotoFromUri(navController, item.localPhotoId ?: item.thumbnailUri)
+                                        val uri = item.localPhotoId ?: item.thumbnailUri
+                                        if (uri != null) {
+                                            navigateToPhotoFromUri(navController, uri)
+                                        } else {
+                                            // Fallback: look up from queuedPhotos by matching file name
+                                            val queuedPhoto = queuedPhotos.find { it.pathUri.contains(item.fileName ?: "", ignoreCase = true) }
+                                            if (queuedPhoto != null) {
+                                                navController.navigate("photo_viewer/${java.net.URLEncoder.encode(queuedPhoto.localId, "UTF-8")}/false")
+                                            }
+                                        }
                                     }
                                 },
                                 modifier = Modifier.animateItem()

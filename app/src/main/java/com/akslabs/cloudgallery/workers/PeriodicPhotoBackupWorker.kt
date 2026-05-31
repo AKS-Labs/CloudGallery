@@ -16,10 +16,13 @@ import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.UploadQueue
 import com.akslabs.cloudgallery.utils.ContentHasher
+import com.akslabs.cloudgallery.utils.generatePreview
 import com.akslabs.cloudgallery.utils.getExtFromMimeType
 import com.akslabs.cloudgallery.utils.getFileName
 import com.akslabs.cloudgallery.utils.getMimeTypeFromUri
+import com.akslabs.cloudgallery.utils.isSyncImagePreviewEnabled
 import com.akslabs.cloudgallery.utils.sendFileApi
+import com.akslabs.cloudgallery.utils.uploadPreviewFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -220,8 +223,26 @@ class PeriodicPhotoBackupWorker(
 
                 val fileName = getFileName(appContext.contentResolver, uri)
 
-                // 7. Upload with hash and device metadata
-                sendFileApi(botApi, channelId, uri, tempFile!!, ext!!, appContext, uploadType, fileName, hash)
+                // 7. Upload preview before original if enabled
+                var previewId: String? = null
+                if (isSyncImagePreviewEnabled()) {
+                    try {
+                        val previewFile = generatePreview(appContext, uri)
+                        if (previewFile != null) {
+                            previewId = uploadPreviewFile(botApi, channelId, previewFile, hash)
+                            if (previewId != null) {
+                                photoDao.updatePreviewRemoteId(current.localId, previewId)
+                                Log.d("PeriodicBackup", "Preview uploaded: $previewId for ${photo.localId}")
+                            }
+                            previewFile.delete()
+                        }
+                    } catch (e: Throwable) {
+                        Log.e("PeriodicBackup", "Preview upload failed for ${photo.localId}, continuing with original", e)
+                    }
+                }
+
+                // 8. Upload original with hash, device metadata, and previewRemoteId
+                sendFileApi(botApi, channelId, uri, tempFile!!, ext!!, appContext, uploadType, fileName, hash, previewId)
 
                 photoDao.updateUploadStatus(current.localId, "DONE", System.currentTimeMillis())
                 uploadQueueDao.markDone(queueId)

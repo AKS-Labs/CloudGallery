@@ -21,6 +21,8 @@ import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.random.Random
@@ -95,7 +97,8 @@ suspend fun sendFileViaUri(
     context: android.content.Context,
     uploadType: String? = null,
     fileName: String? = null,
-    contentHash: String? = null
+    contentHash: String? = null,
+    previewRemoteId: String? = null
 ): Boolean {
     val mimeType: String? = getMimeTypeFromUri(contentResolver, uri)
     val fileExtension = getExtFromMimeType(mimeType!!)
@@ -115,7 +118,8 @@ suspend fun sendFileViaUri(
             context,
             uploadType,
             originalFileName,
-            contentHash
+            contentHash,
+            previewRemoteId
         )
         outputStream.close()
         Log.d(TAG, tempFile.name)
@@ -138,7 +142,8 @@ suspend fun sendFileApi(
     context: android.content.Context,
     uploadType: String? = null,
     fileName: String? = null,
-    contentHash: String? = null
+    contentHash: String? = null,
+    previewRemoteId: String? = null
 ): Boolean {
     val deviceId = Preferences.getOrCreateDeviceId()
     var message: com.github.kotlintelegrambot.entities.Message? = null
@@ -162,7 +167,7 @@ suspend fun sendFileApi(
         appendLine("\u2501".repeat(18))
         appendLine("<b>#device:</b> ${deviceId} (<b>${escapeHtml(deviceName)}</b>)")
         if (contentHash != null) {
-            appendLine()
+//            appendLine()
             appendLine("<b>#hash:</b> ${contentHash}")
         }
     }
@@ -219,7 +224,8 @@ suspend fun sendFileApi(
                 messageId = message?.messageId,
                 uploadType = uploadType,
                 contentHash = contentHash,
-                uploadedByDevice = deviceId
+                uploadedByDevice = deviceId,
+                previewRemoteId = previewRemoteId
             )
         )
         Log.d(TAG, "✅ sendFile: Success! fileId=$fileId, Device: $deviceId, Hash: ${contentHash?.take(8) ?: "none"}")
@@ -230,6 +236,89 @@ suspend fun sendFileApi(
         throw uploadError ?: java.io.IOException("Upload failed: no fileId in Telegram response")
     }
 }
+
+/**
+ * Generates a low-quality JPEG preview of an image at the given URI.
+ * Returns a temp file with the preview, or null on failure.
+ */
+suspend fun generatePreview(
+    context: Context,
+    uri: Uri,
+    maxDimension: Int = 320,
+    quality: Int = 30
+): File? = withContext(Dispatchers.IO) {
+    try {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            BitmapFactory.decodeStream(input, null, opts)
+        }
+        if (opts.outWidth <= 0 || opts.outHeight <= 0) return@withContext null
+
+        val sampleSize = calculateSampleSize(opts.outWidth, opts.outHeight, maxDimension)
+
+        val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val bitmap = context.contentResolver.openInputStream(uri)?.use { input ->
+            BitmapFactory.decodeStream(input, null, decodeOpts)
+        } ?: return@withContext null
+
+        val scale = minOf(
+            maxDimension.toFloat() / bitmap.width,
+            maxDimension.toFloat() / bitmap.height
+        )
+        val newWidth = (bitmap.width * scale).toInt().coerceAtLeast(1)
+        val newHeight = (bitmap.height * scale).toInt().coerceAtLeast(1)
+
+        val scaled = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+        if (scaled != bitmap) bitmap.recycle()
+
+        val tempFile = File.createTempFile("preview_", ".jpg")
+        FileOutputStream(tempFile).use { out -> scaled.compress(Bitmap.CompressFormat.JPEG, quality, out) }
+        scaled.recycle()
+        tempFile
+    } catch (e: Exception) {
+        Log.e("Preview", "Failed to generate preview", e)
+        null
+    }
+}
+
+private fun calculateSampleSize(width: Int, height: Int, maxDimension: Int): Int {
+    var sampleSize = 1
+    while (width / sampleSize > maxDimension * 2 && height / sampleSize > maxDimension * 2) {
+        sampleSize *= 2
+    }
+    return sampleSize
+}
+
+/**
+ * Uploads a preview file to Telegram without creating database records.
+ * Returns the Telegram file ID, or null on failure.
+ */
+suspend fun uploadPreviewFile(
+    botApi: BotApi,
+    channelId: Long,
+    file: File,
+    contentHash: String?
+): String? {
+    val caption = buildString {
+        appendLine("<b>[Preview]</b>")
+        if (contentHash != null) {
+            append("<b>#hash:</b> ${escapeHtml(contentHash)}")
+        }
+    }
+    val (response, error) = botApi.sendPhoto(file, channelId, caption)
+    if (error != null || response == null || !response.isSuccessful) {
+        Log.e("Preview", "Preview upload failed: ${error?.message}")
+        return null
+    }
+    val message = response.body()?.result ?: return null
+    return message.photo?.lastOrNull()?.fileId
+}
+
+/**
+ * Whether sync image preview is enabled in settings.
+ */
+fun isSyncImagePreviewEnabled(): Boolean =
+    Preferences.getBoolean(Preferences.syncImagePreviewKey, false)
 
 suspend fun Context.toastFromMainThread(msg: String?, length: Int = Toast.LENGTH_LONG) =
     withContext(Dispatchers.Main) {
