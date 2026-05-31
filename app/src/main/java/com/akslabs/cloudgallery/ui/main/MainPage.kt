@@ -117,7 +117,7 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
         .collectAsStateWithLifecycle(initialValue = 0)
     val cloudPhotosCount by DbHolder.database.remotePhotoDao().getTotalCountFlow()
         .collectAsStateWithLifecycle(initialValue = 0)
-    val deletedPhotosCount by DbHolder.database.deletedPhotoDao().getCountFlow()
+    val deletedPhotosCount by DbHolder.database.remotePhotoDao().getDeletedCountFlow()
         .collectAsStateWithLifecycle(initialValue = 0)
 
     val photoCounts = listOf(localPhotosCount, cloudPhotosCount)
@@ -154,10 +154,14 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                 }
             } else if (currentRoute == Screens.TrashBin.route) {
                 scope.launch(Dispatchers.IO) {
-                    val allDeleted = DbHolder.database.deletedPhotoDao().getAll()
-                    val allIds = allDeleted.map { it.remoteId }.toSet()
+                    val allDeleted = DbHolder.database.remotePhotoDao().getAllRemoteIds()
+                    // Note: getDeletedFlow returns soft-deleted items; for select-all we need IDs of deleted items
+                    // We'll gather them from the trash view model flow or query directly
+                    val deletedRemote = DbHolder.database.remotePhotoDao().getAllIncludingDeleted()
+                        .filter { it.status == "DELETED" }
+                        .map { it.remoteId }.toSet()
                     withContext(Dispatchers.Main) {
-                        selectedPhotos = allIds
+                        selectedPhotos = deletedRemote
                     }
                 }
             } else {
@@ -281,21 +285,9 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                     },
                                     onRestore = {
                                         scope.launch(Dispatchers.IO) {
-                                            val dao = DbHolder.database.deletedPhotoDao()
                                             val remoteDao = DbHolder.database.remotePhotoDao()
                                             selectedPhotos.forEach { id ->
-                                                val photo = dao.getById(id)
-                                                if (photo != null) {
-                                                    remoteDao.insertAll(com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto(
-                                                        remoteId = photo.remoteId,
-                                                        photoType = photo.photoType,
-                                                        fileName = photo.fileName,
-                                                        fileSize = photo.fileSize,
-                                                        uploadedAt = photo.uploadedAt,
-                                                        messageId = photo.messageId
-                                                    ))
-                                                    dao.delete(photo)
-                                                }
+                                                remoteDao.restore(id)
                                             }
                                             withContext(Dispatchers.Main) {
                                                 ctx.toastFromMainThread("Restored ${selectedPhotos.size} photos")
@@ -305,9 +297,9 @@ fun MainPage(viewModel: MainViewModel = screenScopedViewModel()) {
                                     },
                                     onPermanentlyDelete = {
                                         scope.launch(Dispatchers.IO) {
-                                            val dao = DbHolder.database.deletedPhotoDao()
+                                            val remoteDao = DbHolder.database.remotePhotoDao()
                                             selectedPhotos.forEach { id ->
-                                                dao.deleteById(id)
+                                                remoteDao.delete(id)
                                             }
                                             withContext(Dispatchers.Main) {
                                                 ctx.toastFromMainThread("Deleted ${selectedPhotos.size} photos permanently")

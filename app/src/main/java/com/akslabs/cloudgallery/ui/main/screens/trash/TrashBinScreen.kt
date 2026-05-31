@@ -127,17 +127,8 @@ fun TrashBinScreen(
                                 yield() // Allow other background tasks to breathe
                                 val photo = deletedPhotos.peek(index)
                                 if (photo != null) {
-                                    val remotePhoto = RemotePhoto(
-                                        remoteId = photo.remoteId,
-                                        photoType = photo.photoType,
-                                        fileName = photo.fileName,
-                                        fileSize = photo.fileSize,
-                                        uploadedAt = photo.uploadedAt,
-                                        messageId = photo.messageId
-                                    )
-                                    
                                     val microRequest = ImageRequest.Builder(context)
-                                        .data(remotePhoto)
+                                        .data(photo)
                                         .size(64, 64) 
                                         .allowHardware(true)
                                         .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
@@ -148,7 +139,7 @@ fun TrashBinScreen(
 
                                     if (index <= lastIndex + 10) {
                                         val thumbRequest = ImageRequest.Builder(context)
-                                            .data(remotePhoto)
+                                            .data(photo)
                                             .size(180, 180)
                                             .allowHardware(true)
                                             .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
@@ -251,18 +242,9 @@ fun TrashBinScreen(
                     val photo = deletedPhotos[index]
                     if (photo != null) {
                         val isSelected = selectedPhotos.contains(photo.remoteId)
-                        // Map DeletedPhoto to RemotePhoto for display
-                        val remotePhoto = RemotePhoto(
-                            remoteId = photo.remoteId,
-                            photoType = photo.photoType,
-                            fileName = photo.fileName,
-                            fileSize = photo.fileSize,
-                            uploadedAt = photo.uploadedAt,
-                            messageId = photo.messageId
-                        )
                         
                         TrashPhotoItem(
-                            remotePhoto = remotePhoto,
+                            remotePhoto = photo,
                             isSelected = isSelected,
                             isScrollbarDragging = isScrollbarDragging,
                                 thumbnailResolution = thumbnailResolution,
@@ -270,8 +252,6 @@ fun TrashBinScreen(
                                 if (selectionMode) {
                                     toggleSelection(photo.remoteId)
                                 } else {
-                                    // selectedIndex removed
-
                                     selectedPhotoId = photo.remoteId
                                 }
                             }
