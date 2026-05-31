@@ -98,7 +98,8 @@ suspend fun sendFileViaUri(
     uploadType: String? = null,
     fileName: String? = null,
     contentHash: String? = null,
-    previewRemoteId: String? = null
+    previewRemoteId: String? = null,
+    replyToMessageId: Long? = null
 ): Boolean {
     val mimeType: String? = getMimeTypeFromUri(contentResolver, uri)
     val fileExtension = getExtFromMimeType(mimeType!!)
@@ -119,7 +120,8 @@ suspend fun sendFileViaUri(
             uploadType,
             originalFileName,
             contentHash,
-            previewRemoteId
+            previewRemoteId,
+            replyToMessageId
         )
         outputStream.close()
         Log.d(TAG, tempFile.name)
@@ -143,7 +145,8 @@ suspend fun sendFileApi(
     uploadType: String? = null,
     fileName: String? = null,
     contentHash: String? = null,
-    previewRemoteId: String? = null
+    previewRemoteId: String? = null,
+    replyToMessageId: Long? = null
 ): Boolean {
     val deviceId = Preferences.getOrCreateDeviceId()
     var message: com.github.kotlintelegrambot.entities.Message? = null
@@ -175,7 +178,7 @@ suspend fun sendFileApi(
     Log.d(TAG, "⬆️ sendFileApi: Uploading file=${file.name} (${file.length()} bytes) to channel=$channelId")
     Log.d(TAG, "⬆️ sendFileApi: caption=$caption")
     
-    val result = botApi.sendFile(file, channelId, caption)
+    val result = botApi.sendFile(file, channelId, caption, replyToMessageId)
     val (response, error) = result
     
     if (error != null) {
@@ -334,20 +337,20 @@ suspend fun uploadPreviewFile(
     channelId: Long,
     file: File,
     contentHash: String?
-): String? {
+): Pair<String?, Long?> {
     val caption = buildString {
         append("<b>[Preview ${formatFileSize(file.length())}]</b>")
         if (contentHash != null) {
-            append("<b>#hash:</b> ${escapeHtml(contentHash)}")
+            append(" <b>#hash:</b> ${escapeHtml(contentHash)}")
         }
     }
     val (response, error) = botApi.sendPhoto(file, channelId, caption)
     if (error != null || response == null || !response.isSuccessful) {
         Log.e("Preview", "Preview upload failed: ${error?.message}")
-        return null
+        return Pair(null, null)
     }
-    val message = response.body()?.result ?: return null
-    return message.photo?.lastOrNull()?.fileId
+    val message = response.body()?.result ?: return Pair(null, null)
+    return Pair(message.photo?.lastOrNull()?.fileId, message.messageId)
 }
 
 /**

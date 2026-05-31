@@ -68,12 +68,13 @@ class PeriodicPhotoBackupWorker(
                 var successCount = 0
                 var failedCount = 0
 
-                val chunks = imageList.chunked(PARALLELISM)
+                val parallelism = if (isSyncImagePreviewEnabled()) 1 else PARALLELISM
+                val chunks = imageList.chunked(parallelism)
                 for ((chunkIndex, chunk) in chunks.withIndex()) {
                     val results = coroutineScope {
                         chunk.mapIndexed { indexInChunk, photo ->
                             async(Dispatchers.IO) {
-                                val globalIndex = chunkIndex * PARALLELISM + indexInChunk
+                                val globalIndex = chunkIndex * parallelism + indexInChunk
                                 uploadSinglePhoto(
                                     photo = photo,
                                     index = globalIndex,
@@ -92,7 +93,7 @@ class PeriodicPhotoBackupWorker(
                         if (success) successCount++ else failedCount++
                     }
 
-                    val processed = minOf((chunkIndex + 1) * PARALLELISM, imageList.size)
+                    val processed = minOf((chunkIndex + 1) * parallelism, imageList.size)
                     setProgress(
                         workDataOf(
                             KEY_PROGRESS_CURRENT to processed,
@@ -225,11 +226,14 @@ class PeriodicPhotoBackupWorker(
 
                 // 7. Upload preview before original if enabled
                 var previewId: String? = null
+                var previewMessageId: Long? = null
                 if (isSyncImagePreviewEnabled()) {
                     try {
                         val previewFile = generatePreview(appContext, uri)
                         if (previewFile != null) {
-                            previewId = uploadPreviewFile(botApi, channelId, previewFile, hash)
+                            val result = uploadPreviewFile(botApi, channelId, previewFile, hash)
+                            previewId = result.first
+                            previewMessageId = result.second
                             if (previewId != null) {
                                 photoDao.updatePreviewRemoteId(current.localId, previewId)
                                 Log.d("PeriodicBackup", "Preview uploaded: $previewId for ${photo.localId}")
@@ -242,7 +246,7 @@ class PeriodicPhotoBackupWorker(
                 }
 
                 // 8. Upload original with hash, device metadata, and previewRemoteId
-                sendFileApi(botApi, channelId, uri, tempFile!!, ext!!, appContext, uploadType, fileName, hash, previewId)
+                sendFileApi(botApi, channelId, uri, tempFile!!, ext!!, appContext, uploadType, fileName, hash, previewId, previewMessageId)
 
                 photoDao.updateUploadStatus(current.localId, "DONE", System.currentTimeMillis())
                 uploadQueueDao.markDone(queueId)

@@ -105,11 +105,14 @@ class InstantPhotoUploadWorker(
 
                     // 6. Upload preview before original if enabled
                     var previewId: String? = null
+                    var previewMessageId: Long? = null
                     if (isSyncImagePreviewEnabled()) {
                         try {
                             val previewFile = generatePreview(appContext, photoUri)
                             if (previewFile != null) {
-                                previewId = uploadPreviewFile(botApi, channelId, previewFile, hash)
+                                val result = uploadPreviewFile(botApi, channelId, previewFile, hash)
+                                previewId = result.first
+                                previewMessageId = result.second
                                 if (previewId != null) {
                                     photoDao.updatePreviewRemoteId(photo.localId, previewId)
                                     Log.d("PhotoUpload", "Preview uploaded: $previewId for ${photo.localId}")
@@ -123,7 +126,7 @@ class InstantPhotoUploadWorker(
 
                     // 7. Upload original with hash
                     try {
-                        sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash, previewId)
+                        sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash, previewId, previewMessageId)
                         photoDao.updateUploadStatus(photo.localId, "DONE", System.currentTimeMillis())
                         uploadQueueDao.markDone(queueId)
                     } catch (e: Exception) {

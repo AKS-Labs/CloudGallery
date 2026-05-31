@@ -82,7 +82,8 @@ object BotApi {
     suspend fun sendFile(
         file: File,
         channelId: Long,
-        caption: String? = null
+        caption: String? = null,
+        replyToMessageId: Long? = null
     ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
         return withContext(Dispatchers.IO) {
             Log.d(TAG, "📤 sendFile: file=${file.name}, size=${file.length()}, channel=$channelId, captionLen=${caption?.length ?: 0}")
@@ -100,7 +101,8 @@ object BotApi {
                     document = TelegramFile.ByFile(file),
                     caption = caption,
                     parseMode = ParseMode.HTML,
-                    disableContentTypeDetection = true
+                    disableContentTypeDetection = true,
+                    replyToMessageId = replyToMessageId
                 )
                 val (response, error) = result
                 if (error != null) {
@@ -119,7 +121,8 @@ object BotApi {
     suspend fun sendPhoto(
         file: File,
         channelId: Long,
-        caption: String? = null
+        caption: String? = null,
+        replyToMessageId: Long? = null
     ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
         return withContext(Dispatchers.IO) {
             Log.d(TAG, "📤 sendPhoto: file=${file.name}, size=${file.length()}, channel=$channelId")
@@ -136,7 +139,8 @@ object BotApi {
                     chatId = ChatId.fromId(channelId),
                     photo = TelegramFile.ByFile(file),
                     caption = caption,
-                    parseMode = ParseMode.HTML
+                    parseMode = ParseMode.HTML,
+                    replyToMessageId = replyToMessageId
                 )
                 val (response, error) = result
                 if (error != null) {
