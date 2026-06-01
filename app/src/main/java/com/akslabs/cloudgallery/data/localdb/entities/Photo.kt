@@ -30,7 +30,8 @@ data class Photo(
     @ColumnInfo val uploadStatus: String = "NONE",
     @ColumnInfo val deviceId: String? = null,
     @ColumnInfo val lastUploadAttempt: Long? = null,
-    @ColumnInfo val uploadRetryCount: Int = 0
+    @ColumnInfo val uploadRetryCount: Int = 0,
+    @ColumnInfo val previewRemoteId: String? = null
 ) : Parcelable {
 
     companion object {
@@ -45,8 +46,9 @@ data class Photo(
             @JsonProperty("uploadStatus") uploadStatus: String = "NONE",
             @JsonProperty("deviceId") deviceId: String? = null,
             @JsonProperty("lastUploadAttempt") lastUploadAttempt: Long? = null,
-            @JsonProperty("uploadRetryCount") uploadRetryCount: Int = 0
-        ): Photo = Photo(localId, remoteId, photoType, pathUri, contentHash, uploadStatus, deviceId, lastUploadAttempt, uploadRetryCount)
+            @JsonProperty("uploadRetryCount") uploadRetryCount: Int = 0,
+            @JsonProperty("previewRemoteId") previewRemoteId: String? = null
+        ): Photo = Photo(localId, remoteId, photoType, pathUri, contentHash, uploadStatus, deviceId, lastUploadAttempt, uploadRetryCount, previewRemoteId)
     }
 
     fun toRemotePhoto(): RemotePhoto {
@@ -59,7 +61,8 @@ data class Photo(
             thumbnailCached = false,
             localId = localId,
             contentHash = contentHash,
-            uploadedByDevice = deviceId
+            uploadedByDevice = deviceId,
+            previewRemoteId = previewRemoteId
         )
     }
 }

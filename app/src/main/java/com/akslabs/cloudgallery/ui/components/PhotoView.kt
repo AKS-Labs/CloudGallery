@@ -190,7 +190,9 @@ fun PhotoView(
             SubcomposeAsyncImage(
                 imageLoader = if (isOnlyRemote) ImageLoaderModule.remoteImageLoader else ImageLoaderModule.defaultImageLoader,
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(if (isOnlyRemote) photo.toRemotePhoto() else photo.pathUri)
+                    .data(if (isOnlyRemote) com.akslabs.cloudgallery.utils.coil.FileIdData(photo.remoteId!!) else photo.pathUri)
+                    .memoryCacheKey(if (isOnlyRemote) "fid_${photo.remoteId}_full" else null)
+                    .diskCacheKey(if (isOnlyRemote) "fid_${photo.remoteId}" else null)
                     .crossfade(500)
                     .build(),
                 contentDescription = "Photo",

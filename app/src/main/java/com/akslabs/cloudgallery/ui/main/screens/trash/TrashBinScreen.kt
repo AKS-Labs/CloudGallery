@@ -314,7 +314,7 @@ fun TrashPhotoItem(
         // Fix: Stabilize ImageRequest model
         val imageRequest = remember(remotePhoto.remoteId) {
             ImageRequest.Builder(context)
-                .data(remotePhoto)
+                .data(com.akslabs.cloudgallery.utils.coil.FileIdData(remotePhoto.remoteId))
                 .size(180, 180)
                 .allowHardware(true)
                 .bitmapConfig(android.graphics.Bitmap.Config.RGB_565) // Forced for memory efficiency

@@ -38,7 +38,7 @@ data class ImageMetadata(
         sb.appendLine("\uD83D\uDCC1 <b>File:</b>")
         sb.appendLine("<blockquote><code>${escapeHtml(fileName)}</code></blockquote>")
         if (filePath.isNotEmpty()) {
-            sb.appendLine()
+//            sb.appendLine()
             sb.appendLine("\uD83D\uDCCD <b>Path:</b>")
             sb.appendLine("<blockquote><code>${escapeHtml(filePath)}</code></blockquote>")
         }
@@ -47,23 +47,23 @@ data class ImageMetadata(
         if (width != null && height != null) {
             sb.append("  \u00B7  \uD83D\uDDBC\uFE0F <b>Res: ${width}\u00d7${height}</b>")
         }
-        sb.appendLine()
+//        sb.appendLine()
 
         sb.appendLine()
         sb.appendLine(d)
         if (dateTaken != null) {
-            sb.appendLine()
+//            sb.appendLine()
             sb.appendLine("<b>Date taken:</b>")
             sb.appendLine("<blockquote><code>${formatDate(dateTaken)}</code></blockquote>")
         }
-        sb.appendLine()
+//        sb.appendLine()
         sb.appendLine("<b>Date added:</b>")
         sb.appendLine("<blockquote><code>${formatDate(dateAdded)}</code></blockquote>")
 
         camera?.let { cam ->
             val has = cam.make.isNotEmpty() || cam.model.isNotEmpty() || cam.lens.isNotEmpty()
             if (has) {
-                sb.appendLine()
+//                sb.appendLine()
                 sb.appendLine(d)
                 if (cam.make.isNotEmpty()) sb.appendLine("\uD83C\uDFED <b>Make:</b> <i>${escapeHtml(cam.make)}</i>")
                 if (cam.model.isNotEmpty()) sb.appendLine("\uD83D\uDCF1 <b>Model:</b> <u>${escapeHtml(cam.model)}</u>")
@@ -75,7 +75,7 @@ data class ImageMetadata(
             val has = tech.aperture.isNotEmpty() || tech.shutterSpeed.isNotEmpty() ||
                 tech.iso.isNotEmpty() || tech.focalLength.isNotEmpty() || tech.flash.isNotEmpty()
             if (has) {
-                sb.appendLine()
+//                sb.appendLine()
                 sb.appendLine(d)
                 if (tech.aperture.isNotEmpty()) sb.appendLine("\uD83D\uDD73\uFE0F <b>Aperture:</b> f/${tech.aperture}")
                 if (tech.shutterSpeed.isNotEmpty()) sb.appendLine("\u26A1 <b>Shutter:</b> <s>${tech.shutterSpeed}</s>")
@@ -86,7 +86,7 @@ data class ImageMetadata(
         }
 
         location?.let { loc ->
-            sb.appendLine()
+//            sb.appendLine()
             sb.appendLine(d)
             sb.appendLine("\uD83D\uDCCD <b>Coords:</b> <code>${loc.latitude}, ${loc.longitude}</code>")
             if (loc.altitude != null) {
@@ -99,7 +99,7 @@ data class ImageMetadata(
         }
 
         if (tags.isNotEmpty()) {
-            sb.appendLine()
+//            sb.appendLine()
             sb.appendLine(d)
             sb.appendLine(tags.joinToString(" ") { "#$it" })
         }

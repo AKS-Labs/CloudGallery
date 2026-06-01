@@ -100,6 +100,9 @@ interface PhotoDao {
 
     @Query("UPDATE photos SET deviceId = :deviceId WHERE localId = :localId")
     suspend fun setDeviceId(localId: String, deviceId: String)
+
+    @Query("UPDATE photos SET previewRemoteId = :previewRemoteId WHERE localId = :localId")
+    suspend fun updatePreviewRemoteId(localId: String, previewRemoteId: String)
 }
 
 data class SyncedPhotoTuple(

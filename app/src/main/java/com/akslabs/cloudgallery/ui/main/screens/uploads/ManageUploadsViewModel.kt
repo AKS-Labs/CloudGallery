@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.akslabs.cloudgallery.data.localdb.DbHolder
+import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.workers.InstantPhotoUploadWorker
 import com.akslabs.cloudgallery.workers.PeriodicPhotoBackupWorker
@@ -56,12 +57,10 @@ enum class UploadStatus {
 
 class ManageUploadsViewModel(application: Application) : AndroidViewModel(application) {
 
-    companion object {
-        private val dismissedIds = mutableSetOf<String>()
-    }
-
-    // UI-dismissed synced item IDs — held in companion object to survive ViewModel recreation
-    private val _dismissedIds = MutableStateFlow<Set<String>>(emptySet())
+    // UI-dismissed synced item IDs — persisted in SharedPreferences across app relaunches
+    private val _dismissedIds = MutableStateFlow<Set<String>>(
+        Preferences.getStringSet("dismissedSyncedIds", emptySet())
+    )
 
     init {
         // Auto-clear history older than 24 hours on startup
@@ -69,8 +68,6 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
             DbHolder.database.remotePhotoDao().deleteOlderThan(oneDayAgo)
         }
-        // Restore persisted dismissed IDs into the StateFlow
-        _dismissedIds.value = dismissedIds.toSet()
     }
 
     private val workManager = WorkManager.getInstance(application)
@@ -449,8 +446,9 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
 
     fun clearAllHistory() {
         val currentSynced = syncedUploads.value.map { it.id }.toSet()
-        dismissedIds.addAll(currentSynced)
-        _dismissedIds.value = dismissedIds.toSet()
+        val newDismissed = _dismissedIds.value + currentSynced
+        _dismissedIds.value = newDismissed
+        Preferences.edit { putStringSet("dismissedSyncedIds", newDismissed) }
     }
 
     fun retryAllFailed() {

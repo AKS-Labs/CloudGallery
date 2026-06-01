@@ -395,6 +395,9 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
     var isMetadataUploadEnabled by remember {
         mutableStateOf(MetadataConfig.shouldIncludeMetadata())
     }
+    var isSyncImagePreviewEnabled by remember {
+        mutableStateOf(Preferences.getBoolean(Preferences.syncImagePreviewKey, false))
+    }
     var backupStats by remember { mutableStateOf<BackupHelper.BackupStats?>(null) }
     val totalCloudPhotosCount by DbHolder.database.remotePhotoDao()
         .getTotalCountFlow().collectAsStateWithLifecycle(initialValue = 0)
@@ -562,6 +565,20 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                             MetadataConfig.setIncludeMetadata(enabled)
                             scope.launch {
                                 context.toastFromMainThread(if (enabled) "Metadata enabled" else "Metadata disabled")
+                            }
+                        }
+                    )
+
+                    SettingsSwitchItem(
+                        icon = Icons.Rounded.Image,
+                        title = "Sync Image Preview",
+                        subtitle = "Sync low-quality previews with original image",
+                        isChecked = isSyncImagePreviewEnabled,
+                        onCheckedChange = { enabled ->
+                            isSyncImagePreviewEnabled = enabled
+                            Preferences.edit { putBoolean(Preferences.syncImagePreviewKey, enabled) }
+                            scope.launch {
+                                context.toastFromMainThread(if (enabled) "Image preview sync enabled" else "Image preview sync disabled")
                             }
                         }
                     )

@@ -82,7 +82,8 @@ object BotApi {
     suspend fun sendFile(
         file: File,
         channelId: Long,
-        caption: String? = null
+        caption: String? = null,
+        replyToMessageId: Long? = null
     ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
         return withContext(Dispatchers.IO) {
             Log.d(TAG, "📤 sendFile: file=${file.name}, size=${file.length()}, channel=$channelId, captionLen=${caption?.length ?: 0}")
@@ -100,7 +101,8 @@ object BotApi {
                     document = TelegramFile.ByFile(file),
                     caption = caption,
                     parseMode = ParseMode.HTML,
-                    disableContentTypeDetection = true
+                    disableContentTypeDetection = true,
+                    replyToMessageId = replyToMessageId
                 )
                 val (response, error) = result
                 if (error != null) {
@@ -111,6 +113,44 @@ object BotApi {
                 result
             } catch (e: Exception) {
                 Log.e(TAG, "❌ sendFile: Exception during upload", e)
+                Pair(null, e)
+            }
+        }
+    }
+
+    suspend fun sendPhoto(
+        file: File,
+        channelId: Long,
+        caption: String? = null,
+        replyToMessageId: Long? = null
+    ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
+        return withContext(Dispatchers.IO) {
+            Log.d(TAG, "📤 sendPhoto: file=${file.name}, size=${file.length()}, channel=$channelId")
+            if (!file.exists()) {
+                Log.e(TAG, "❌ sendPhoto: File does not exist: ${file.absolutePath}")
+                return@withContext Pair(null, java.io.FileNotFoundException("File not found: ${file.absolutePath}"))
+            }
+            if (channelId == 0L) {
+                Log.e(TAG, "❌ sendPhoto: Invalid channel ID: $channelId")
+                return@withContext Pair(null, IllegalArgumentException("Invalid channel ID: $channelId"))
+            }
+            try {
+                val result = bot.sendPhoto(
+                    chatId = ChatId.fromId(channelId),
+                    photo = TelegramFile.ByFile(file),
+                    caption = caption,
+                    parseMode = ParseMode.HTML,
+                    replyToMessageId = replyToMessageId
+                )
+                val (response, error) = result
+                if (error != null) {
+                    Log.e(TAG, "❌ sendPhoto: API error", error)
+                } else {
+                    Log.d(TAG, "📤 sendPhoto: Response code=${response?.code()}, isSuccessful=${response?.isSuccessful}")
+                }
+                result
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ sendPhoto: Exception during upload", e)
                 Pair(null, e)
             }
         }
