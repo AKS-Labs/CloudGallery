@@ -182,6 +182,8 @@ class PeriodicPhotoBackupWorker(
             val uri = photo.pathUri.toUri()
             var tempFile: File? = null
 
+            var messageThreadId: Long? = null
+            var topicName: String? = null
             try {
                 val mimeType = getMimeTypeFromUri(appContext.contentResolver, uri)
                 val ext = getExtFromMimeType(mimeType!!)
@@ -224,6 +226,24 @@ class PeriodicPhotoBackupWorker(
 
                 val fileName = getFileName(appContext.contentResolver, uri)
 
+                // 7a. Determine folder/topic for forum organization
+                try {
+                    val bucketName = com.akslabs.cloudgallery.utils.getBucketName(appContext.contentResolver, uri)
+                    if (bucketName != null && bucketName.isNotBlank()) {
+                        topicName = bucketName
+                        messageThreadId = botApi.topicCache[bucketName]
+                        if (messageThreadId == null) {
+                            messageThreadId = botApi.createForumTopic(channelId, bucketName)
+                            if (messageThreadId != null) {
+                                botApi.topicCache[bucketName] = messageThreadId
+                                Log.d("PeriodicBackup", "Created topic '$bucketName' with id=$messageThreadId")
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w("PeriodicBackup", "Failed to create/get topic for ${photo.localId}, uploading to General", e)
+                }
+
                 // 7. Upload preview before original if enabled
                 var previewId: String? = null
                 var previewMessageId: Long? = null
@@ -246,16 +266,26 @@ class PeriodicPhotoBackupWorker(
                 }
 
                 // 8. Upload original with hash, device metadata, and previewRemoteId
-                sendFileApi(botApi, channelId, uri, tempFile!!, ext!!, appContext, uploadType, fileName, hash, previewId, previewMessageId)
+                val topicLabel = if (topicName != null) " topic='$topicName'($messageThreadId)" else " (General)"
+                Log.d("PeriodicBackup", "Uploading ${photo.localId}$topicLabel (${tempFile!!.length()} bytes)")
+
+                sendFileApi(botApi, channelId, uri, tempFile!!, ext!!, appContext, uploadType, fileName, hash, previewId, previewMessageId, messageThreadId, topicName)
 
                 photoDao.updateUploadStatus(current.localId, "DONE", System.currentTimeMillis())
                 uploadQueueDao.markDone(queueId)
                 Log.d("PeriodicBackup", "Upload success: ${photo.localId}")
                 true
             } catch (e: Exception) {
-                Log.e("PeriodicBackup", "Upload failed for ${photo.localId}: ${e.message}")
+                Log.e("PeriodicBackup", "Upload failed for ${photo.localId}: ${e.message}" +
+                    if (topicName != null) " (topic='$topicName')" else "")
                 photoDao.updateUploadStatus(current.localId, "FAILED", System.currentTimeMillis())
                 uploadQueueDao.markFailed(queueId, e.message)
+                // Check retry count — if exceeded, permanently cancel to avoid infinite loop
+                val updatedQueue = uploadQueueDao.getById(queueId)
+                if (updatedQueue?.retryCount != null && updatedQueue.retryCount >= MAX_RETRIES) {
+                    Log.e("PeriodicBackup", "Permanently cancelling ${photo.localId}: retries exhausted ($MAX_RETRIES)")
+                    uploadQueueDao.markCancelled(queueId)
+                }
                 false
             } finally {
                 tempFile?.delete()
@@ -289,5 +319,6 @@ class PeriodicPhotoBackupWorker(
         const val MAX_BATCH_SIZE = 50
         const val PARALLELISM = 3
         const val DELAY_BETWEEN_CHUNKS_MS = 1500L
+        const val MAX_RETRIES = 3
     }
 }

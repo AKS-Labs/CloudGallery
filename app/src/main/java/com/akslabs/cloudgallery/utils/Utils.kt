@@ -99,7 +99,9 @@ suspend fun sendFileViaUri(
     fileName: String? = null,
     contentHash: String? = null,
     previewRemoteId: String? = null,
-    replyToMessageId: Long? = null
+    replyToMessageId: Long? = null,
+    messageThreadId: Long? = null,
+    topicName: String? = null
 ): Boolean {
     val mimeType: String? = getMimeTypeFromUri(contentResolver, uri)
     val fileExtension = getExtFromMimeType(mimeType!!)
@@ -121,7 +123,9 @@ suspend fun sendFileViaUri(
             originalFileName,
             contentHash,
             previewRemoteId,
-            replyToMessageId
+            replyToMessageId,
+            messageThreadId,
+            topicName
         )
         outputStream.close()
         Log.d(TAG, tempFile.name)
@@ -146,12 +150,15 @@ suspend fun sendFileApi(
     fileName: String? = null,
     contentHash: String? = null,
     previewRemoteId: String? = null,
-    replyToMessageId: Long? = null
+    replyToMessageId: Long? = null,
+    messageThreadId: Long? = null,
+    topicName: String? = null
 ): Boolean {
     val deviceId = Preferences.getOrCreateDeviceId()
     var message: com.github.kotlintelegrambot.entities.Message? = null
     var uploadError: Exception? = null
-    
+    var uploadedToTopic: Boolean = false
+
     // Build caption: metadata + device/hash tags
     val metadataCaption = if (MetadataConfig.shouldIncludeMetadata()) {
         val metadata = ImageMetadataExtractor.extractMetadata(context, pathUri)
@@ -159,7 +166,7 @@ suspend fun sendFileApi(
     } else {
         null
     }
-    
+
     // Append device and hash tags in formatted footer
     val deviceName = Preferences.getDeviceName()
     val caption = buildString {
@@ -170,33 +177,27 @@ suspend fun sendFileApi(
         appendLine("\u2501".repeat(18))
         appendLine("<b>#device:</b> ${deviceId} (<b>${escapeHtml(deviceName)}</b>)")
         if (contentHash != null) {
-//            appendLine()
             appendLine("<b>#hash:</b> ${contentHash}")
         }
     }
-    
-    Log.d(TAG, "⬆️ sendFileApi: Uploading file=${file.name} (${file.length()} bytes) to channel=$channelId")
+
+    val topicLabel = if (topicName != null) " topic='$topicName'($messageThreadId)" else " (General)"
+    Log.d(TAG, "⬆️ sendFileApi: Uploading file=${file.name} (${file.length()} bytes) to channel=$channelId$topicLabel")
     Log.d(TAG, "⬆️ sendFileApi: caption=$caption")
-    
-    val result = botApi.sendFile(file, channelId, caption, replyToMessageId)
-    val (response, error) = result
-    
-    if (error != null) {
-        Log.e(TAG, "❌ sendFileApi: Network/API error during upload", error)
-        uploadError = error
-    } else if (response != null) {
-        val body = response.body()
-        if (response.isSuccessful && body?.result != null) {
-            message = body.result
-            Log.d(TAG, "✅ sendFileApi: Telegram API returned success, messageId=${message?.messageId}")
-        } else {
-            val errorBody = response.errorBody()?.string()
-            Log.e(TAG, "❌ sendFileApi: Telegram API error - code=${response.code()}, body=$errorBody")
-            uploadError = java.io.IOException("Telegram API error ${response.code()}: $errorBody")
+
+    // Attempt upload — if topic upload fails, fall back to General topic
+    attemptUpload(botApi, channelId, file, caption, replyToMessageId, messageThreadId).also { (msg, err) ->
+        message = msg; uploadError = err
+        if (err == null) uploadedToTopic = true
+    }
+
+    // Fallback: if topic upload failed, retry without topic
+    if (uploadError != null && messageThreadId != null) {
+        Log.w(TAG, "⚠️ sendFileApi: Topic upload failed (${uploadError.message}), retrying to General topic")
+        botApi.removeTopicFromCache(topicName)
+        attemptUpload(botApi, channelId, file, caption, replyToMessageId, null).also { (msg, err) ->
+            message = msg; uploadError = err
         }
-    } else {
-        Log.e(TAG, "❌ sendFileApi: Both response and error are null")
-        uploadError = java.io.IOException("Upload returned null response")
     }
 
     val doc = message?.document
@@ -205,17 +206,13 @@ suspend fun sendFileApi(
     val fileId = doc?.fileId ?: photoSize?.fileId ?: sticker?.fileId
 
     if (fileId != null) {
-        // Resolve extension from Telegram metadata if available
         val resolvedExt = when {
             doc?.mimeType != null -> getExtFromMimeType(doc.mimeType!!) ?: extension
             photoSize != null -> "jpg"
             else -> extension
         }
 
-        // Atomically update the remoteId for the photo using its pathUri
         DbHolder.database.photoDao().updateRemoteIdForPath(pathUri.toString(), fileId)
-
-        // Insert/replace RemotePhoto with device metadata
         DbHolder.database.remotePhotoDao().insertAll(
             RemotePhoto(
                 remoteId = fileId,
@@ -228,16 +225,47 @@ suspend fun sendFileApi(
                 uploadType = uploadType,
                 contentHash = contentHash,
                 uploadedByDevice = deviceId,
-                previewRemoteId = previewRemoteId
+                previewRemoteId = previewRemoteId,
+                topicId = if (uploadedToTopic) messageThreadId else null,
+                topicName = if (uploadedToTopic) topicName else null
             )
         )
         Log.d(TAG, "✅ sendFile: Success! fileId=$fileId, Device: $deviceId, Hash: ${contentHash?.take(8) ?: "none"}")
         return true
     } else {
         Log.e(TAG, "❌ sendFile: Upload FAILED - no fileId in response. Error: ${uploadError?.message}")
-        // Throw so callers know the upload failed
         throw uploadError ?: java.io.IOException("Upload failed: no fileId in Telegram response")
     }
+}
+
+/** Calls botApi.sendFile and returns (message, error). */
+private suspend fun attemptUpload(
+    botApi: BotApi,
+    channelId: Long,
+    file: File,
+    caption: String?,
+    replyToMessageId: Long?,
+    messageThreadId: Long?
+): Pair<com.github.kotlintelegrambot.entities.Message?, Exception?> {
+    val result = botApi.sendFile(file, channelId, caption, replyToMessageId, messageThreadId)
+    val (response, error) = result
+    if (error != null) {
+        Log.e(TAG, "❌ attemptUpload: Error for topic=$messageThreadId", error)
+        return Pair(null, error)
+    }
+    if (response != null) {
+        val body = response.body()
+        val message = body?.result
+        if (response.isSuccessful && message != null) {
+            Log.d(TAG, "✅ attemptUpload: success, messageId=${message.messageId}")
+            return Pair(message, null)
+        }
+        val errorBody = response.errorBody()?.string()
+        Log.e(TAG, "❌ attemptUpload: API error code=${response.code()}, body=$errorBody")
+        return Pair(null, java.io.IOException("Telegram API error ${response.code()}: $errorBody"))
+    }
+    Log.e(TAG, "❌ attemptUpload: Both response and error are null")
+    return Pair(null, java.io.IOException("Upload returned null response"))
 }
 
 /**
@@ -374,4 +402,26 @@ fun formatFileSize(bytes: Long): String {
     }
     return if (unitIndex == 0) "${bytes} ${units[unitIndex]}"
     else "%.1f %s".format(size, units[unitIndex])
+}
+
+/**
+ * Queries MediaStore for the BUCKET_DISPLAY_NAME (folder name) of a content URI.
+ * Returns null if the URI is not a MediaStore content URI or the query fails.
+ */
+fun getBucketName(contentResolver: android.content.ContentResolver, uri: android.net.Uri): String? {
+    return try {
+        val cursor = contentResolver.query(
+            uri,
+            arrayOf(android.provider.MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME),
+            null, null, null
+        )
+        cursor?.use {
+            if (it.moveToFirst()) {
+                it.getString(it.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME))
+            } else null
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to get bucket name for $uri", e)
+        null
+    }
 }

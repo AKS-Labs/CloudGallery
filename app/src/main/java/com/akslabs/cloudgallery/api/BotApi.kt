@@ -10,11 +10,13 @@ import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.ParseMode
+import com.github.kotlintelegrambot.entities.ReplyParameters
 import com.github.kotlintelegrambot.entities.TelegramFile
 import com.github.kotlintelegrambot.entities.Update
 import com.github.kotlintelegrambot.entities.files.Document
 import com.github.kotlintelegrambot.entities.files.PhotoSize
 import com.github.kotlintelegrambot.network.Response
+import com.github.kotlintelegrambot.types.TelegramBotResult
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,6 +30,17 @@ object BotApi {
     private lateinit var bot: Bot
     var chatId: Long? = null
 
+    /** In-memory cache of topic name → messageThreadId to avoid re-creating topics. */
+    val topicCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    /** Remove a topic from cache (e.g. after a failed upload to that topic). */
+    fun removeTopicFromCache(topicName: String?) {
+        if (topicName != null) {
+            topicCache.remove(topicName)
+            Log.w(TAG, "Removed topic '$topicName' from cache due to upload failure")
+        }
+    }
+
     fun create() {
         bot = bot {
             token = Preferences.getEncryptedString(
@@ -38,7 +51,6 @@ object BotApi {
                 command("start") {
                     chatId = message.chat.id
                     chatId?.let { id ->
-                        // Store chat ID in preferences for historical sync
                         Preferences.edit {
                             putString("telegram_chat_id", id.toString())
                         }
@@ -83,34 +95,39 @@ object BotApi {
         file: File,
         channelId: Long,
         caption: String? = null,
-        replyToMessageId: Long? = null
+        replyToMessageId: Long? = null,
+        messageThreadId: Long? = null
     ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
+        if (!file.exists()) {
+            Log.e(TAG, "❌ sendFile: File does not exist: ${file.absolutePath}")
+            return Pair(null, java.io.FileNotFoundException("File not found: ${file.absolutePath}"))
+        }
+        if (channelId == 0L) {
+            Log.e(TAG, "❌ sendFile: Invalid channel ID: $channelId")
+            return Pair(null, IllegalArgumentException("Invalid channel ID: $channelId"))
+        }
         return withContext(Dispatchers.IO) {
-            Log.d(TAG, "📤 sendFile: file=${file.name}, size=${file.length()}, channel=$channelId, captionLen=${caption?.length ?: 0}")
-            if (!file.exists()) {
-                Log.e(TAG, "❌ sendFile: File does not exist: ${file.absolutePath}")
-                return@withContext Pair(null, java.io.FileNotFoundException("File not found: ${file.absolutePath}"))
-            }
-            if (channelId == 0L) {
-                Log.e(TAG, "❌ sendFile: Invalid channel ID: $channelId")
-                return@withContext Pair(null, IllegalArgumentException("Invalid channel ID: $channelId"))
-            }
             try {
-                val result = bot.sendDocument(
-                    chatId = ChatId.fromId(channelId),
-                    document = TelegramFile.ByFile(file),
-                    caption = caption,
-                    parseMode = ParseMode.HTML,
-                    disableContentTypeDetection = true,
-                    replyToMessageId = replyToMessageId
-                )
-                val (response, error) = result
-                if (error != null) {
-                    Log.e(TAG, "❌ sendFile: API error", error)
+                val replyParams = replyToMessageId?.let { ReplyParameters(messageId = it) }
+                if (messageThreadId != null) {
+                    bot.sendPhoto(
+                        chatId = ChatId.fromId(channelId),
+                        photo = TelegramFile.ByFile(file),
+                        caption = caption,
+                        parseMode = ParseMode.HTML,
+                        replyParameters = replyParams,
+                        messageThreadId = messageThreadId
+                    )
                 } else {
-                    Log.d(TAG, "📤 sendFile: Response code=${response?.code()}, isSuccessful=${response?.isSuccessful}")
+                    bot.sendDocument(
+                        chatId = ChatId.fromId(channelId),
+                        document = TelegramFile.ByFile(file),
+                        caption = caption,
+                        parseMode = ParseMode.HTML,
+                        disableContentTypeDetection = true,
+                        replyParameters = replyParams
+                    )
                 }
-                result
             } catch (e: Exception) {
                 Log.e(TAG, "❌ sendFile: Exception during upload", e)
                 Pair(null, e)
@@ -122,33 +139,27 @@ object BotApi {
         file: File,
         channelId: Long,
         caption: String? = null,
-        replyToMessageId: Long? = null
+        replyToMessageId: Long? = null,
+        messageThreadId: Long? = null
     ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
+        if (!file.exists()) {
+            Log.e(TAG, "❌ sendPhoto: File does not exist: ${file.absolutePath}")
+            return Pair(null, java.io.FileNotFoundException("File not found: ${file.absolutePath}"))
+        }
+        if (channelId == 0L) {
+            Log.e(TAG, "❌ sendPhoto: Invalid channel ID: $channelId")
+            return Pair(null, IllegalArgumentException("Invalid channel ID: $channelId"))
+        }
         return withContext(Dispatchers.IO) {
-            Log.d(TAG, "📤 sendPhoto: file=${file.name}, size=${file.length()}, channel=$channelId")
-            if (!file.exists()) {
-                Log.e(TAG, "❌ sendPhoto: File does not exist: ${file.absolutePath}")
-                return@withContext Pair(null, java.io.FileNotFoundException("File not found: ${file.absolutePath}"))
-            }
-            if (channelId == 0L) {
-                Log.e(TAG, "❌ sendPhoto: Invalid channel ID: $channelId")
-                return@withContext Pair(null, IllegalArgumentException("Invalid channel ID: $channelId"))
-            }
             try {
-                val result = bot.sendPhoto(
+                bot.sendPhoto(
                     chatId = ChatId.fromId(channelId),
                     photo = TelegramFile.ByFile(file),
                     caption = caption,
                     parseMode = ParseMode.HTML,
-                    replyToMessageId = replyToMessageId
+                    replyParameters = replyToMessageId?.let { ReplyParameters(messageId = it) },
+                    messageThreadId = messageThreadId
                 )
-                val (response, error) = result
-                if (error != null) {
-                    Log.e(TAG, "❌ sendPhoto: API error", error)
-                } else {
-                    Log.d(TAG, "📤 sendPhoto: Response code=${response?.code()}, isSuccessful=${response?.isSuccessful}")
-                }
-                result
             } catch (e: Exception) {
                 Log.e(TAG, "❌ sendPhoto: Exception during upload", e)
                 Pair(null, e)
@@ -156,9 +167,31 @@ object BotApi {
         }
     }
 
-    suspend fun getFile(fileId: String): ByteArray? {
+    suspend fun createForumTopic(
+        chatId: Long,
+        name: String
+    ): Long? {
         return withContext(Dispatchers.IO) {
-            bot.downloadFileBytes(fileId)
+            try {
+                Log.d(TAG, "📋 Creating forum topic '$name' in chat $chatId")
+                val result = bot.createForumTopic(
+                    chatId = ChatId.fromId(chatId),
+                    name = name
+                )
+                result.fold(
+                    ifSuccess = { topic ->
+                        Log.d(TAG, "✅ Forum topic '$name' created: messageThreadId=${topic.messageThreadId}")
+                        topic.messageThreadId
+                    },
+                    ifError = { error ->
+                        Log.w(TAG, "⚠️ Failed to create forum topic '$name': $error")
+                        null
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Exception creating forum topic '$name'", e)
+                null
+            }
         }
     }
 
@@ -171,6 +204,12 @@ object BotApi {
                 Log.e(TAG, "Error deleting message $messageId from chat $chatId", e)
                 false
             }
+        }
+    }
+
+    suspend fun getFile(fileId: String): ByteArray? {
+        return withContext(Dispatchers.IO) {
+            bot.downloadFileBytes(fileId)
         }
     }
 
@@ -224,11 +263,9 @@ object BotApi {
 
                     updateList.forEach { update ->
                         update.message?.let { message ->
-                            // Only process messages from the target channel
                             if (message.chat.id == channelId) {
                                 lastMessageId = message.messageId.toLong()
 
-                                // Check for document attachments
                                 message.document?.let { document ->
                                     val mediaFile = DiscoveredMediaFile(
                                         fileId = document.fileId,
@@ -243,7 +280,6 @@ object BotApi {
                                     Log.d(TAG, "Found document: ${document.fileName} (${document.fileId})")
                                 }
 
-                                // Check for photo attachments
                                 message.photo?.let { photos ->
                                     val largestPhoto = photos.maxByOrNull { it.fileSize ?: 0 }
                                     largestPhoto?.let { photo ->

@@ -36,7 +36,9 @@ data class RemotePhoto(
     @ColumnInfo val deletedAt: Long? = null,
     @ColumnInfo val uploadedByDevice: String? = null,
     @ColumnInfo val deletedByDevice: String? = null,
-    @ColumnInfo val previewRemoteId: String? = null
+    @ColumnInfo val previewRemoteId: String? = null,
+    @ColumnInfo val topicId: Long? = null,
+    @ColumnInfo val topicName: String? = null
 ) : Parcelable {
 
     fun toPhoto(): Photo = Photo("", remoteId, photoType, "")
@@ -59,11 +61,13 @@ data class RemotePhoto(
             @JsonProperty("deletedAt") deletedAt: Long? = null,
             @JsonProperty("uploadedByDevice") uploadedByDevice: String? = null,
             @JsonProperty("deletedByDevice") deletedByDevice: String? = null,
-            @JsonProperty("previewRemoteId") previewRemoteId: String? = null
+            @JsonProperty("previewRemoteId") previewRemoteId: String? = null,
+            @JsonProperty("topicId") topicId: Long? = null,
+            @JsonProperty("topicName") topicName: String? = null
         ): RemotePhoto = RemotePhoto(
             remoteId, photoType, fileName, fileSize, uploadedAt, thumbnailCached,
             messageId, uploadType, localId, contentHash, status, deletedAt,
-            uploadedByDevice, deletedByDevice, previewRemoteId
+            uploadedByDevice, deletedByDevice, previewRemoteId, topicId, topicName
         )
     }
 }

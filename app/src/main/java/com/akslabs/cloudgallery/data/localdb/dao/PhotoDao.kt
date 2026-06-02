@@ -98,6 +98,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE uploadStatus IN ('NONE', 'FAILED') AND remoteId IS NULL")
     suspend fun getAllPendingUpload(): List<Photo>
 
+    @Query("SELECT * FROM photos WHERE uploadStatus IN ('NONE', 'FAILED', 'UPLOADING') AND remoteId IS NULL ORDER BY lastUploadAttempt DESC")
+    fun getPendingUploadFlow(): Flow<List<Photo>>
+
     @Query("UPDATE photos SET deviceId = :deviceId WHERE localId = :localId")
     suspend fun setDeviceId(localId: String, deviceId: String)
 

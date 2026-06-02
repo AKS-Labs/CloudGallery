@@ -14,9 +14,11 @@ import androidx.paging.cachedIn
 import androidx.work.WorkManager
 import androidx.work.WorkInfo
 import com.akslabs.cloudgallery.data.localdb.DbHolder
+import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import com.akslabs.cloudgallery.data.mediastore.AlbumInfo
 import com.akslabs.cloudgallery.data.mediastore.LocalPhotoSource
+import kotlinx.coroutines.flow.flatMapLatest
 import com.akslabs.cloudgallery.data.mediastore.LocalUiPhoto
 import com.akslabs.cloudgallery.ui.main.nav.Screens
 import com.akslabs.cloudgallery.workers.WorkModule
@@ -94,19 +96,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         ).flow.cachedIn(viewModelScope)
     }
 
-    val allCloudPhotosFlow: Flow<PagingData<RemotePhoto>> by lazy {
+    // ── Topic/album filtering for remote grid ──
+
+    private val _selectedTopicAlbumId = MutableStateFlow(-1L)  // -1L = "All"
+    val selectedTopicAlbumId: StateFlow<Long> = _selectedTopicAlbumId.asStateFlow()
+
+    fun selectTopicAlbum(id: Long) {
+        _selectedTopicAlbumId.value = id
+    }
+
+    val topicAlbums: StateFlow<List<AlbumInfo>> by lazy {
+        combine(
+            DbHolder.database.remotePhotoDao().getDistinctTopicNames(),
+            totalCloudPhotosCount
+        ) { names, totalCount ->
+            mutableListOf(
+                AlbumInfo(id = -1L, label = "All", count = totalCount, coverUri = "")
+            ).apply {
+                names.forEachIndexed { index, name ->
+                    add(AlbumInfo(id = index.toLong(), label = name, count = 0, coverUri = ""))
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val allCloudPhotosFlow: Flow<PagingData<RemotePhoto>> = _selectedTopicAlbumId.map { albumId ->
+        val pagingSource = if (albumId == -1L) {
+            Log.d("MainViewModel", "=== CREATING ALL REMOTE PAGING SOURCE ===")
+            DbHolder.database.remotePhotoDao().getAllPagingSource()
+        } else {
+            // Map album ID back to topic name
+            val currentAlbums = topicAlbums.value
+            val topicName = currentAlbums.find { it.id == albumId }?.label
+            if (topicName != null && topicName != "All") {
+                Log.d("MainViewModel", "=== CREATING TOPIC PAGING SOURCE: $topicName ===")
+                DbHolder.database.remotePhotoDao().getByTopicNamePagingSource(topicName)
+            } else {
+                DbHolder.database.remotePhotoDao().getAllPagingSource()
+            }
+        }
         Pager(
             config = PagingConfig(
                 pageSize = 24,
                 prefetchDistance = 72,
                 jumpThreshold = 120
             ),
-            pagingSourceFactory = {
-                Log.d("MainViewModel", "=== CREATING NEW REMOTE PAGING SOURCE ===")
-                DbHolder.database.remotePhotoDao().getAllPagingSource()
-            }
-        ).flow.cachedIn(viewModelScope)
-    }
+            pagingSourceFactory = { pagingSource }
+        ).flow
+    }.flatMapLatest { it }.cachedIn(viewModelScope)
 
     val localPhotosCount: StateFlow<Int> by lazy {
         DbHolder.database.photoDao().getAllCountFlow()
@@ -116,6 +154,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val totalCloudPhotosCount: StateFlow<Int> by lazy {
         DbHolder.database.remotePhotoDao().getTotalCountFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    }
+
+    val pendingUploadsFlow: StateFlow<List<Photo>> by lazy {
+        DbHolder.database.photoDao().getPendingUploadFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     }
 
     val allLocalPhotos: StateFlow<List<com.akslabs.cloudgallery.data.localdb.entities.Photo>> by lazy {

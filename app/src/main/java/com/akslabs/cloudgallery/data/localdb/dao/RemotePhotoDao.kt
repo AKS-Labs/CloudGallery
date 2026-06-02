@@ -95,4 +95,13 @@ interface RemotePhotoDao {
 
     @Query("SELECT * FROM remote_photos WHERE uploadedByDevice = :deviceId AND status = 'ACTIVE'")
     suspend fun getByDeviceId(deviceId: String): List<RemotePhoto>
+
+    @Query("SELECT DISTINCT topicName FROM remote_photos WHERE topicName IS NOT NULL AND status = 'ACTIVE' ORDER BY topicName")
+    fun getDistinctTopicNames(): Flow<List<String>>
+
+    @Query("SELECT * FROM remote_photos WHERE status = 'ACTIVE' AND topicId = :topicId ORDER BY uploadedAt DESC")
+    fun getByTopicPagingSource(topicId: Long): PagingSource<Int, RemotePhoto>
+
+    @Query("SELECT * FROM remote_photos WHERE status = 'ACTIVE' AND topicName = :topicName ORDER BY uploadedAt DESC")
+    fun getByTopicNamePagingSource(topicName: String): PagingSource<Int, RemotePhoto>
 }
