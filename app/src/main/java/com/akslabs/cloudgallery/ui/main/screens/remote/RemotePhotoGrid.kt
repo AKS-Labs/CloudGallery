@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -66,9 +67,12 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.snapshotFlow
+import com.akslabs.cloudgallery.data.mediastore.AlbumInfo
+import com.akslabs.cloudgallery.ui.components.AlbumChipBar
 import com.akslabs.cloudgallery.ui.components.DragSelectableLazyVerticalGrid
 import com.akslabs.cloudgallery.ui.components.ExpressiveScrollbar
 import com.akslabs.cloudgallery.R
+import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import com.akslabs.cloudgallery.ui.components.LoadAnimation
 import com.akslabs.cloudgallery.ui.components.PhotoPageView
@@ -84,7 +88,6 @@ import kotlinx.coroutines.yield
 
 private const val TAG = "RemotePhotoGrid"
 
-// Sealed class for remote grid items to support date grouping
 sealed class RemoteGridItem {
     data class PhotoItem(val photo: RemotePhoto, val originalIndex: Int) : RemoteGridItem()
     data class HeaderItem(val dateLabel: String, val id: String) : RemoteGridItem()
@@ -151,31 +154,25 @@ private fun groupRemotePhotosByDateOptimized(
     }.sortedByDescending { it.sortKey }
 }
 
-// Optimized function to create remote layout cache
 private fun createRemoteLayoutCache(
     cloudPhotos: LazyPagingItems<RemotePhoto>
 ): RemoteLayoutCache {
     val startTime = System.currentTimeMillis()
 
-    // Create normal grid items (simple list)
     val normalGridItems = (0 until cloudPhotos.itemCount).mapNotNull { index ->
         cloudPhotos.peek(index)?.let { photo ->
             RemoteGridItem.PhotoItem(photo, index)
         }
     }
 
-    // Create date grouped items
     val dateGroups = groupRemotePhotosByDateOptimized(cloudPhotos)
     val dateGroupedItems = mutableListOf<RemoteGridItem>()
 
     dateGroups.forEachIndexed { groupIndex, dateGroup ->
-        // Add date header
         dateGroupedItems.add(RemoteGridItem.HeaderItem(
             dateLabel = dateGroup.dateLabel,
             id = "header_${groupIndex}_${dateGroup.dateLabel}"
         ))
-
-        // Add all photos for this date
         dateGroup.photos.forEach { (photo, originalIndex) ->
             dateGroupedItems.add(RemoteGridItem.PhotoItem(photo, originalIndex))
         }
@@ -183,7 +180,7 @@ private fun createRemoteLayoutCache(
 
     val idToNormalIndex = mutableMapOf<String, Int>()
     normalGridItems.forEachIndexed { index, item ->
-        idToNormalIndex[item.photo.remoteId] = index
+        if (item is RemoteGridItem.PhotoItem) idToNormalIndex[item.photo.remoteId] = index
     }
 
     val idToDateGroupedIndex = mutableMapOf<String, Int>()
@@ -206,6 +203,9 @@ private fun createRemoteLayoutCache(
 fun RemotePhotosGrid(
     cloudPhotos: LazyPagingItems<RemotePhoto>,
     onPhotoClick: (Int, RemotePhoto?) -> Unit,
+    topicAlbums: List<AlbumInfo> = emptyList(),
+    selectedTopicAlbumId: Long = -1L,
+    onTopicAlbumSelected: (Long) -> Unit = {},
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     selectionMode: Boolean,
@@ -409,146 +409,158 @@ fun RemotePhotosGrid(
 
     val maxLineSpan = columns
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // Reset topic filter on back press
+    BackHandler(selectedTopicAlbumId != -1L) {
+        onTopicAlbumSelected(-1L)
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
         if (cloudPhotos.loadState.refresh == LoadState.Loading && cloudPhotos.itemCount == 0) {
-            LoadAnimation(modifier = Modifier.align(Alignment.Center))
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadAnimation()
+            }
         } else if (cloudPhotos.itemCount == 0 && cloudPhotos.loadState.refresh is LoadState.NotLoading) {
-             ExpressiveEmptyState(
-                icon = Icons.Rounded.Cloud,
-                title = "No cloud photos",
-                description = "Sync images to view your collection here anytime, anywhere.",
-                actionText = "Start Backup",
-                onActionClick = {
-                    // Navigate to settings or trigger backup
-                    navController.navigate(Screens.Settings.route)
-                }
-            )
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                ExpressiveEmptyState(
+                    icon = Icons.Rounded.Cloud,
+                    title = "No cloud photos",
+                    description = "Sync images to view your collection here anytime, anywhere.",
+                    actionText = "Start Backup",
+                    onActionClick = {
+                        navController.navigate(Screens.Settings.route)
+                    }
+                )
+            }
         } else {
-            ExpressiveScrollbar(
-                lazyGridState = lazyGridState,
-                totalRows = effectiveTotalRows,
-                modifier = Modifier.align(Alignment.CenterEnd),
-                onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
-                labelProvider = { index ->
-                    val safeIndex = index.coerceIn(0, currentLayoutItems.size - 1)
-                    
-                    // Binary search for the nearest header at or above safeIndex
-                    var low = 0
-                    var high = headerIndices.size - 1
-                    var result = "..."
-                    
-                    while (low <= high) {
-                        val mid = (low + high) / 2
-                        if (headerIndices[mid].first <= safeIndex) {
-                            result = headerIndices[mid].second
-                            low = mid + 1
-                        } else {
-                            high = mid - 1
-                        }
-                    }
-                    result
-                }
+            AlbumChipBar(
+                albums = topicAlbums,
+                selectedAlbumId = selectedTopicAlbumId,
+                onAlbumSelected = onTopicAlbumSelected
             )
-            DragSelectableLazyVerticalGrid(
-                lazyGridState = lazyGridState,
-                selectionEnabled = selectionMode,
-                glideSelectionBehavior = glideSelectionBehavior,
-                onItemSelectionChange = { key, isSelected ->
-                    if (key is String && !key.startsWith("header_")) {
-                        val photoId = key
-                        val currentlySelected = selectedPhotos.contains(photoId)
-                        if (isSelected != currentlySelected) {
-                            toggleSelection(photoId)
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                ExpressiveScrollbar(
+                    lazyGridState = lazyGridState,
+                    totalRows = effectiveTotalRows,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    onDraggingChange = { isDragging -> isScrollbarDragging = isDragging },
+                    labelProvider = { index ->
+                        val safeIndex = index.coerceIn(0, currentLayoutItems.size - 1)
+                        
+                        var low = 0
+                        var high = headerIndices.size - 1
+                        var result = "..."
+                        
+                        while (low <= high) {
+                            val mid = (low + high) / 2
+                            if (headerIndices[mid].first <= safeIndex) {
+                                result = headerIndices[mid].second
+                                low = mid + 1
+                            } else {
+                                high = mid - 1
+                            }
                         }
-                        if (!selectionMode && isSelected) {
-                            onSelectionModeChange(true)
-                        }
+                        result
                     }
-                },
-                isItemSelected = { key ->
-                    if (key is String && !key.startsWith("header_")) {
-                        selectedPhotos.contains(key)
-                    } else false
-                },
-                onDragSelectionEnd = {
-                    if (selectedPhotos.isEmpty()) {
-                        onSelectionModeChange(false)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.background)
-                    .floatingToolbarVerticalNestedScroll(
-                        expanded = expanded,
-                        onExpand = { onExpandedChange(true) },
-                        onCollapse = { onExpandedChange(false) },
-                    ),
-                columns = GridCells.Fixed(columns),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(verticalSpacing),
-                horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
-            ) {
-                // Unified remote layout rendering with smooth transitions
-                items(
-                    count = currentLayoutItems.size,
-                    key = { index ->
-                        when (val item = currentLayoutItems[index]) {
-                            is RemoteGridItem.HeaderItem -> item.id
-                            is RemoteGridItem.PhotoItem -> item.photo.remoteId
+                )
+                DragSelectableLazyVerticalGrid(
+                    lazyGridState = lazyGridState,
+                    selectionEnabled = selectionMode,
+                    glideSelectionBehavior = glideSelectionBehavior,
+                    onItemSelectionChange = { key, isSelected ->
+                        if (key is String && !key.startsWith("header_")) {
+                            val photoId = key
+                            val currentlySelected = selectedPhotos.contains(photoId)
+                            if (isSelected != currentlySelected) {
+                                toggleSelection(photoId)
+                            }
+                            if (!selectionMode && isSelected) {
+                                onSelectionModeChange(true)
+                            }
                         }
                     },
-                    span = { index ->
-                        when (currentLayoutItems[index]) {
-                            is RemoteGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
-                            is RemoteGridItem.PhotoItem -> GridItemSpan(1)
+                    isItemSelected = { key ->
+                        if (key is String && !key.startsWith("header_")) {
+                            selectedPhotos.contains(key)
+                        } else false
+                    },
+                    onDragSelectionEnd = {
+                        if (selectedPhotos.isEmpty()) {
+                            onSelectionModeChange(false)
                         }
-                    }
-                ) { index ->
-                    when (val item = currentLayoutItems[index]) {
-                        is RemoteGridItem.HeaderItem -> {
-                            // Date header
-                            Text(
-                                text = item.dateLabel,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp, bottom = 4.dp)
-                            )
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                        .floatingToolbarVerticalNestedScroll(
+                            expanded = expanded,
+                            onExpand = { onExpandedChange(true) },
+                            onCollapse = { onExpandedChange(false) },
+                        ),
+                    columns = GridCells.Fixed(columns),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+                    horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
+                ) {
+                    items(
+                        count = currentLayoutItems.size,
+                        key = { index ->
+                            when (val item = currentLayoutItems[index]) {
+                                is RemoteGridItem.HeaderItem -> item.id
+                                is RemoteGridItem.PhotoItem -> item.photo.remoteId
+                            }
+                        },
+                        span = { index ->
+                            when (currentLayoutItems[index]) {
+                                is RemoteGridItem.HeaderItem -> GridItemSpan(maxLineSpan)
+                                else -> GridItemSpan(1)
+                            }
                         }
-                        is RemoteGridItem.PhotoItem -> {
-                            val isSelected = selectedPhotos.contains(item.photo.remoteId)
-                            CloudPhotoItem(
-                                remotePhoto = item.photo,
-                                index = item.originalIndex,
-                                isSelected = isSelected,
-                                isScrollbarDragging = isScrollbarDragging,
-                                thumbnailResolution = thumbnailResolution,
-                                sharedTransitionScope = sharedTransitionScope,
-                                animatedVisibilityScope = animatedVisibilityScope,
-                                modifier = Modifier.clickable(
-                                    onClick = {
-                                        if (selectionMode) {
-                                            toggleSelection(item.photo.remoteId)
-                                        } else {
-                                            onSaveScrollState(
-                                                item.photo.remoteId,
-                                                lazyGridState.firstVisibleItemIndex,
-                                                lazyGridState.firstVisibleItemScrollOffset
-                                            )
-                                            onPhotoClick(item.originalIndex, item.photo)
-                                        }
-                                    }
+                    ) { index ->
+                        when (val item = currentLayoutItems[index]) {
+                            is RemoteGridItem.HeaderItem -> {
+                                Text(
+                                    text = item.dateLabel,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp, bottom = 4.dp)
                                 )
-                            )
+                            }
+                            is RemoteGridItem.PhotoItem -> {
+                                val isSelected = selectedPhotos.contains(item.photo.remoteId)
+                                CloudPhotoItem(
+                                    remotePhoto = item.photo,
+                                    index = item.originalIndex,
+                                    isSelected = isSelected,
+                                    isScrollbarDragging = isScrollbarDragging,
+                                    thumbnailResolution = thumbnailResolution,
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    modifier = Modifier.clickable(
+                                        onClick = {
+                                            if (selectionMode) {
+                                                toggleSelection(item.photo.remoteId)
+                                            } else {
+                                                onSaveScrollState(
+                                                    item.photo.remoteId,
+                                                    lazyGridState.firstVisibleItemIndex,
+                                                    lazyGridState.firstVisibleItemScrollOffset
+                                                )
+                                                onPhotoClick(item.originalIndex, item.photo)
+                                            }
+                                        }
+                                    )
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-
     }
 }
 

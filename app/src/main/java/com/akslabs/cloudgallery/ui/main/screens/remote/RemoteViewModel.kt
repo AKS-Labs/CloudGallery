@@ -9,6 +9,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
+import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,6 +42,12 @@ class RemoteViewModel : ViewModel() {
     val totalCloudPhotosCount: StateFlow<Int> by lazy {
         DbHolder.database.remotePhotoDao().getTotalCountFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    }
+
+    // Pending local uploads shown in the remote grid
+    val pendingUploadsFlow: StateFlow<List<Photo>> by lazy {
+        DbHolder.database.photoDao().getPendingUploadFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     }
 
     // Total size of cloud photos

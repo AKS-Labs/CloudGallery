@@ -103,14 +103,40 @@ class InstantPhotoUploadWorker(
                         )
                     )
 
-                    // 6. Upload preview before original if enabled
+                    // 6. Determine folder/topic for forum organization
+                    var messageThreadId: Long? = null
+                    var topicName: String? = null
+                    try {
+                        val bucketName = com.akslabs.cloudgallery.utils.getBucketName(appContext.contentResolver, photoUri)
+                        if (bucketName != null && bucketName.isNotBlank()) {
+                            topicName = bucketName
+                            messageThreadId = botApi.topicCache[bucketName]
+                            if (messageThreadId == null) {
+                                messageThreadId = remotePhotoDao.getTopicIdByName(bucketName)
+                                if (messageThreadId != null) {
+                                    botApi.topicCache[bucketName] = messageThreadId
+                                    Log.d("PhotoUpload", "Loaded topic '$bucketName' from DB: id=$messageThreadId")
+                                } else {
+                                    messageThreadId = botApi.createForumTopic(channelId, bucketName)
+                                    if (messageThreadId != null) {
+                                        botApi.topicCache[bucketName] = messageThreadId
+                                        Log.d("PhotoUpload", "Created topic '$bucketName' with id=$messageThreadId")
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w("PhotoUpload", "Failed to create/get topic for ${photo.localId}, uploading to General", e)
+                    }
+
+                    // 7. Upload preview before original if enabled
                     var previewId: String? = null
                     var previewMessageId: Long? = null
                     if (isSyncImagePreviewEnabled()) {
                         try {
                             val previewFile = generatePreview(appContext, photoUri)
                             if (previewFile != null) {
-                                val result = uploadPreviewFile(botApi, channelId, previewFile, hash)
+                                val result = uploadPreviewFile(botApi, channelId, previewFile, hash, messageThreadId, topicName)
                                 previewId = result.first
                                 previewMessageId = result.second
                                 if (previewId != null) {
@@ -124,14 +150,25 @@ class InstantPhotoUploadWorker(
                         }
                     }
 
-                    // 7. Upload original with hash
+                    // 8. Upload original with hash
                     try {
-                        sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash, previewId, previewMessageId)
+                        val topicLabel = if (topicName != null) " topic='$topicName'($messageThreadId)" else " (General)"
+                        Log.d("PhotoUpload", "Uploading ${photo.localId}$topicLabel")
+
+                        sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash, previewId, previewMessageId, messageThreadId, topicName)
                         photoDao.updateUploadStatus(photo.localId, "DONE", System.currentTimeMillis())
                         uploadQueueDao.markDone(queueId)
                     } catch (e: Exception) {
+                        Log.e("PhotoUpload", "Upload failed for ${photo.localId}: ${e.message}" +
+                            if (topicName != null) " (topic='$topicName')" else "")
                         photoDao.updateUploadStatus(photo.localId, "FAILED", System.currentTimeMillis())
                         uploadQueueDao.markFailed(queueId, e.message)
+                        val updatedQueue = uploadQueueDao.getById(queueId)
+                        if (updatedQueue?.retryCount != null && updatedQueue.retryCount >= MAX_RETRIES) {
+                            Log.e("PhotoUpload", "Permanently cancelling ${photo.localId}: retries exhausted")
+                            uploadQueueDao.markCancelled(queueId)
+                            return@withContext Result.failure()
+                        }
                         throw e
                     }
                 } else {
@@ -173,5 +210,6 @@ class InstantPhotoUploadWorker(
         const val KEY_PHOTO_URI = "photoUri"
         const val KEY_FILE_NAME = "fileName"
         const val KEY_UPLOAD_TYPE = "upload_type"
+        const val MAX_RETRIES = 3
     }
 }

@@ -29,6 +29,12 @@ interface UploadQueueDao {
     @Query("UPDATE upload_queue SET status = 'FAILED', errorMessage = :error, retryCount = retryCount + 1 WHERE id = :id")
     suspend fun markFailed(id: Long, error: String?)
 
+    @Query("UPDATE upload_queue SET status = 'CANCELLED' WHERE id = :id")
+    suspend fun markCancelled(id: Long)
+
+    @Query("SELECT * FROM upload_queue WHERE id = :id")
+    suspend fun getById(id: Long): UploadQueue?
+
     @Query("DELETE FROM upload_queue WHERE status = 'DONE' AND completedAt < :before")
     suspend fun cleanupOld(before: Long)
 
