@@ -257,7 +257,7 @@ class PeriodicPhotoBackupWorker(
                     try {
                         val previewFile = generatePreview(appContext, uri)
                         if (previewFile != null) {
-                            val result = uploadPreviewFile(botApi, channelId, previewFile, hash)
+                            val result = uploadPreviewFile(botApi, channelId, previewFile, hash, messageThreadId, topicName)
                             previewId = result.first
                             previewMessageId = result.second
                             if (previewId != null) {

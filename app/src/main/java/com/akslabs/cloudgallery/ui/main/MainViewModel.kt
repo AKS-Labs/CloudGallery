@@ -121,30 +121,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val allCloudPhotosFlow: Flow<PagingData<RemotePhoto>> = _selectedTopicAlbumId.map { albumId ->
-        val pagingSource = if (albumId == -1L) {
-            Log.d("MainViewModel", "=== CREATING ALL REMOTE PAGING SOURCE ===")
-            DbHolder.database.remotePhotoDao().getAllPagingSource()
-        } else {
-            // Map album ID back to topic name
-            val currentAlbums = topicAlbums.value
-            val topicName = currentAlbums.find { it.id == albumId }?.label
-            if (topicName != null && topicName != "All") {
-                Log.d("MainViewModel", "=== CREATING TOPIC PAGING SOURCE: $topicName ===")
-                DbHolder.database.remotePhotoDao().getByTopicNamePagingSource(topicName)
-            } else {
-                DbHolder.database.remotePhotoDao().getAllPagingSource()
-            }
-        }
+    val allCloudPhotosFlow: Flow<PagingData<RemotePhoto>> = _selectedTopicAlbumId.flatMapLatest { albumId ->
         Pager(
             config = PagingConfig(
                 pageSize = 24,
                 prefetchDistance = 72,
                 jumpThreshold = 120
             ),
-            pagingSourceFactory = { pagingSource }
+            pagingSourceFactory = {
+                if (albumId == -1L) {
+                    Log.d("MainViewModel", "=== CREATING ALL REMOTE PAGING SOURCE ===")
+                    DbHolder.database.remotePhotoDao().getAllPagingSource()
+                } else {
+                    val currentAlbums = topicAlbums.value
+                    val topicName = currentAlbums.find { it.id == albumId }?.label
+                    if (topicName != null && topicName != "All") {
+                        Log.d("MainViewModel", "=== CREATING TOPIC PAGING SOURCE: $topicName ===")
+                        DbHolder.database.remotePhotoDao().getByTopicNamePagingSource(topicName)
+                    } else {
+                        DbHolder.database.remotePhotoDao().getAllPagingSource()
+                    }
+                }
+            }
         ).flow
-    }.flatMapLatest { it }.cachedIn(viewModelScope)
+    }.cachedIn(viewModelScope)
 
     val localPhotosCount: StateFlow<Int> by lazy {
         DbHolder.database.photoDao().getAllCountFlow()

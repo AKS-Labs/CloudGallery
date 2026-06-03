@@ -364,7 +364,9 @@ suspend fun uploadPreviewFile(
     botApi: BotApi,
     channelId: Long,
     file: File,
-    contentHash: String?
+    contentHash: String?,
+    messageThreadId: Long? = null,
+    topicName: String? = null
 ): Pair<String?, Long?> {
     val caption = buildString {
         append("<b>[Preview ${formatFileSize(file.length())}]</b>")
@@ -372,9 +374,9 @@ suspend fun uploadPreviewFile(
             append(" <b>#hash:</b> ${escapeHtml(contentHash)}")
         }
     }
-    val (response, error) = botApi.sendPhoto(file, channelId, caption)
+    val (response, error) = botApi.sendPhoto(file, channelId, caption, messageThreadId = messageThreadId)
     if (error != null || response == null || !response.isSuccessful) {
-        Log.e("Preview", "Preview upload failed: ${error?.message}")
+        Log.e("Preview", "Preview upload failed: ${error?.message}" + if (topicName != null) " (topic='$topicName')" else "")
         return Pair(null, null)
     }
     val message = response.body()?.result ?: return Pair(null, null)
