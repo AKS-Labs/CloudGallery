@@ -112,10 +112,16 @@ class InstantPhotoUploadWorker(
                             topicName = bucketName
                             messageThreadId = botApi.topicCache[bucketName]
                             if (messageThreadId == null) {
-                                messageThreadId = botApi.createForumTopic(channelId, bucketName)
+                                messageThreadId = remotePhotoDao.getTopicIdByName(bucketName)
                                 if (messageThreadId != null) {
                                     botApi.topicCache[bucketName] = messageThreadId
-                                    Log.d("PhotoUpload", "Created topic '$bucketName' with id=$messageThreadId")
+                                    Log.d("PhotoUpload", "Loaded topic '$bucketName' from DB: id=$messageThreadId")
+                                } else {
+                                    messageThreadId = botApi.createForumTopic(channelId, bucketName)
+                                    if (messageThreadId != null) {
+                                        botApi.topicCache[bucketName] = messageThreadId
+                                        Log.d("PhotoUpload", "Created topic '$bucketName' with id=$messageThreadId")
+                                    }
                                 }
                             }
                         }

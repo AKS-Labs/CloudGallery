@@ -104,4 +104,7 @@ interface RemotePhotoDao {
 
     @Query("SELECT * FROM remote_photos WHERE status = 'ACTIVE' AND topicName = :topicName ORDER BY uploadedAt DESC")
     fun getByTopicNamePagingSource(topicName: String): PagingSource<Int, RemotePhoto>
+
+    @Query("SELECT topicId FROM remote_photos WHERE topicName = :topicName AND topicId IS NOT NULL AND status = 'ACTIVE' LIMIT 1")
+    suspend fun getTopicIdByName(topicName: String): Long?
 }

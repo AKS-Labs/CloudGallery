@@ -17,9 +17,16 @@ import com.github.kotlintelegrambot.entities.files.Document
 import com.github.kotlintelegrambot.entities.files.PhotoSize
 import com.github.kotlintelegrambot.network.Response
 import com.github.kotlintelegrambot.types.TelegramBotResult
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * The remote API module of the project.
@@ -40,6 +47,16 @@ object BotApi {
             Log.w(TAG, "Removed topic '$topicName' from cache due to upload failure")
         }
     }
+
+    private val httpClient: okhttp3.OkHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
+    private val gson: Gson = Gson()
 
     fun create() {
         bot = bot {
@@ -108,17 +125,10 @@ object BotApi {
         }
         return withContext(Dispatchers.IO) {
             try {
-                val replyParams = replyToMessageId?.let { ReplyParameters(messageId = it) }
                 if (messageThreadId != null) {
-                    bot.sendPhoto(
-                        chatId = ChatId.fromId(channelId),
-                        photo = TelegramFile.ByFile(file),
-                        caption = caption,
-                        parseMode = ParseMode.HTML,
-                        replyParameters = replyParams,
-                        messageThreadId = messageThreadId
-                    )
+                    sendDocumentMultipart(file, channelId, caption, replyToMessageId, messageThreadId)
                 } else {
+                    val replyParams = replyToMessageId?.let { ReplyParameters(messageId = it) }
                     bot.sendDocument(
                         chatId = ChatId.fromId(channelId),
                         document = TelegramFile.ByFile(file),
@@ -130,6 +140,73 @@ object BotApi {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ sendFile: Exception during upload", e)
+                Pair(null, e)
+            }
+        }
+    }
+
+    /**
+     * Sends a file as a document to a forum topic using a direct HTTP multipart call.
+     * Uses sendDocument (not sendPhoto) so original file quality is preserved.
+     */
+    private suspend fun sendDocumentMultipart(
+        file: File,
+        channelId: Long,
+        caption: String?,
+        replyToMessageId: Long?,
+        messageThreadId: Long
+    ): Pair<retrofit2.Response<Response<Message>?>?, Exception?> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val token = Preferences.getEncryptedString(Preferences.botToken, SAMPLE_API_KEY)
+                val url = "https://api.telegram.org/bot${token}/sendDocument"
+
+                val mediaType = "application/octet-stream".toMediaType()
+                val fileRequestBody = okhttp3.RequestBody.create(mediaType, file)
+                val bodyBuilder = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("chat_id", channelId.toString())
+                    .addFormDataPart("message_thread_id", messageThreadId.toString())
+                    .addFormDataPart("document", file.name, fileRequestBody)
+
+                if (caption != null) {
+                    bodyBuilder.addFormDataPart("caption", caption)
+                    bodyBuilder.addFormDataPart("parse_mode", "HTML")
+                }
+
+                if (replyToMessageId != null) {
+                    bodyBuilder.addFormDataPart("reply_parameters", """{"message_id":$replyToMessageId}""")
+                }
+
+                bodyBuilder.addFormDataPart("disable_content_type_detection", "true")
+
+                val request = Request.Builder()
+                    .url(url)
+                    .post(bodyBuilder.build())
+                    .build()
+
+                val okResponse = httpClient.newCall(request).execute()
+                val bodyString = okResponse.body?.string()
+
+                if (!okResponse.isSuccessful) {
+                    Log.e(TAG, "❌ sendDocumentMultipart: HTTP ${okResponse.code}: $bodyString")
+                    val errorBody = okResponse.body?.let {
+                        okhttp3.ResponseBody.create("application/json".toMediaType(), bodyString ?: "")
+                    }
+                    val retrofitResponse = retrofit2.Response.error<Response<Message>?>(
+                        okResponse.code,
+                        errorBody ?: okhttp3.ResponseBody.create("application/json".toMediaType(), """{"ok":false,"description":"HTTP ${okResponse.code}"}""")
+                    )
+                    return@withContext Pair(retrofitResponse, null)
+                }
+
+                val type = object : TypeToken<Response<Message>>() {}.type
+                val apiResponse = gson.fromJson<Response<Message>>(bodyString, type)
+                @Suppress("UNCHECKED_CAST")
+                val retrofitResponse = retrofit2.Response.success<Response<Message>?>(apiResponse as Response<Message>?)
+                Pair(retrofitResponse, null)
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ sendDocumentMultipart: Exception", e)
                 Pair(null, e)
             }
         }
@@ -183,8 +260,16 @@ object BotApi {
                         Log.d(TAG, "✅ Forum topic '$name' created: messageThreadId=${topic.messageThreadId}")
                         topic.messageThreadId
                     },
-                    ifError = { error ->
-                        Log.w(TAG, "⚠️ Failed to create forum topic '$name': $error")
+                    ifError = { err ->
+                        val msg = err.toString()
+                        when {
+                            msg.contains("401") || msg.contains("Unauthorized") ->
+                                Log.e(TAG, "❌ Bot unauthorized for chat $chatId — check bot token and ensure bot is admin in the group")
+                            msg.contains("TOPICS_NOT_ENABLED") || msg.contains("can't create topic") ->
+                                Log.w(TAG, "⚠️ Forum topics not enabled in chat $chatId — photos will upload to General topic")
+                            else ->
+                                Log.w(TAG, "⚠️ Failed to create forum topic '$name': $msg")
+                        }
                         null
                     }
                 )

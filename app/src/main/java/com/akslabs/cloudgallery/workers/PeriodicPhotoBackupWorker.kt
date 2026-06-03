@@ -233,10 +233,16 @@ class PeriodicPhotoBackupWorker(
                         topicName = bucketName
                         messageThreadId = botApi.topicCache[bucketName]
                         if (messageThreadId == null) {
-                            messageThreadId = botApi.createForumTopic(channelId, bucketName)
+                            messageThreadId = remotePhotoDao.getTopicIdByName(bucketName)
                             if (messageThreadId != null) {
                                 botApi.topicCache[bucketName] = messageThreadId
-                                Log.d("PeriodicBackup", "Created topic '$bucketName' with id=$messageThreadId")
+                                Log.d("PeriodicBackup", "Loaded topic '$bucketName' from DB: id=$messageThreadId")
+                            } else {
+                                messageThreadId = botApi.createForumTopic(channelId, bucketName)
+                                if (messageThreadId != null) {
+                                    botApi.topicCache[bucketName] = messageThreadId
+                                    Log.d("PeriodicBackup", "Created topic '$bucketName' with id=$messageThreadId")
+                                }
                             }
                         }
                     }

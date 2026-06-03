@@ -143,7 +143,6 @@ fun AppNavHost(
             val totalCloudPhotosCount by viewModel.totalCloudPhotosCount.collectAsStateWithLifecycle()
             val lastViewedId by viewModel.lastViewedPhotoId.collectAsStateWithLifecycle()
 
-            val pendingPhotos by viewModel.pendingUploadsFlow.collectAsStateWithLifecycle()
             val topicAlbums by viewModel.topicAlbums.collectAsStateWithLifecycle()
             val selectedTopicAlbumId by viewModel.selectedTopicAlbumId.collectAsStateWithLifecycle()
 
@@ -155,10 +154,6 @@ fun AppNavHost(
                         navController.navigate("photo_viewer/${it.remoteId}/true") 
                     }
                 },
-                onPendingPhotoClick = { photo ->
-                    navController.navigate("photo_viewer/${java.net.URLEncoder.encode(photo.localId, "UTF-8")}/false")
-                },
-                pendingPhotos = pendingPhotos,
                 topicAlbums = topicAlbums,
                 selectedTopicAlbumId = selectedTopicAlbumId,
                 onTopicAlbumSelected = { viewModel.selectTopicAlbum(it) },
