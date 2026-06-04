@@ -268,6 +268,9 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         localMap: Map<String, String>
     ): UploadUiItem {
         val localPath = localMap[remote.remoteId]
+        val remoteThumb = if (localPath == null) {
+            com.akslabs.cloudgallery.utils.coil.FileIdData(remote.previewRemoteId ?: remote.remoteId)
+        } else null
         return UploadUiItem(
             id = remote.remoteId,
             type = when (remote.uploadType) {
@@ -278,11 +281,11 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             status = UploadStatus.Completed,
             progress = 1f,
             progressText = "Synced to Cloud",
-            thumbnailUri = localPath ?: remote, // Smart Thumbnail: Use local path if available, else RemotePhoto object
+            thumbnailUri = localPath ?: remoteThumb,
             totalItems = 1,
             fileName = remote.fileName ?: "Uploaded Photo",
             isCancellable = false,
-            localPhotoId = localPath, // Allow clicking to open local if available
+            localPhotoId = localPath,
             timestamp = remote.uploadedAt
         )
     }

@@ -278,7 +278,7 @@ suspend fun generatePreview(
     context: Context,
     uri: Uri,
     maxDimension: Int = 320,
-    minBytes: Long = 25600
+    minBytes: Long = getPreviewMinBytes()
 ): File? = withContext(Dispatchers.IO) {
     try {
         // Check original file size — if already below threshold, copy as-is
@@ -388,6 +388,12 @@ suspend fun uploadPreviewFile(
  */
 fun isSyncImagePreviewEnabled(): Boolean =
     Preferences.getBoolean(Preferences.syncImagePreviewKey, false)
+
+/**
+ * Returns the configured preview size in bytes.
+ */
+fun getPreviewMinBytes(): Long =
+    Preferences.getInt(Preferences.syncImagePreviewSizeKey, 25).coerceIn(10, 500) * 1024L
 
 suspend fun Context.toastFromMainThread(msg: String?, length: Int = Toast.LENGTH_LONG) =
     withContext(Dispatchers.Main) {

@@ -58,6 +58,7 @@ object Preferences {
     const val thumbnailResolutionKey: String = "thumbnailResolution"
     const val defaultThumbnailResolution: Int = 150
     const val syncImagePreviewKey: String = "syncImagePreview"
+    const val syncImagePreviewSizeKey: String = "syncImagePreviewSize"
 
     private const val prefFile: String = "preferences"
     private const val encryptedPrefFile: String = "encryptedPreferences"

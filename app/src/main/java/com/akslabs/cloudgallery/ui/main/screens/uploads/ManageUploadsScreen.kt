@@ -1014,9 +1014,9 @@ private fun UploadItemCard(
                                     .crossfade(true)
                                     .size(256)
                                 
-                                if (thumb is RemotePhoto) {
-                                    builder.memoryCacheKey("rt_thumb_${thumb.remoteId}")
-                                        .diskCacheKey("rt_thumb_${thumb.remoteId}")
+                                if (thumb is com.akslabs.cloudgallery.utils.coil.FileIdData) {
+                                    builder.memoryCacheKey("rt_thumb_${thumb.fileId}")
+                                        .diskCacheKey("rt_thumb_${thumb.fileId}")
                                 }
                                 builder.build()
                             },
