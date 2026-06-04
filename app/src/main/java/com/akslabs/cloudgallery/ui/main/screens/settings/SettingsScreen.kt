@@ -398,6 +398,9 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
     var isSyncImagePreviewEnabled by remember {
         mutableStateOf(Preferences.getBoolean(Preferences.syncImagePreviewKey, false))
     }
+    var currentPreviewSize by remember {
+        mutableStateOf(Preferences.getInt(Preferences.syncImagePreviewSizeKey, 25))
+    }
     var backupStats by remember { mutableStateOf<BackupHelper.BackupStats?>(null) }
     val totalCloudPhotosCount by DbHolder.database.remotePhotoDao()
         .getTotalCountFlow().collectAsStateWithLifecycle(initialValue = 0)
@@ -572,7 +575,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     SettingsSwitchItem(
                         icon = Icons.Rounded.Image,
                         title = "Sync Image Preview",
-                        subtitle = "Sync low-quality previews with original image",
+                        subtitle = "Sync low-quality previews with original image (${currentPreviewSize} KB)",
                         isChecked = isSyncImagePreviewEnabled,
                         onCheckedChange = { enabled ->
                             isSyncImagePreviewEnabled = enabled
@@ -582,6 +585,110 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                             }
                         }
                     )
+
+                    if (isSyncImagePreviewEnabled) {
+                        var showCustom by remember { mutableStateOf(currentPreviewSize !in listOf(25, 50, 100, 200, 400)) }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(25, 50, 100, 200, 400).forEach { size ->
+                                    val selected = currentPreviewSize == size && !showCustom
+                                    Surface(
+                                        onClick = {
+                                            showCustom = false
+                                            currentPreviewSize = size
+                                            Preferences.edit { putInt(Preferences.syncImagePreviewSizeKey, size) }
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                                                else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        border = if (selected) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
+                                    ) {
+                                        Text(
+                                            text = "${size}KB",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                        )
+                                    }
+                                }
+                                Surface(
+                                    onClick = { showCustom = !showCustom },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (showCustom) MaterialTheme.colorScheme.primaryContainer
+                                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    border = if (showCustom) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
+                                ) {
+                                    Text(
+                                        text = "Custom",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (showCustom) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (showCustom) MaterialTheme.colorScheme.onPrimaryContainer
+                                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
+
+                            if (showCustom) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                                ) {
+                                    var manualInput by remember(showCustom) {
+                                        mutableStateOf(
+                                            if (currentPreviewSize !in listOf(25, 50, 100, 200, 400)) currentPreviewSize.toString() else ""
+                                        )
+                                    }
+                                    Text(
+                                        text = "Enter size",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    TextField(
+                                        value = manualInput,
+                                        onValueChange = { value ->
+                                            val filtered = value.filter { it.isDigit() }
+                                            if (filtered.length <= 3) {
+                                                manualInput = filtered
+                                                val size = filtered.toIntOrNull()
+                                                if (size != null && size in 10..500) {
+                                                    currentPreviewSize = size
+                                                    Preferences.edit { putInt(Preferences.syncImagePreviewSizeKey, size) }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.width(72.dp),
+                                        textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+                                        singleLine = true,
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                        colors = TextFieldDefaults.colors(
+                                            unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                            focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                            unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
+                                            focusedIndicatorColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "KB",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
