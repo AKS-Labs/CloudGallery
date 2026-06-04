@@ -641,13 +641,20 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                             if (showCustom) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(top = 6.dp)
+                                    horizontalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
                                 ) {
                                     var manualInput by remember(showCustom) {
                                         mutableStateOf(
                                             if (currentPreviewSize !in listOf(25, 50, 100, 200, 400)) currentPreviewSize.toString() else ""
                                         )
                                     }
+                                    Text(
+                                        text = "Enter size",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     TextField(
                                         value = manualInput,
                                         onValueChange = { value ->
@@ -661,10 +668,9 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                                                 }
                                             }
                                         },
-                                        modifier = Modifier.width(140.dp),
+                                        modifier = Modifier.width(72.dp),
                                         textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
                                         singleLine = true,
-                                        placeholder = { Text("Enter size", style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center) },
                                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                                         colors = TextFieldDefaults.colors(
                                             unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -672,6 +678,12 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                                             unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
                                             focusedIndicatorColor = MaterialTheme.colorScheme.primary
                                         )
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "KB",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
