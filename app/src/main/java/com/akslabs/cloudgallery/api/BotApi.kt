@@ -249,15 +249,16 @@ object BotApi {
         name: String
     ): Long? {
         return withContext(Dispatchers.IO) {
+            val displayName = "$name"
             try {
-                Log.d(TAG, "📋 Creating forum topic '$name' in chat $chatId")
+                Log.d(TAG, "📋 Creating forum topic '$displayName' in chat $chatId")
                 val result = bot.createForumTopic(
                     chatId = ChatId.fromId(chatId),
-                    name = name
+                    name = displayName
                 )
                 result.fold(
                     ifSuccess = { topic ->
-                        Log.d(TAG, "✅ Forum topic '$name' created: messageThreadId=${topic.messageThreadId}")
+                        Log.d(TAG, "✅ Forum topic '$displayName' created: messageThreadId=${topic.messageThreadId}")
                         topic.messageThreadId
                     },
                     ifError = { err ->
@@ -268,13 +269,13 @@ object BotApi {
                             msg.contains("TOPICS_NOT_ENABLED") || msg.contains("can't create topic") ->
                                 Log.w(TAG, "⚠️ Forum topics not enabled in chat $chatId — photos will upload to General topic")
                             else ->
-                                Log.w(TAG, "⚠️ Failed to create forum topic '$name': $msg")
+                                Log.w(TAG, "⚠️ Failed to create forum topic '$displayName': $msg")
                         }
                         null
                     }
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Exception creating forum topic '$name'", e)
+                Log.e(TAG, "❌ Exception creating forum topic '$displayName'", e)
                 null
             }
         }
