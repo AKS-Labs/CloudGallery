@@ -40,6 +40,9 @@ interface RemotePhotoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vararg remotePhotos: RemotePhoto)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIfNotExists(vararg remotePhotos: RemotePhoto)
+
     @Query("DELETE FROM remote_photos")
     suspend fun clearAll()
 

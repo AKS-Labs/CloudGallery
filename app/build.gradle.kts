@@ -193,6 +193,5 @@ dependencies {
 //    implementation("androidx.compose.material3:material3:1.3.1")     // UI
 
     implementation("androidx.documentfile:documentfile:1.0.1")
-
-
+    implementation("com.google.android.material:material:1.12.0")
 }

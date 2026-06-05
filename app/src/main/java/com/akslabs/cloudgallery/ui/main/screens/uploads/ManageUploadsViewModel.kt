@@ -12,6 +12,7 @@ import com.akslabs.cloudgallery.data.localdb.entities.Photo
 import com.akslabs.cloudgallery.workers.InstantPhotoUploadWorker
 import com.akslabs.cloudgallery.workers.PeriodicPhotoBackupWorker
 import com.akslabs.cloudgallery.workers.WorkModule
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -61,6 +62,9 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     private val _dismissedIds = MutableStateFlow<Set<String>>(
         Preferences.getStringSet("dismissedSyncedIds", emptySet())
     )
+
+    // Dismissed work IDs (failed/cancelled items dismissed by user) — runtime only
+    private val _dismissedWorkIds = MutableStateFlow<Set<String>>(emptySet())
 
     init {
         // Auto-clear history older than 24 hours on startup
@@ -153,29 +157,39 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    // Combined active work
-    private val allWorkFlow = combine(
-        manualBackupFlow,
-        instantUploadFlow,
-        periodicBackupFlow,
-        remoteToLocalPathMapFlow
-    ) { manual, instant, periodic, localMap ->
-        // Use a map to deduplicate by ID, keeping the most specific type mapping if possible.
-        // We prioritize the lists in order: Manual -> Instant -> Periodic
-        val workMap = mutableMapOf<UUID, Pair<WorkInfo, UploadType>>()
-        
-        manual.forEach { workMap[it.id] = it to UploadType.Selective }
-        instant.forEach { if (!workMap.containsKey(it.id)) workMap[it.id] = it to UploadType.Instant }
-        periodic.forEach { if (!workMap.containsKey(it.id)) workMap[it.id] = it to UploadType.Background }
-
-        workMap.values.mapNotNull { (info, type) -> 
-            mapWorkInfoToUiItem(info, type, localMap) 
-        }
-    }
-
     // Queued Photos (from DB — not yet uploaded)
     val queuedPhotos: StateFlow<List<Photo>> = DbHolder.database.photoDao().getAllNotUploadedFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Raw active work (before thumbnail enrichment)
+    private val rawWorkFlow = combine(
+        manualBackupFlow,
+        instantUploadFlow,
+        periodicBackupFlow,
+        remoteToLocalPathMapFlow,
+        _dismissedWorkIds
+    ) { manual, instant, periodic, localMap, dismissedIds ->
+        val workMap = mutableMapOf<UUID, Pair<WorkInfo, UploadType>>()
+        manual.forEach { workMap[it.id] = it to UploadType.Selective }
+        instant.forEach { if (!workMap.containsKey(it.id)) workMap[it.id] = it to UploadType.Instant }
+        periodic.forEach { if (!workMap.containsKey(it.id)) workMap[it.id] = it to UploadType.Background }
+        workMap.values.mapNotNull { (info, type) -> 
+            val item = mapWorkInfoToUiItem(info, type, localMap)
+            if (item != null && item.id !in dismissedIds) item else null
+        }
+    }
+
+    // Combined active work with local thumbnails resolved
+    private val allWorkFlow: Flow<List<UploadUiItem>> = rawWorkFlow.combine(queuedPhotos) { workItems, nonUploadedPhotos ->
+        workItems.map { item ->
+            if (item.thumbnailUri == null && item.localPhotoId == null && item.fileName != null) {
+                val matchingPath = nonUploadedPhotos.firstOrNull { p ->
+                    p.pathUri.contains(item.fileName, ignoreCase = true)
+                }?.pathUri
+                if (matchingPath != null) item.copy(thumbnailUri = matchingPath, localPhotoId = matchingPath) else item
+            } else item
+        }
+    }
 
     // All uploads sorted by status and merging DB history
     val allUploads: StateFlow<List<UploadUiItem>> = combine(
@@ -317,14 +331,17 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         when (type) {
             UploadType.Selective, UploadType.Instant -> {
                 // Check both possible keys for URIs (Instant uses KEY_PHOTO_URI, Periodic uses KEY_CURRENT_FILE_URI)
+                // Also fall back to WorkPhotoRegistry for queued workers that haven't run yet
                 val extractedUri = progressData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.takeIf<String> { it.isNotEmpty() }
                     ?: progressData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.takeIf<String> { it.isNotEmpty() }
                     ?: outputData.getString(InstantPhotoUploadWorker.KEY_PHOTO_URI)?.takeIf<String> { it.isNotEmpty() }
                     ?: outputData.getString(PeriodicPhotoBackupWorker.KEY_CURRENT_FILE_URI)?.takeIf<String> { it.isNotEmpty() }
+                    ?: WorkModule.WorkPhotoRegistry.resolve(workInfo.id.toString())?.takeIf<String> { it.isNotEmpty() }
                 
                 thumbnailUri = extractedUri
                 localPhotoId = extractedUri
                 
+                val registryFileName = extractedUri?.substringAfterLast("/")?.takeIf { it.isNotEmpty() }
                 progressText = when (status) {
                     UploadStatus.InProgress -> if (type == UploadType.Instant) "Syncing..." else "Uploading..."
                     UploadStatus.Completed -> "Synced"
@@ -334,6 +351,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
                 
                 fileName = progressData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.takeIf<String> { it.isNotEmpty() }
                     ?: outputData.getString(InstantPhotoUploadWorker.KEY_FILE_NAME)?.takeIf<String> { it.isNotEmpty() }
+                    ?: registryFileName
                     ?: "Photo Upload"
 
                 // Try to resolve thumbnail from localMap by filename if URI is missing
@@ -456,6 +474,8 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
 
     fun retryAllFailed() {
         val failed = allUploads.value.filter { it.status == UploadStatus.Failed }
+        // Dismiss all failed items so they disappear from the list
+        _dismissedWorkIds.value = _dismissedWorkIds.value + failed.map { it.id }.toSet()
         // Retry logic:
         // 1. Enqueue periodic backup if any manual/auto backup failed
         if (failed.any { it.type == UploadType.Selective || it.type == UploadType.Background }) {
@@ -469,24 +489,35 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
 
     fun retryUpload(id: String) {
         viewModelScope.launch {
+            // Dismiss the old work ID so it disappears from lists immediately
+            _dismissedWorkIds.value = _dismissedWorkIds.value + id
+
             val item = allUploads.value.find { it.id == id }
             if (item != null) {
                 // Try to enqueue using localPhotoId or thumbnailUri if available
-                val uriStr = item.localPhotoId ?: (item.thumbnailUri as? String)
+                var uriStr = item.localPhotoId ?: (item.thumbnailUri as? String)
+
+                // If URI not in work data, look up from DB by filename
+                if (uriStr.isNullOrEmpty() && item.fileName != null) {
+                    val photo = DbHolder.database.photoDao().getAllNotUploaded()
+                        .find { it.pathUri.contains(item.fileName, ignoreCase = true) }
+                    uriStr = photo?.pathUri
+                }
+
                 if (!uriStr.isNullOrEmpty()) {
                     try {
                         val uri = android.net.Uri.parse(uriStr)
                         WorkModule.InstantUpload(uri, type = "manual_backup").enqueue()
-                        return@launch
                     } catch (e: Exception) {
-                        // fallback
+                        // couldn't retry — just dismissed
                     }
                 }
-
-                // Fallback: retryAllFailed as a broad attempt
-                retryAllFailed()
             }
         }
+    }
+
+    fun dismissFailedItem(id: String) {
+        _dismissedWorkIds.value = _dismissedWorkIds.value + id
     }
 
     fun refreshWorkInfo() {

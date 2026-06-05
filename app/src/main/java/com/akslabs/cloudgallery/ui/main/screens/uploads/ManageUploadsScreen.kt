@@ -680,16 +680,27 @@ private fun UploadListContent(
                 }
             },
             confirmButton = {
-                androidx.compose.material3.TextButton(onClick = { 
-                    errorToShow?.id?.let { onRetry(it) }
-                    errorToShow = null 
-                }) {
-                    Text("Retry All")
-                }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { errorToShow = null }) {
-                    Text("Dismiss")
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    androidx.compose.material3.TextButton(onClick = {
+                        errorToShow?.let {
+                            val uri = it.localPhotoId ?: (it.thumbnailUri as? String)
+                            if (uri != null) {
+                                navigateToPhotoFromUri(navController, uri)
+                            }
+                        }
+                        errorToShow = null
+                    }) {
+                        Text("Open")
+                    }
+                    androidx.compose.material3.TextButton(onClick = {
+                        errorToShow?.id?.let { onRetry(it) }
+                        errorToShow = null
+                    }) {
+                        Text("Retry")
+                    }
+                    androidx.compose.material3.TextButton(onClick = { errorToShow = null }) {
+                        Text("Dismiss")
+                    }
                 }
             }
         )
@@ -758,10 +769,18 @@ private fun UploadListContent(
                     )
                 }
                 items(activeItems, key = { it.id }) { item ->
+                            // Resolve local thumbnail for work items that haven't set progress data yet
+                            val resolvedItem = if (item.thumbnailUri == null && item.localPhotoId == null) {
+                                val photoUri = queuedPhotos.firstOrNull { p ->
+                                    item.fileName != null && p.pathUri.contains(item.fileName, ignoreCase = true)
+                                }?.pathUri
+                                if (photoUri != null) item.copy(thumbnailUri = photoUri, localPhotoId = photoUri) else item
+                            } else item
                             UploadItemCard(
-                                item = item,
+                                item = resolvedItem,
                                 onCancel = { onCancel(item.id) },
                                 onRetry = { onRetry(item.id) },
+                                onDismiss = { viewModel?.dismissFailedItem(item.id) },
                                 isSelected = selectedIds.contains(item.id),
                                 onToggleSelection = { onToggleSelection(item.id) },
                                 isSelectionMode = selectedIds.isNotEmpty(),
@@ -771,7 +790,7 @@ private fun UploadListContent(
                                     } else if (item.status == UploadStatus.Failed) {
                                         errorToShow = item
                                     } else {
-                                        val uri = item.localPhotoId ?: item.thumbnailUri
+                                        val uri = resolvedItem.localPhotoId ?: resolvedItem.thumbnailUri
                                         if (uri != null) {
                                             navigateToPhotoFromUri(navController, uri)
                                         } else {
@@ -854,6 +873,7 @@ private fun UploadListContent(
                             item = item,
                             onCancel = {},
                             onRetry = {},
+                            onDismiss = { viewModel?.dismissFailedItem(item.id) },
                             isSelected = selectedIds.contains(item.id),
                             onToggleSelection = { onToggleSelection(item.id) },
                             isSelectionMode = selectedIds.isNotEmpty(),
@@ -861,7 +881,7 @@ private fun UploadListContent(
                                 if (selectedIds.isNotEmpty()) {
                                     onToggleSelection(item.id)
                                 } else {
-                                    navigateToPhotoFromUri(navController, item.thumbnailUri)
+                                    navigateToPhotoFromUri(navController, item.localPhotoId ?: item.thumbnailUri)
                                 }
                             },
                             modifier = Modifier.animateItem()
@@ -871,6 +891,7 @@ private fun UploadListContent(
                             item = item,
                             onCancel = {},
                             onRetry = {},
+                            onDismiss = { viewModel?.dismissFailedItem(item.id) },
                             isSelected = selectedIds.contains(item.id),
                             onToggleSelection = { onToggleSelection(item.id) },
                             isSelectionMode = selectedIds.isNotEmpty(),
@@ -878,7 +899,7 @@ private fun UploadListContent(
                                 if (selectedIds.isNotEmpty()) {
                                     onToggleSelection(item.id)
                                 } else {
-                                    navigateToPhotoFromUri(navController, item.thumbnailUri)
+                                    navigateToPhotoFromUri(navController, item.localPhotoId ?: item.thumbnailUri)
                                 }
                             },
                             modifier = Modifier.animateItem()
@@ -962,6 +983,7 @@ private fun UploadItemCard(
     item: UploadUiItem,
     onCancel: () -> Unit,
     onRetry: (String) -> Unit,
+    onDismiss: () -> Unit = {},
     isSelected: Boolean = false,
     onToggleSelection: () -> Unit = {},
     isSelectionMode: Boolean = false,
@@ -987,7 +1009,11 @@ private fun UploadItemCard(
                 onClick = onTap,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onToggleSelection()
+                    if (item.status == UploadStatus.Failed) {
+                        showContextMenu = true
+                    } else {
+                        onToggleSelection()
+                    }
                 }
             )
     ) {
@@ -997,6 +1023,7 @@ private fun UploadItemCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // ─── Thumbnail ───────────────────────────────
+                val thumbData = item.thumbnailUri ?: item.localPhotoId
                 Box(
                     modifier = Modifier
                         .size(64.dp)
@@ -1004,11 +1031,11 @@ private fun UploadItemCard(
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (item.thumbnailUri != null) {
+                    if (thumbData != null) {
                         AsyncImage(
                             imageLoader = com.akslabs.cloudgallery.utils.coil.ImageLoaderModule.thumbnailImageLoader,
                             model = let {
-                                val thumb = item.thumbnailUri
+                                val thumb = thumbData
                                 val builder = ImageRequest.Builder(LocalContext.current)
                                     .data(thumb)
                                     .crossfade(true)
@@ -1257,15 +1284,23 @@ private fun UploadItemCard(
             }
             if (item.status == UploadStatus.Failed || item.status == UploadStatus.Cancelled) {
                 DropdownMenuItem(
-                    text = { Text("Retry Upload") },
+                    text = { Text("Retry") },
                     leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(20.dp)) },
                     onClick = {
                         onRetry(item.id)
                         showContextMenu = false
                     }
                 )
+                DropdownMenuItem(
+                    text = { Text("Dismiss") },
+                    leadingIcon = { Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    onClick = {
+                        onDismiss()
+                        showContextMenu = false
+                    }
+                )
             }
-            if (item.thumbnailUri != null) {
+            if (item.thumbnailUri != null || item.localPhotoId != null) {
                 DropdownMenuItem(
                     text = { Text("View Photo") },
                     leadingIcon = { Icon(Icons.Rounded.Image, contentDescription = null, modifier = Modifier.size(20.dp)) },

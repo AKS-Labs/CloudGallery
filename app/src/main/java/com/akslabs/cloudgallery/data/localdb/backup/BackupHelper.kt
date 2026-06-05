@@ -87,14 +87,14 @@ object BackupHelper {
                 if (isSameDevice) {
                     // Same device — full import
                     Log.i(TAG, "Importing from same device (${backupFile.deviceId}): full import")
-                    DbHolder.database.photoDao().updatePhotos(*backupFile.photos.toTypedArray())
-                    DbHolder.database.remotePhotoDao().insertAll(
+                    DbHolder.database.photoDao().insertPhotos(*backupFile.photos.toTypedArray())
+                    DbHolder.database.remotePhotoDao().insertAllIfNotExists(
                         *backupFile.remotePhotos.toTypedArray()
                     )
                 } else {
                     // Different device — only merge remotePhotos to avoid localId collisions
                     Log.i(TAG, "Importing from different device (${backupFile.deviceId} → $currentDeviceId): remotePhotos only")
-                    DbHolder.database.remotePhotoDao().insertAll(
+                    DbHolder.database.remotePhotoDao().insertAllIfNotExists(
                         *backupFile.remotePhotos.toTypedArray()
                     )
                 }
@@ -205,12 +205,12 @@ object BackupHelper {
                 Log.i(TAG, "Database backup downloaded: ${backupFile.photos.size} photos, ${backupFile.remotePhotos.size} remote photos (from device: ${backupFile.deviceId})")
 
                 if (isSameDevice) {
-                    Log.i(TAG, "Same device import — full merge")
-                    DbHolder.database.photoDao().updatePhotos(*backupFile.photos.toTypedArray())
-                    DbHolder.database.remotePhotoDao().insertAll(*backupFile.remotePhotos.toTypedArray())
+                    Log.i(TAG, "Importing from same device (${backupFile.deviceId}): full import")
+                    DbHolder.database.photoDao().insertPhotos(*backupFile.photos.toTypedArray())
+                    DbHolder.database.remotePhotoDao().insertAllIfNotExists(*backupFile.remotePhotos.toTypedArray())
                 } else {
-                    Log.i(TAG, "Cross-device import — remotePhotos only (skipping ${backupFile.photos.size} local photos)")
-                    DbHolder.database.remotePhotoDao().insertAll(*backupFile.remotePhotos.toTypedArray())
+                    Log.i(TAG, "Importing from different device (${backupFile.deviceId} → $currentDeviceId): remotePhotos only")
+                    DbHolder.database.remotePhotoDao().insertAllIfNotExists(*backupFile.remotePhotos.toTypedArray())
                 }
 
                 Log.i(TAG, "✅ Database imported successfully")

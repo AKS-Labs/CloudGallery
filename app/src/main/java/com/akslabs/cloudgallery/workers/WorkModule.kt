@@ -24,6 +24,14 @@ object WorkModule {
         manager = WorkManager.getInstance(applicationContext)
     }
 
+    // Registry mapping work UUID → photo URI for thumbnail resolution
+    object WorkPhotoRegistry {
+        private val map = mutableMapOf<String, String>()
+        fun register(workId: String, photoUri: String) { map[workId] = photoUri }
+        fun resolve(workId: String): String? = map[workId]
+        fun remove(workId: String) { map.remove(workId) }
+    }
+
     object PeriodicBackup {
 
         private fun getConstraints(): Constraints {
@@ -161,11 +169,13 @@ object WorkModule {
                 .build()
 
         fun enqueue() {
+            val workId = instantUploadRequest.id.toString()
             manager.enqueueUniqueWork(
                 "$UPLOADING_ID:${uri.lastPathSegment}",
                 ExistingWorkPolicy.KEEP,
                 instantUploadRequest
             )
+            WorkPhotoRegistry.register(workId, uri.toString())
         }
 
         fun cancel() {
