@@ -1,5 +1,6 @@
 package com.akslabs.cloudgallery.ui.main.screens.settings
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -43,6 +44,7 @@ import com.akslabs.cloudgallery.utils.Constants
 import com.akslabs.cloudgallery.utils.MetadataConfig
 import com.akslabs.cloudgallery.utils.toastFromMainThread
 import com.akslabs.cloudgallery.workers.WorkModule
+import com.akslabs.cloudgallery.data.mediastore.AlbumInfo
 import com.akslabs.cloudgallery.ui.components.DonateBottomSheet
 import com.akslabs.cloudgallery.ui.components.MoreAppsBottomSheet
 import kotlinx.coroutines.Dispatchers
@@ -692,6 +694,30 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                 }
             }
 
+            // EXCLUDE FOLDERS SECTION
+            Spacer(modifier = Modifier.height(16.dp))
+            SettingsSection(title = "Exclude Folders")
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
+                var showExcludedDialog by remember { mutableStateOf(false) }
+                val excludedCount = remember { Preferences.getExcludedBucketNames().size }
+                SettingsItem(
+                    icon = Icons.Rounded.FolderOff,
+                    title = "Exclude Folders",
+                    subtitle = if (excludedCount > 0) "$excludedCount folder${if (excludedCount != 1) "s" else ""} excluded · Tap to manage"
+                              else "Choose folders to exclude from auto-sync",
+                    onClick = { showExcludedDialog = true }
+                )
+                if (showExcludedDialog) {
+                    ManageExcludedFoldersDialog(
+                        onDismiss = { showExcludedDialog = false }
+                    )
+                }
+            }
+
             // CLOUD ACTIONS SECTION
             Spacer(modifier = Modifier.height(16.dp))
             SettingsSection(title = "Cloud Actions")
@@ -1004,6 +1030,178 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
             }
         }
     }
+}
+
+/**
+ * Dialog to manage which folders are excluded from auto-sync.
+ * Loads all albums (folders) from MediaStore and lets the user toggle them on/off.
+ */
+@Composable
+private fun ManageExcludedFoldersDialog(
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var albums by remember { mutableStateOf<List<AlbumInfo>>(emptyList()) }
+    var excludedNames by remember { mutableStateOf(Preferences.getExcludedBucketNames()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                albums = loadAlbumsFromMediaStore(context)
+                isLoading = false
+            } catch (e: Exception) {
+                loadError = true
+                isLoading = false
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.FolderOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Exclude Folders",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Toggle folders to exclude them from auto periodic sync. Photos in excluded folders will not be uploaded automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        text = {
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(150.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                loadError -> {
+                    Text("Could not load albums. Make sure storage permission is granted.")
+                }
+                albums.isEmpty() -> {
+                    Text("No albums found on this device.")
+                }
+                else -> {
+                    val sortedAlbums = remember(albums, excludedNames) {
+                        albums.sortedByDescending { it.label in excludedNames }
+                    }
+                    Column(
+                        modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())
+                    ) {
+                        sortedAlbums.forEach { album ->
+                            val isExcluded = album.label in excludedNames
+                            Surface(
+                                onClick = {
+                                    excludedNames = if (isExcluded) excludedNames - album.label
+                                                    else excludedNames + album.label
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isExcluded) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                                        else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = isExcluded,
+                                        onCheckedChange = { checked ->
+                                            excludedNames = if (checked) excludedNames + album.label
+                                                            else excludedNames - album.label
+                                        },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = MaterialTheme.colorScheme.error,
+                                            uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Icon(
+                                        imageVector = Icons.Rounded.Folder,
+                                        contentDescription = null,
+                                        tint = if (isExcluded) MaterialTheme.colorScheme.error
+                                               else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = album.label,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = if (isExcluded) MaterialTheme.colorScheme.error
+                                                else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    Preferences.setExcludedBucketNames(excludedNames)
+                    onDismiss()
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+/**
+ * Queries MediaStore for all distinct album buckets on the device.
+ */
+private fun loadAlbumsFromMediaStore(context: Context): List<AlbumInfo> {
+    val contentResolver = context.contentResolver
+    val uri = android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL)
+    val projection = arrayOf(
+        android.provider.MediaStore.Images.ImageColumns.BUCKET_ID,
+        android.provider.MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME
+    )
+    val sortOrder = "${android.provider.MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME} ASC"
+    val albums = mutableListOf<AlbumInfo>()
+    contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
+        val bucketIdIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.BUCKET_ID)
+        val bucketNameIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME)
+        val seenIds = mutableSetOf<Long>()
+        while (cursor.moveToNext()) {
+            val id = cursor.getLong(bucketIdIdx)
+            if (id !in seenIds) {
+                seenIds.add(id)
+                val name = cursor.getString(bucketNameIdx) ?: "Unknown"
+                albums.add(AlbumInfo(id = id, label = name, count = 0, coverUri = ""))
+            }
+        }
+    }
+    return albums
 }
 
 @Composable

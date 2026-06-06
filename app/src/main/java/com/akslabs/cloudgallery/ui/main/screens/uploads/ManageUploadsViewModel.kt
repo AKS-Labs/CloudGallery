@@ -9,15 +9,18 @@ import androidx.work.WorkManager
 import com.akslabs.cloudgallery.data.localdb.DbHolder
 import com.akslabs.cloudgallery.data.localdb.Preferences
 import com.akslabs.cloudgallery.data.localdb.entities.Photo
+import com.akslabs.cloudgallery.utils.getBucketNamesForIds
 import com.akslabs.cloudgallery.workers.InstantPhotoUploadWorker
 import com.akslabs.cloudgallery.workers.PeriodicPhotoBackupWorker
 import com.akslabs.cloudgallery.workers.WorkModule
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -157,9 +160,24 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    // Queued Photos (from DB — not yet uploaded)
+    // Queued Photos (from DB — not yet uploaded, excluding excluded folders)
     val queuedPhotos: StateFlow<List<Photo>> = DbHolder.database.photoDao().getAllNotUploadedFlow()
+        .map { photos -> filterExcludedBucketPhotos(photos) }
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private suspend fun filterExcludedBucketPhotos(photos: List<Photo>): List<Photo> {
+        val excludedNames = Preferences.getExcludedBucketNames()
+        if (excludedNames.isEmpty() || photos.isEmpty()) return photos
+        val contentResolver = getApplication<Application>().contentResolver
+        val ids = photos.mapNotNull { it.pathUri.substringAfterLast("/").toLongOrNull() }
+        val bucketNameMap = getBucketNamesForIds(contentResolver, ids)
+        return photos.filter { photo ->
+            val photoId = photo.pathUri.substringAfterLast("/")
+            val bucketName = bucketNameMap[photoId]
+            bucketName !in excludedNames
+        }
+    }
 
     // Raw active work (before thumbnail enrichment)
     private val rawWorkFlow = combine(

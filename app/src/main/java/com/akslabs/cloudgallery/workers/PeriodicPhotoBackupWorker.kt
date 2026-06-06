@@ -19,6 +19,7 @@ import com.akslabs.cloudgallery.utils.ContentHasher
 import com.akslabs.cloudgallery.utils.generatePreview
 import com.akslabs.cloudgallery.utils.getExtFromMimeType
 import com.akslabs.cloudgallery.utils.getFileName
+import com.akslabs.cloudgallery.utils.getBucketNamesForIds
 import com.akslabs.cloudgallery.utils.getMimeTypeFromUri
 import com.akslabs.cloudgallery.utils.isSyncImagePreviewEnabled
 import com.akslabs.cloudgallery.utils.sendFileApi
@@ -51,7 +52,19 @@ class PeriodicPhotoBackupWorker(
         val uploadQueueDao = DbHolder.database.uploadQueueDao()
 
         val allPending = photoDao.getAllPendingUpload()
-        val imageList = allPending.take(MAX_BATCH_SIZE)
+        val excludedBucketNames = Preferences.getExcludedBucketNames()
+        val pendingPhotos = if (excludedBucketNames.isEmpty()) {
+            allPending
+        } else {
+            val ids = allPending.mapNotNull { it.pathUri.substringAfterLast("/").toLongOrNull() }
+            val bucketNameMap = getBucketNamesForIds(appContext.contentResolver, ids)
+            allPending.filter { photo ->
+                val photoId = photo.pathUri.substringAfterLast("/")
+                val bucketName = bucketNameMap[photoId]
+                bucketName !in excludedBucketNames
+            }
+        }
+        val imageList = pendingPhotos.take(MAX_BATCH_SIZE)
 
         return withContext(Dispatchers.IO) {
             try {
