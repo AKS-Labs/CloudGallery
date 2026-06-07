@@ -465,3 +465,35 @@ fun getBucketNamesForIds(contentResolver: android.content.ContentResolver, ids: 
     }
     return result
 }
+
+/**
+ * Batch-resolves DATE_ADDED (epoch seconds) for multiple MediaStore image IDs.
+ * Returns a map of ID string -> dateAdded in milliseconds.
+ */
+fun getDateAddedForIds(contentResolver: android.content.ContentResolver, ids: List<Long>): Map<String, Long> {
+    if (ids.isEmpty()) return emptyMap()
+    val uri = android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL)
+    val projection = arrayOf(
+        android.provider.MediaStore.Images.ImageColumns._ID,
+        android.provider.MediaStore.Images.ImageColumns.DATE_ADDED
+    )
+    val placeholders = ids.joinToString(",") { "?" }
+    val selection = "${android.provider.MediaStore.Images.ImageColumns._ID} IN ($placeholders)"
+    val selectionArgs = ids.map { it.toString() }.toTypedArray()
+    val result = mutableMapOf<String, Long>()
+    try {
+        contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
+            val idIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns._ID)
+            val dateIdx = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.ImageColumns.DATE_ADDED)
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idIdx).toString()
+                val dateAddedSecs = cursor.getLong(dateIdx)
+                // DATE_ADDED is in seconds, convert to millis
+                result[id] = dateAddedSecs * 1000L
+            }
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to batch resolve dateAdded for ${ids.size} IDs", e)
+    }
+    return result
+}

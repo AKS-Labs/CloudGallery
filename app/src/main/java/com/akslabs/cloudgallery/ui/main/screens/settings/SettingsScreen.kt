@@ -458,22 +458,28 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                 color = MaterialTheme.colorScheme.surfaceContainerLow
             ) {
                 Column {
+                    var showSyncModeChoiceDialog by remember { mutableStateOf(false) }
+                    var currentSyncMode by remember {
+                        mutableStateOf(
+                            run {
+                                val current = Preferences.getSyncMode()
+                                if (current == Preferences.SYNC_MODE_NEW_ONLY) "Only new photos" else "All photos"
+                            }
+                        )
+                    }
                     SettingsSwitchItem(
                         icon = Icons.Rounded.CloudSync,
                         title = stringResource(R.string.auto_periodic_backup),
                         subtitle = "Automatically backup photos to Telegram",
                         isChecked = isAutoPhotoBackupEnabled,
                         onCheckedChange = { enabled ->
-                            isAutoPhotoBackupEnabled = enabled
-                            Preferences.edit {
-                                putBoolean(Preferences.isAutoBackupEnabledKey, enabled)
-                            }
                             if (enabled) {
-                                WorkModule.PeriodicBackup.enqueue()
-                                scope.launch {
-                                    context.toastFromMainThread("Periodic backup enabled")
-                                }
+                                showSyncModeChoiceDialog = true
                             } else {
+                                isAutoPhotoBackupEnabled = false
+                                Preferences.edit {
+                                    putBoolean(Preferences.isAutoBackupEnabledKey, false)
+                                }
                                 try {
                                     val workManager = WorkManager.getInstance(context)
                                     workManager.cancelAllWorkByTag("manual_backup")
@@ -488,6 +494,130 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                             }
                         }
                     )
+
+                    if (showSyncModeChoiceDialog) {
+                        AlertDialog(
+                            onDismissRequest = {
+                                showSyncModeChoiceDialog = false
+                            },
+                            title = {
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Sync,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = "Sync Scope",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Choose what to sync before enabling periodic backup.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Surface(
+                                        onClick = {
+                                            Preferences.setSyncMode(Preferences.SYNC_MODE_ALL)
+                                            Preferences.setSyncNewOnlyTimestamp(0L)
+                                            currentSyncMode = "All photos"
+                                            isAutoPhotoBackupEnabled = true
+                                            Preferences.edit { putBoolean(Preferences.isAutoBackupEnabledKey, true) }
+                                            WorkModule.PeriodicBackup.enqueue()
+                                            showSyncModeChoiceDialog = false
+                                            scope.launch { context.toastFromMainThread("Periodic backup enabled") }
+                                        },
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.CloudSync,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(28.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(14.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "Sync All Photos",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                                Text(
+                                                    text = "Upload existing photos and new ones going forward",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Surface(
+                                        onClick = {
+                                            Preferences.setSyncMode(Preferences.SYNC_MODE_NEW_ONLY)
+                                            Preferences.setSyncNewOnlyTimestamp(System.currentTimeMillis())
+                                            currentSyncMode = "Only new photos"
+                                            isAutoPhotoBackupEnabled = true
+                                            Preferences.edit { putBoolean(Preferences.isAutoBackupEnabledKey, true) }
+                                            WorkModule.PeriodicBackup.enqueue()
+                                            showSyncModeChoiceDialog = false
+                                            scope.launch { context.toastFromMainThread("Periodic backup enabled — new photos only") }
+                                        },
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.History,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                modifier = Modifier.size(28.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(14.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "Sync Only New Photos",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                                )
+                                                Text(
+                                                    text = "Skip existing photos, only upload photos added from now on",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {},
+                            dismissButton = {
+                                TextButton(onClick = { showSyncModeChoiceDialog = false }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
+                    }
 
                     var currentInterval by remember {
                         mutableStateOf(
@@ -557,6 +687,37 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                             ).find { it.second == value }?.first ?: "All networks"
                             currentNetwork = selectedLabel
                             WorkModule.PeriodicBackup.enqueue(forceUpdate = true)
+                        }
+                    )
+
+                    SettingsDialogItem(
+                        icon = Icons.Rounded.Sync,
+                        title = "Sync Scope",
+                        subtitle = if (currentSyncMode == "Only new photos") "Only sync photos added from now on"
+                                   else "Sync all existing and new photos",
+                        currentValue = currentSyncMode,
+                        options = listOf(
+                            "All photos" to Preferences.SYNC_MODE_ALL,
+                            "Only new photos" to Preferences.SYNC_MODE_NEW_ONLY
+                        ),
+                        enabled = isAutoPhotoBackupEnabled,
+                        onValueChange = { value ->
+                            if (value == Preferences.SYNC_MODE_NEW_ONLY) {
+                                val now = System.currentTimeMillis()
+                                Preferences.setSyncNewOnlyTimestamp(now)
+                                Preferences.setSyncMode(Preferences.SYNC_MODE_NEW_ONLY)
+                                currentSyncMode = "Only new photos"
+                                scope.launch {
+                                    context.toastFromMainThread("Will only sync photos added from now on")
+                                }
+                            } else {
+                                Preferences.setSyncMode(Preferences.SYNC_MODE_ALL)
+                                Preferences.setSyncNewOnlyTimestamp(0L)
+                                currentSyncMode = "All photos"
+                                scope.launch {
+                                    context.toastFromMainThread("Will sync all existing and new photos")
+                                }
+                            }
                         }
                     )
 

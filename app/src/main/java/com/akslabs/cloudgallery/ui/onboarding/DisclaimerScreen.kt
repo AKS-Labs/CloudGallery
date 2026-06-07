@@ -150,7 +150,7 @@ fun DisclaimerScreen(
                 icon = Icons.Rounded.Security,
                 title = "Privacy & Data Handling",
                 content = """
-                    • Your images are synced directly to YOUR Telegram bot
+                    • Your images are synced directly to YOUR Telegram bot as-is
                     • We do NOT store, access, or transmit your data to any servers
                     • All data remains under YOUR complete control
                     • Zero analytics, tracking, or third-party data sharing

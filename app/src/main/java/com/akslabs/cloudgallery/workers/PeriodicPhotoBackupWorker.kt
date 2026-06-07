@@ -20,6 +20,7 @@ import com.akslabs.cloudgallery.utils.generatePreview
 import com.akslabs.cloudgallery.utils.getExtFromMimeType
 import com.akslabs.cloudgallery.utils.getFileName
 import com.akslabs.cloudgallery.utils.getBucketNamesForIds
+import com.akslabs.cloudgallery.utils.getDateAddedForIds
 import com.akslabs.cloudgallery.utils.getMimeTypeFromUri
 import com.akslabs.cloudgallery.utils.isSyncImagePreviewEnabled
 import com.akslabs.cloudgallery.utils.sendFileApi
@@ -53,15 +54,35 @@ class PeriodicPhotoBackupWorker(
 
         val allPending = photoDao.getAllPendingUpload()
         val excludedBucketNames = Preferences.getExcludedBucketNames()
-        val pendingPhotos = if (excludedBucketNames.isEmpty()) {
-            allPending
-        } else {
-            val ids = allPending.mapNotNull { it.pathUri.substringAfterLast("/").toLongOrNull() }
-            val bucketNameMap = getBucketNamesForIds(appContext.contentResolver, ids)
-            allPending.filter { photo ->
-                val photoId = photo.pathUri.substringAfterLast("/")
-                val bucketName = bucketNameMap[photoId]
-                bucketName !in excludedBucketNames
+        val syncMode = Preferences.getSyncMode()
+        val newOnlyTimestamp = Preferences.getSyncNewOnlyTimestamp()
+        val pendingPhotos = when {
+            excludedBucketNames.isEmpty() && syncMode != Preferences.SYNC_MODE_NEW_ONLY -> allPending
+            else -> {
+                val ids = allPending.mapNotNull { it.pathUri.substringAfterLast("/").toLongOrNull() }
+                var filtered = allPending
+
+                // Filter by excluded folders
+                if (excludedBucketNames.isNotEmpty()) {
+                    val bucketNameMap = getBucketNamesForIds(appContext.contentResolver, ids)
+                    filtered = filtered.filter { photo ->
+                        val photoId = photo.pathUri.substringAfterLast("/")
+                        val bucketName = bucketNameMap[photoId]
+                        bucketName !in excludedBucketNames
+                    }
+                }
+
+                // Filter by sync-new-only timestamp
+                if (syncMode == Preferences.SYNC_MODE_NEW_ONLY && newOnlyTimestamp > 0L) {
+                    val dateAddedMap = getDateAddedForIds(appContext.contentResolver, ids)
+                    filtered = filtered.filter { photo ->
+                        val photoId = photo.pathUri.substringAfterLast("/")
+                        val dateAdded = dateAddedMap[photoId] ?: 0L
+                        dateAdded >= newOnlyTimestamp
+                    }
+                }
+
+                filtered
             }
         }
         val imageList = pendingPhotos.take(MAX_BATCH_SIZE)

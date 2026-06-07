@@ -60,6 +60,10 @@ object Preferences {
     const val syncImagePreviewKey: String = "syncImagePreview"
     const val syncImagePreviewSizeKey: String = "syncImagePreviewSize"
     const val excludedBucketNamesKey: String = "excludedBucketNames"
+    const val syncModeKey: String = "syncMode"
+    const val syncNewOnlyTimestampKey: String = "syncNewOnlyTimestamp"
+    const val SYNC_MODE_ALL: String = "all"
+    const val SYNC_MODE_NEW_ONLY: String = "newOnly"
 
     private const val prefFile: String = "preferences"
     private const val encryptedPrefFile: String = "encryptedPreferences"
@@ -139,6 +143,18 @@ object Preferences {
 
     fun setExcludedBucketNames(names: Set<String>) {
         edit { putStringSet(excludedBucketNamesKey, names) }
+    }
+
+    fun getSyncMode(): String = getString(syncModeKey, SYNC_MODE_ALL)
+
+    fun setSyncMode(mode: String) {
+        edit { putString(syncModeKey, mode) }
+    }
+
+    fun getSyncNewOnlyTimestamp(): Long = getLong(syncNewOnlyTimestampKey, 0L)
+
+    fun setSyncNewOnlyTimestamp(timestamp: Long) {
+        edit { putLong(syncNewOnlyTimestampKey, timestamp) }
     }
 
     fun getStringFlow(key: String, defValue: String): StateFlow<String> {
