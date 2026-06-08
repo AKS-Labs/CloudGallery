@@ -247,7 +247,7 @@ fun GettingStartedScreen(
                 description = "Set up a private group for your Images",
                 details = listOf(
                     "Create a new private group in Official Telegram",
-                    "Add your bot to the group as an admin",
+                    "Add your bot to the group as an admin and enable Topics",
                     "Send /start in the group",
                     "Be patient it can take some time to show chat id",
                     "It'll only work when Bot himself sends you chat ID in your Group",
@@ -331,9 +331,9 @@ fun GettingStartedScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "• Make sure your bot is added to the group as an admin\n" +
+                        text =  "• Make sure your bot is added to the group as an admin\n" +
                                 "• The chat ID should include the minus sign if negative\n" +
-                                "• Your bot token should be kept private and secure\n" +
+                                "• Use the @Myidbot to get the chat ID if not received\n" +
                                 "• If validation fails, double-check your bot setup",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,

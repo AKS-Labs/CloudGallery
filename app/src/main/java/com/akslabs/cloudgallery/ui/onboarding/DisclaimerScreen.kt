@@ -209,7 +209,7 @@ fun DisclaimerScreen(
                     • You need to create a private group/channel for images storage
                     • Your bot token is like a password - keep it secure
                     • Only you have access to your bot and synced messages
-                    • The bot operates independently of any servers
+                    • The app operates independently of any servers
                 """.trimIndent(),
                 containerColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer

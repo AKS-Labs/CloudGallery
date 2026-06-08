@@ -931,7 +931,7 @@ fun SettingsScreen(modifier: Modifier = Modifier.clip(RoundedCornerShape(32.dp))
                     SettingsItem(
                         icon = Icons.Rounded.CloudSync,
                         title = "Sync Cloud Photos",
-                        subtitle = "Scan Telegram channel for new photos",
+                        subtitle = "Sync images which are uploaded via Telegram",
                         onClick = {
                             scope.launch {
                                 context.toastFromMainThread("Syncing...")
