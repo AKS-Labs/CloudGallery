@@ -41,6 +41,7 @@ data class UploadUiItem(
     val totalItems: Int = 1,
     val isCancellable: Boolean = true,
     val localPhotoId: String? = null,
+    val localId: String? = null,
     val speed: String? = null,
     val eta: String? = null,
     val timestamp: Long = System.currentTimeMillis()
@@ -70,8 +71,10 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     // Dismissed work IDs (failed/cancelled items dismissed by user) — runtime only
     private val _dismissedWorkIds = MutableStateFlow<Set<String>>(emptySet())
 
+    // Retrying work IDs — items currently being retried (shown as Queued instantly)
+    private val _retryingIds = MutableStateFlow<Set<String>>(emptySet())
+
     init {
-        // Auto-clear history older than 24 hours on startup
         viewModelScope.launch {
             val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
             DbHolder.database.remotePhotoDao().deleteOlderThan(oneDayAgo)
@@ -161,6 +164,12 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    private val remoteToLocalIdMapFlow: StateFlow<Map<String, String>> = DbHolder.database.photoDao().getAllFlow()
+        .map { photos ->
+            photos.filter { it.remoteId != null }.associate { it.remoteId!! to it.localId }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     // Queued Photos (from DB — not yet uploaded, excluding excluded folders)
     val queuedPhotos: StateFlow<List<Photo>> = DbHolder.database.photoDao().getAllNotUploadedFlow()
         .map { photos -> filterExcludedBucketPhotos(photos) }
@@ -217,8 +226,10 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
     }
 
     // Combined active work with local thumbnails resolved
-    private val allWorkFlow: Flow<List<UploadUiItem>> = rawWorkFlow.combine(queuedPhotos) { workItems, nonUploadedPhotos ->
+    private val allWorkFlow: Flow<List<UploadUiItem>> = combine(rawWorkFlow, queuedPhotos, _retryingIds) { workItems, nonUploadedPhotos, retryingIds ->
         workItems.map { item ->
+            if (item.id in retryingIds) item.copy(status = UploadStatus.Queued, progressText = "Retrying...") else item
+        }.map { item ->
             if (item.thumbnailUri == null && item.localPhotoId == null && item.fileName != null) {
                 val matchingPath = nonUploadedPhotos.firstOrNull { p ->
                     p.pathUri.contains(item.fileName, ignoreCase = true)
@@ -233,11 +244,12 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         allWorkFlow, 
         remotePhotosFlow,
         remoteToLocalPathMapFlow,
+        remoteToLocalIdMapFlow,
         _dismissedIds
-    ) { workItems, dbItems, localMap, dismissed ->
+    ) { workItems, dbItems, localMap, localIdMap, dismissed ->
         val dbUploads = dbItems
             .filter { it.remoteId !in dismissed }
-            .map { mapRemotePhotoToUiItem(it, localMap) }
+            .map { mapRemotePhotoToUiItem(it, localMap, localIdMap) }
         val dbFileNames = dbItems.mapNotNull { it.fileName }.toSet()
 
         // Deduplicate: Keep work items only if they are not yet in the DB
@@ -264,13 +276,14 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         allWorkFlow, 
         remotePhotosFlow,
         remoteToLocalPathMapFlow,
+        remoteToLocalIdMapFlow,
         _dismissedIds
-    ) { workItems, dbItems, localMap, dismissed ->
+    ) { workItems, dbItems, localMap, localIdMap, dismissed ->
         val manualWork = workItems.filter { it.type == UploadType.Selective || it.type == UploadType.Instant }
         val manualDb = dbItems
             .filter { it.uploadType == "manual_backup" || it.uploadType == "instant" }
             .filter { it.remoteId !in dismissed }
-            .map { mapRemotePhotoToUiItem(it, localMap) }
+            .map { mapRemotePhotoToUiItem(it, localMap, localIdMap) }
         
         val dbFileNames = manualDb.mapNotNull { it.fileName }.toSet()
         val filteredWork = manualWork.filter { 
@@ -299,11 +312,12 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
         allWorkFlow,
         remotePhotosFlow,
         remoteToLocalPathMapFlow,
+        remoteToLocalIdMapFlow,
         _dismissedIds
-    ) { workItems, dbItems, localMap, dismissed ->
+    ) { workItems, dbItems, localMap, localIdMap, dismissed ->
         val dbUploads = dbItems
             .filter { it.remoteId !in dismissed }
-            .map { mapRemotePhotoToUiItem(it, localMap) }
+            .map { mapRemotePhotoToUiItem(it, localMap, localIdMap) }
         val dbFileNames = dbItems.mapNotNull { it.fileName }.toSet()
         
         // Include work items that are completed but not yet in DB
@@ -316,9 +330,11 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
  
     private fun mapRemotePhotoToUiItem(
         remote: com.akslabs.cloudgallery.data.localdb.entities.RemotePhoto,
-        localMap: Map<String, String>
+        localPathMap: Map<String, String>,
+        localIdMap: Map<String, String> = emptyMap()
     ): UploadUiItem {
-        val localPath = localMap[remote.remoteId]
+        val localPath = localPathMap[remote.remoteId]
+        val matchedLocalId = localIdMap[remote.remoteId]
         val remoteThumb = if (localPath == null) {
             com.akslabs.cloudgallery.utils.coil.FileIdData(remote.previewRemoteId ?: remote.remoteId)
         } else null
@@ -337,6 +353,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             fileName = remote.fileName ?: "Uploaded Photo",
             isCancellable = false,
             localPhotoId = localPath,
+            localId = matchedLocalId,
             timestamp = remote.uploadedAt
         )
     }
@@ -511,23 +528,20 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
 
     fun retryAllFailed() {
         val failed = allUploads.value.filter { it.status == UploadStatus.Failed }
-        // Dismiss all failed items so they disappear from the list
-        _dismissedWorkIds.value = _dismissedWorkIds.value + failed.map { it.id }.toSet()
-        // Retry logic:
-        // 1. Enqueue periodic backup if any manual/auto backup failed
+        val failedIds = failed.map { it.id }.toSet()
+        // Mark as retrying immediately so UI shows "Retrying..." without dismissing
+        _retryingIds.value = _retryingIds.value + failedIds
+        // Enqueue periodic backup if any manual/auto backup failed
         if (failed.any { it.type == UploadType.Selective || it.type == UploadType.Background }) {
             WorkModule.PeriodicBackup.enqueue()
         }
-        // 2. Retry instant uploads (WorkManager retry logic handles this, but if cancelled we might need to re-enqueue. 
-        // Simple retry for now is relying on WorkManager's auto-retry or re-enqueuing if we had the URI, 
-        // but re-enqueuing requires keeping track of URIs which we don't fully do here yet apart from observing.
-        // For now, retryAll primarily triggers the main backup worker which picks up queued items.
     }
 
     fun retryUpload(id: String) {
         viewModelScope.launch {
-            // Dismiss the old work ID so it disappears from lists immediately
-            _dismissedWorkIds.value = _dismissedWorkIds.value + id
+            // Mark as retrying immediately — shows "Retrying..." in UI
+            _retryingIds.value = _retryingIds.value + id
+            _dismissedWorkIds.value = _dismissedWorkIds.value - id
 
             val item = allUploads.value.find { it.id == id }
             if (item != null) {
@@ -546,7 +560,7 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
                         val uri = android.net.Uri.parse(uriStr)
                         WorkModule.InstantUpload(uri, type = "manual_backup").enqueue()
                     } catch (e: Exception) {
-                        // couldn't retry — just dismissed
+                        // couldn't retry
                     }
                 }
             }
@@ -564,6 +578,30 @@ class ManageUploadsViewModel(application: Application) : AndroidViewModel(applic
             // as WorkInfo streams are continuous.
             delay(800)
             _isRefreshing.value = false
+        }
+    }
+
+    // Second init block — runs after all property initializers (including rawWorkFlow)
+    init {
+        viewModelScope.launch {
+            rawWorkFlow.collect { workItems ->
+                val currentRetrying = _retryingIds.value
+                if (currentRetrying.isEmpty()) return@collect
+                val toClear = currentRetrying.filter { retryId ->
+                    val retryItem = workItems.find { it.id == retryId } ?: return@filter false
+                    val fileName = retryItem.fileName ?: return@filter false
+                    workItems.any { item ->
+                        item.id != retryId &&
+                        item.fileName == fileName &&
+                        item.id !in currentRetrying &&
+                        item.status != UploadStatus.Failed
+                    }
+                }
+                if (toClear.isNotEmpty()) {
+                    _retryingIds.value = currentRetrying - toClear.toSet()
+                    _dismissedWorkIds.value = _dismissedWorkIds.value + toClear.toSet()
+                }
+            }
         }
     }
 }

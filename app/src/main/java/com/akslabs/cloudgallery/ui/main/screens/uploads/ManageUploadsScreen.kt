@@ -881,7 +881,12 @@ private fun UploadListContent(
                                 if (selectedIds.isNotEmpty()) {
                                     onToggleSelection(item.id)
                                 } else {
-                                    navigateToPhotoFromUri(navController, item.localPhotoId ?: item.thumbnailUri)
+                                    val localId = item.localId
+                                    if (localId != null) {
+                                        navController.navigate("photo_viewer/$localId/false")
+                                    } else {
+                                        navigateToPhotoFromUri(navController, item.localPhotoId ?: item.thumbnailUri)
+                                    }
                                 }
                             },
                             modifier = Modifier.animateItem()
@@ -899,7 +904,12 @@ private fun UploadListContent(
                                 if (selectedIds.isNotEmpty()) {
                                     onToggleSelection(item.id)
                                 } else {
-                                    navigateToPhotoFromUri(navController, item.localPhotoId ?: item.thumbnailUri)
+                                    val localId = item.localId
+                                    if (localId != null) {
+                                        navController.navigate("photo_viewer/$localId/false")
+                                    } else {
+                                        navigateToPhotoFromUri(navController, item.localPhotoId ?: item.thumbnailUri)
+                                    }
                                 }
                             },
                             modifier = Modifier.animateItem()
