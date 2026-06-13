@@ -206,10 +206,10 @@ fun MoreAppsBottomSheet(
                 ) {
                     AppItemWithDrawable(
                         iconRes = R.drawable.logo,
-                        title = "Pixel Screenshots",
+                        title = "Screenshots",
                         subtitle = "Screenshot Manager: Organize Screenshots via drag-and-drop instantly.",
 //                        isFoss = true,
-                        onClick = { onAppSelected("https://play.google.com/store/apps/details?id=com.akslabs.pixelscreenshots") }
+                        onClick = { onAppSelected("https://play.google.com/store/apps/details?id=com.akslabs.screenshots") }
                     )
 
                     AppItemWithDrawable(

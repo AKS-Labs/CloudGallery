@@ -19,6 +19,8 @@ import com.akslabs.cloudgallery.utils.isSyncImagePreviewEnabled
 import com.akslabs.cloudgallery.utils.sendFileViaUri
 import com.akslabs.cloudgallery.utils.uploadPreviewFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class InstantPhotoUploadWorker(
@@ -37,164 +39,162 @@ class InstantPhotoUploadWorker(
             return Result.failure()
         }
 
-        return withContext(Dispatchers.IO) {
-            try {
-                val deviceId = Preferences.getOrCreateDeviceId()
-                val photoDao = DbHolder.database.photoDao()
-                val remotePhotoDao = DbHolder.database.remotePhotoDao()
-                val uploadQueueDao = DbHolder.database.uploadQueueDao()
+        val uploadBlock: suspend () -> Result = {
+            withContext(Dispatchers.IO) {
+                try {
+                    val deviceId = Preferences.getOrCreateDeviceId()
+                    val photoDao = DbHolder.database.photoDao()
+                    val remotePhotoDao = DbHolder.database.remotePhotoDao()
+                    val uploadQueueDao = DbHolder.database.uploadQueueDao()
 
-                val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
-                val photoUri = photoUriString.toUri()
-                val fileName = com.akslabs.cloudgallery.utils.getFileName(appContext.contentResolver, photoUri)
-                val uploadType = params.inputData.getString(KEY_UPLOAD_TYPE) ?: "instant"
+                    val photoUriString = params.inputData.getString(KEY_PHOTO_URI)!!
+                    val photoUri = photoUriString.toUri()
+                    val fileName = com.akslabs.cloudgallery.utils.getFileName(appContext.contentResolver, photoUri)
+                    val uploadType = params.inputData.getString(KEY_UPLOAD_TYPE) ?: "instant"
 
-                // Find the photo in database by path URI
-                val photo = photoDao.getAll().find { it.pathUri == photoUriString }
+                    val photo = photoDao.getAll().find { it.pathUri == photoUriString }
 
-                if (photo != null) {
-                    // 1. Check if already uploaded
-                    if (photo.uploadStatus == "DONE" || photo.remoteId != null) {
-                        Log.d("PhotoUpload", "Skipping: already uploaded (${photo.localId})")
-                        return@withContext Result.success()
-                    }
-
-                    // 2. Check for active queue entry
-                    val activeEntry = uploadQueueDao.getActiveForPhoto(photo.localId)
-                    if (activeEntry != null) {
-                        Log.d("PhotoUpload", "Skipping: active queue entry (${photo.localId})")
-                        return@withContext Result.success()
-                    }
-
-                    // 3. Compute content hash
-                    val hash = photo.contentHash ?: ContentHasher.computeHash(appContext, photoUri)
-                    if (hash != null && photo.contentHash == null) {
-                        photoDao.updateContentHash(photo.localId, hash)
-                    }
-
-                    // 4. Content-based dedup
-                    if (hash != null) {
-                        val existing = remotePhotoDao.getByContentHash(hash)
-                        if (existing != null) {
-                            Log.d("PhotoUpload", "Dedup: content already in cloud (hash match)")
-                            photoDao.updateRemoteIdForLocalId(photo.localId, existing.remoteId)
-                            photoDao.updateUploadStatus(photo.localId, "DONE", System.currentTimeMillis())
+                    if (photo != null) {
+                        if (photo.uploadStatus == "DONE" || photo.remoteId != null) {
+                            Log.d("PhotoUpload", "Skipping: already uploaded (${photo.localId})")
                             return@withContext Result.success()
                         }
-                    }
 
-                    // 5. Create queue entry and mark uploading
-                    val queueId = uploadQueueDao.insert(UploadQueue(
-                        localId = photo.localId,
-                        pathUri = photo.pathUri,
-                        contentHash = hash,
-                        workerType = "instant",
-                        deviceId = deviceId
-                    ))
-                    photoDao.updateUploadStatus(photo.localId, "UPLOADING", System.currentTimeMillis())
-                    uploadQueueDao.markInProgress(queueId)
+                        val activeEntry = uploadQueueDao.getActiveForPhoto(photo.localId)
+                        if (activeEntry != null) {
+                            Log.d("PhotoUpload", "Skipping: active queue entry (${photo.localId})")
+                            return@withContext Result.success()
+                        }
 
-                    setProgress(
-                        workDataOf(
-                            "progress" to "started",
-                            KEY_PHOTO_URI to photoUriString,
-                            KEY_FILE_NAME to fileName,
-                            KEY_UPLOAD_TYPE to uploadType
+                        val hash = photo.contentHash ?: ContentHasher.computeHash(appContext, photoUri)
+                        if (hash != null && photo.contentHash == null) {
+                            photoDao.updateContentHash(photo.localId, hash)
+                        }
+
+                        if (hash != null) {
+                            val existing = remotePhotoDao.getByContentHash(hash)
+                            if (existing != null) {
+                                Log.d("PhotoUpload", "Dedup: content already in cloud (hash match)")
+                                photoDao.updateRemoteIdForLocalId(photo.localId, existing.remoteId)
+                                photoDao.updateUploadStatus(photo.localId, "DONE", System.currentTimeMillis())
+                                return@withContext Result.success()
+                            }
+                        }
+
+                        val queueId = uploadQueueDao.insert(UploadQueue(
+                            localId = photo.localId,
+                            pathUri = photo.pathUri,
+                            contentHash = hash,
+                            workerType = "instant",
+                            deviceId = deviceId
+                        ))
+                        photoDao.updateUploadStatus(photo.localId, "UPLOADING", System.currentTimeMillis())
+                        uploadQueueDao.markInProgress(queueId)
+
+                        setProgress(
+                            workDataOf(
+                                "progress" to "started",
+                                KEY_PHOTO_URI to photoUriString,
+                                KEY_FILE_NAME to fileName,
+                                KEY_UPLOAD_TYPE to uploadType
+                            )
                         )
-                    )
 
-                    // 6. Determine folder/topic for forum organization
-                    var messageThreadId: Long? = null
-                    var topicName: String? = null
-                    try {
-                        val bucketName = com.akslabs.cloudgallery.utils.getBucketName(appContext.contentResolver, photoUri)
-                        if (bucketName != null && bucketName.isNotBlank()) {
-                            topicName = bucketName
-                            messageThreadId = botApi.topicCache[bucketName]
-                            if (messageThreadId == null) {
-                                messageThreadId = remotePhotoDao.getTopicIdByName(bucketName)
-                                if (messageThreadId != null) {
-                                    botApi.topicCache[bucketName] = messageThreadId
-                                    Log.d("PhotoUpload", "Loaded topic '$bucketName' from DB: id=$messageThreadId")
-                                } else {
-                                    messageThreadId = botApi.createForumTopic(channelId, bucketName)
+                        var messageThreadId: Long? = null
+                        var topicName: String? = null
+                        try {
+                            val bucketName = com.akslabs.cloudgallery.utils.getBucketName(appContext.contentResolver, photoUri)
+                            if (bucketName != null && bucketName.isNotBlank()) {
+                                topicName = bucketName
+                                messageThreadId = botApi.topicCache[bucketName]
+                                if (messageThreadId == null) {
+                                    messageThreadId = remotePhotoDao.getTopicIdByName(bucketName)
                                     if (messageThreadId != null) {
                                         botApi.topicCache[bucketName] = messageThreadId
-                                        Log.d("PhotoUpload", "Created topic '$bucketName' with id=$messageThreadId")
+                                        Log.d("PhotoUpload", "Loaded topic '$bucketName' from DB: id=$messageThreadId")
+                                    } else {
+                                        messageThreadId = botApi.createForumTopic(channelId, bucketName)
+                                        if (messageThreadId != null) {
+                                            botApi.topicCache[bucketName] = messageThreadId
+                                            Log.d("PhotoUpload", "Created topic '$bucketName' with id=$messageThreadId")
+                                        }
                                     }
                                 }
                             }
+                        } catch (e: Exception) {
+                            Log.w("PhotoUpload", "Failed to create/get topic for ${photo.localId}, uploading to General", e)
                         }
-                    } catch (e: Exception) {
-                        Log.w("PhotoUpload", "Failed to create/get topic for ${photo.localId}, uploading to General", e)
-                    }
 
-                    // 7. Upload preview before original if enabled
-                    var previewId: String? = null
-                    var previewMessageId: Long? = null
-                    if (isSyncImagePreviewEnabled()) {
-                        try {
-                            val previewFile = generatePreview(appContext, photoUri)
-                            if (previewFile != null) {
-                                val result = uploadPreviewFile(botApi, channelId, previewFile, hash, messageThreadId, topicName)
-                                previewId = result.first
-                                previewMessageId = result.second
-                                if (previewId != null) {
-                                    photoDao.updatePreviewRemoteId(photo.localId, previewId)
-                                    Log.d("PhotoUpload", "Preview uploaded: $previewId for ${photo.localId}")
+                        var previewId: String? = null
+                        var previewMessageId: Long? = null
+                        if (isSyncImagePreviewEnabled()) {
+                            try {
+                                val previewFile = generatePreview(appContext, photoUri)
+                                if (previewFile != null) {
+                                    val result = uploadPreviewFile(botApi, channelId, previewFile, hash, messageThreadId, topicName)
+                                    previewId = result.first
+                                    previewMessageId = result.second
+                                    if (previewId != null) {
+                                        photoDao.updatePreviewRemoteId(photo.localId, previewId)
+                                        Log.d("PhotoUpload", "Preview uploaded: $previewId for ${photo.localId}")
+                                    }
+                                    previewFile.delete()
                                 }
-                                previewFile.delete()
+                            } catch (e: Throwable) {
+                                Log.e("PhotoUpload", "Preview upload failed for ${photo.localId}, continuing with original", e)
                             }
-                        } catch (e: Throwable) {
-                            Log.e("PhotoUpload", "Preview upload failed for ${photo.localId}, continuing with original", e)
                         }
-                    }
 
-                    // 8. Upload original with hash
-                    try {
-                        val topicLabel = if (topicName != null) " topic='$topicName'($messageThreadId)" else " (General)"
-                        Log.d("PhotoUpload", "Uploading ${photo.localId}$topicLabel")
+                        try {
+                            val topicLabel = if (topicName != null) " topic='$topicName'($messageThreadId)" else " (General)"
+                            Log.d("PhotoUpload", "Uploading ${photo.localId}$topicLabel")
 
-                        sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash, previewId, previewMessageId, messageThreadId, topicName)
-                        photoDao.updateUploadStatus(photo.localId, "DONE", System.currentTimeMillis())
-                        uploadQueueDao.markDone(queueId)
-                    } catch (e: Exception) {
-                        Log.e("PhotoUpload", "Upload failed for ${photo.localId}: ${e.message}" +
-                            if (topicName != null) " (topic='$topicName')" else "")
-                        photoDao.updateUploadStatus(photo.localId, "FAILED", System.currentTimeMillis())
-                        uploadQueueDao.markFailed(queueId, e.message)
-                        val updatedQueue = uploadQueueDao.getById(queueId)
-                        if (updatedQueue?.retryCount != null && updatedQueue.retryCount >= MAX_RETRIES) {
-                            Log.e("PhotoUpload", "Permanently cancelling ${photo.localId}: retries exhausted")
-                            uploadQueueDao.markCancelled(queueId)
-                            return@withContext Result.failure()
+                            sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash, previewId, previewMessageId, messageThreadId, topicName)
+                            photoDao.updateUploadStatus(photo.localId, "DONE", System.currentTimeMillis())
+                            uploadQueueDao.markDone(queueId)
+                        } catch (e: Exception) {
+                            Log.e("PhotoUpload", "Upload failed for ${photo.localId}: ${e.message}" +
+                                if (topicName != null) " (topic='$topicName')" else "")
+                            photoDao.updateUploadStatus(photo.localId, "FAILED", System.currentTimeMillis())
+                            uploadQueueDao.markFailed(queueId, e.message)
+                            val updatedQueue = uploadQueueDao.getById(queueId)
+                            if (updatedQueue?.retryCount != null && updatedQueue.retryCount >= MAX_RETRIES) {
+                                Log.e("PhotoUpload", "Permanently cancelling ${photo.localId}: retries exhausted")
+                                uploadQueueDao.markCancelled(queueId)
+                                return@withContext Result.failure()
+                            }
+                            throw e
                         }
-                        throw e
-                    }
-                } else {
-                    // Photo not in our database (e.g. direct share) — upload without dedup
-                    setProgress(
-                        workDataOf(
-                            "progress" to "started",
-                            KEY_PHOTO_URI to photoUriString,
-                            KEY_FILE_NAME to fileName,
-                            KEY_UPLOAD_TYPE to uploadType
+                    } else {
+                        setProgress(
+                            workDataOf(
+                                "progress" to "started",
+                                KEY_PHOTO_URI to photoUriString,
+                                KEY_FILE_NAME to fileName,
+                                KEY_UPLOAD_TYPE to uploadType
+                            )
                         )
-                    )
 
-                    val hash = ContentHasher.computeHash(appContext, photoUri)
-                    sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash)
+                        val hash = ContentHasher.computeHash(appContext, photoUri)
+                        sendFileViaUri(photoUri, appContext.contentResolver, channelId, botApi, appContext, uploadType, fileName, hash)
+                    }
+
+                    Result.success(workDataOf(
+                        KEY_PHOTO_URI to photoUriString,
+                        KEY_FILE_NAME to fileName,
+                        KEY_UPLOAD_TYPE to uploadType
+                    ))
+                } catch (e: Throwable) {
+                    Log.d("PhotoUpload", "FAILED, will retry: ${e.localizedMessage}")
+                    Result.retry()
                 }
-
-                Result.success(workDataOf(
-                    KEY_PHOTO_URI to photoUriString,
-                    KEY_FILE_NAME to fileName,
-                    KEY_UPLOAD_TYPE to uploadType
-                ))
-            } catch (e: Throwable) {
-                Log.d("PhotoUpload", "FAILED, will retry: ${e.localizedMessage}")
-                Result.retry()
             }
+        }
+
+        return if (isSyncImagePreviewEnabled()) {
+            uploadMutex.withLock { uploadBlock() }
+        } else {
+            uploadBlock()
         }
     }
 
@@ -207,6 +207,7 @@ class InstantPhotoUploadWorker(
     }
 
     companion object {
+        private val uploadMutex = Mutex()
         const val KEY_PHOTO_URI = "photoUri"
         const val KEY_FILE_NAME = "fileName"
         const val KEY_UPLOAD_TYPE = "upload_type"
